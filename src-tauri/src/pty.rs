@@ -79,21 +79,41 @@ pub fn pty_spawn(
     let mut reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
     let writer = pair.master.take_writer().map_err(|e| e.to_string())?;
 
-    // blocking reader thread -> emit output bytes (lossy UTF-8) to the webview
+    // blocking reader thread -> emit output to the webview.
+    // Accumulate bytes and only emit the longest VALID UTF-8 prefix, holding any
+    // trailing partial multibyte sequence for the next read. Raw 8 KiB reads can
+    // split a multibyte char (e.g. Thai = 3 bytes) across a boundary; decoding each
+    // chunk independently would corrupt it with replacement chars.
     let app2 = app.clone();
     let evt = output_event(&pane_id);
     let exit_evt = format!("pty://exit/{pane_id}");
     std::thread::spawn(move || {
+        let mut carry: Vec<u8> = Vec::new();
         let mut buf = [0u8; 8192];
         loop {
             match reader.read(&mut buf) {
-                Ok(0) => break,                  // EOF: claude exited
+                Ok(0) => break, // EOF: claude exited
                 Ok(n) => {
-                    let chunk = String::from_utf8_lossy(&buf[..n]).into_owned();
-                    let _ = app2.emit(&evt, chunk);
+                    carry.extend_from_slice(&buf[..n]);
+                    let valid_up_to = match std::str::from_utf8(&carry) {
+                        Ok(_) => carry.len(),
+                        Err(e) => e.valid_up_to(),
+                    };
+                    // If nothing is valid yet but we already have >=4 bytes, the first
+                    // byte is genuinely invalid (no UTF-8 char exceeds 4 bytes) — flush
+                    // it lossily so carry can't grow unbounded on a binary stream.
+                    let emit_to = if valid_up_to == 0 && carry.len() >= 4 { carry.len() } else { valid_up_to };
+                    if emit_to > 0 {
+                        let chunk = String::from_utf8_lossy(&carry[..emit_to]).into_owned();
+                        let _ = app2.emit(&evt, chunk);
+                        carry.drain(..emit_to);
+                    }
                 }
                 Err(_) => break,
             }
+        }
+        if !carry.is_empty() {
+            let _ = app2.emit(&evt, String::from_utf8_lossy(&carry).into_owned());
         }
         let _ = app2.emit(&exit_evt, ());
     });
