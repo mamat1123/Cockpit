@@ -47,3 +47,20 @@ rendered to feel satisfying. "Game-like" = aesthetic JUICE, not game mechanics (
 - "หลายจอ" = multiple physical monitors, or just panes/splits? (affects window management)
 - App name.
 - Motion-design language for the juice (a later design pass).
+
+---
+
+## Status — updated 2026-06-19
+
+**M1 (single-pane PTY foundation) — DONE & verified.**
+- Risk #1 (Rust ↔ webview IPC + portable-pty) — ✅ RETIRED. Proven by a working pane: a real
+  interactive login shell runs in xterm.js via portable-pty; `claude` launches and is usable;
+  input, resize, and exit all work; Thai output is not corrupted (UTF-8 carry-buffer fix).
+- Adjustment from plan: panes spawn the user's `$SHELL -il`, not `claude` directly (ADR 0006) —
+  fixes the GUI-PATH problem and makes the pane a true terminal.
+- 8 commits on `main`. Remaining M1 follow-ups deferred to later milestones: `pty_kill` +
+  pane lifecycle (so unmount stops the process; also re-enables StrictMode), dead-session
+  cleanup from the manager map, and per-pane auto-launch of `claude`.
+
+Next: **M2 — log-tail → working state** (the differentiator: per-pane working/idle/waiting + the
+start of cost). Risk #2 (log-tail → state) is the spike there.
