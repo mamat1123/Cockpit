@@ -68,9 +68,15 @@ pub fn pty_spawn(
         .openpty(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })
         .map_err(|e| e.to_string())?;
 
-    let mut cmd = CommandBuilder::new("claude");
+    // Spawn the user's interactive login shell, NOT `claude` directly. A GUI app's
+    // PATH doesn't include nvm/homebrew, and the user's `claude` is a zsh function —
+    // so `CommandBuilder::new("claude")` would fail to resolve. An interactive login
+    // shell (`-il`) sources the user's profile (full PATH, functions, aliases), making
+    // the pane a real terminal in which `claude` (and anything else) resolves correctly.
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+    let mut cmd = CommandBuilder::new(&shell);
+    cmd.arg("-il");
     cmd.cwd(&cwd);
-    // inherit the user's env so ~/.claude config / PATH / hooks all apply
     cmd.env("TERM", "xterm-256color");
 
     let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
