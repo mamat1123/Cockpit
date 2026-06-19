@@ -71,7 +71,14 @@ pub fn logtail_start(
             let newest = newest_session_file(&dir);
             if newest != current {
                 current = newest.clone();
-                offset = 0;
+                // Start at EOF: only emit lines appended after we attach, so opening a
+                // pane with a pre-existing session log doesn't replay old lines (which
+                // would falsely show "working"). Activity = growth from now on.
+                offset = current
+                    .as_ref()
+                    .and_then(|p| std::fs::metadata(p).ok())
+                    .map(|m| m.len())
+                    .unwrap_or(0);
             }
             if let Some(path) = &current {
                 if let Ok(mut f) = std::fs::File::open(path) {
