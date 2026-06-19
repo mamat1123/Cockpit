@@ -12,11 +12,14 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(pty::PtyManager::default())
+        .manage(logtail::LogtailManager::default())
         .invoke_handler(tauri::generate_handler![
             greet,
             pty::pty_spawn,
             pty::pty_write,
-            pty::pty_resize
+            pty::pty_resize,
+            logtail::logtail_start,
+            logtail::logtail_stop
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

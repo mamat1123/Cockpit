@@ -1,4 +1,9 @@
+use std::collections::HashMap;
+use std::io::{BufRead, BufReader, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use tauri::{AppHandle, Emitter, State};
 
 /// Claude Code stores a session under ~/.claude/projects/<encoded>/, where <encoded>
 /// is the absolute cwd with path separators turned into '-'. Verified against real dirs
@@ -32,6 +37,72 @@ pub fn newest_session_file(dir: &Path) -> Option<PathBuf> {
         }
     }
     newest.map(|(_, p)| p)
+}
+
+#[derive(Default)]
+pub struct LogtailManager(pub Mutex<HashMap<String, Arc<AtomicBool>>>);
+
+pub fn log_event(pane_id: &str) -> String {
+    format!("pane://log/{pane_id}")
+}
+
+#[tauri::command]
+pub fn logtail_start(
+    app: AppHandle,
+    mgr: State<LogtailManager>,
+    pane_id: String,
+    cwd: String,
+) -> Result<(), String> {
+    // restart-safe: stop any existing tail for this pane first (inlined)
+    if let Some(prev) = mgr.0.lock().unwrap().remove(&pane_id) {
+        prev.store(true, Ordering::Relaxed);
+    }
+    let stop = Arc::new(AtomicBool::new(false));
+    mgr.0.lock().unwrap().insert(pane_id.clone(), stop.clone());
+
+    let home = dirs_home().ok_or("no home dir")?;
+    let dir = project_log_dir(&home, &cwd);
+    let evt = log_event(&pane_id);
+
+    std::thread::spawn(move || {
+        let mut current: Option<PathBuf> = None;
+        let mut offset: u64 = 0;
+        while !stop.load(Ordering::Relaxed) {
+            let newest = newest_session_file(&dir);
+            if newest != current {
+                current = newest.clone();
+                offset = 0;
+            }
+            if let Some(path) = &current {
+                if let Ok(mut f) = std::fs::File::open(path) {
+                    let len = f.metadata().map(|m| m.len()).unwrap_or(0);
+                    if len > offset {
+                        let _ = f.seek(SeekFrom::Start(offset));
+                        let reader = BufReader::new(&mut f);
+                        for line in reader.lines().map_while(Result::ok) {
+                            if !line.trim().is_empty() {
+                                let _ = app.emit(&evt, line);
+                            }
+                        }
+                        offset = len;
+                    }
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_millis(300));
+        }
+    });
+    Ok(())
+}
+
+#[tauri::command]
+pub fn logtail_stop(mgr: State<LogtailManager>, pane_id: String) {
+    if let Some(stop) = mgr.0.lock().unwrap().remove(&pane_id) {
+        stop.store(true, Ordering::Relaxed);
+    }
+}
+
+fn dirs_home() -> Option<PathBuf> {
+    std::env::var_os("HOME").map(PathBuf::from)
 }
 
 #[cfg(test)]
