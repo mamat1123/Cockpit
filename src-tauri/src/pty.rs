@@ -104,3 +104,20 @@ pub fn pty_spawn(
     );
     Ok(())
 }
+
+#[tauri::command]
+pub fn pty_write(mgr: State<PtyManager>, pane_id: String, data: String) -> Result<(), String> {
+    let mut map = mgr.0.lock().unwrap();
+    let s = map.get_mut(&pane_id).ok_or("no such pane")?;
+    s.writer.write_all(data.as_bytes()).map_err(|e| e.to_string())?;
+    s.writer.flush().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn pty_resize(mgr: State<PtyManager>, pane_id: String, cols: u16, rows: u16) -> Result<(), String> {
+    let map = mgr.0.lock().unwrap();
+    let s = map.get(&pane_id).ok_or("no such pane")?;
+    s.master
+        .resize(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })
+        .map_err(|e| e.to_string())
+}
