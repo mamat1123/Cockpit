@@ -18,12 +18,25 @@ export function CockpitView() {
   useKeybindings(dispatch);
 
   const [slots, setSlots] = useState<Record<string, HTMLElement>>({});
-  const registerSlot = useCallback((paneId: string, el: HTMLElement | null) => {
-    setSlots((prev) => {
-      if (el) { if (prev[paneId] === el) return prev; return { ...prev, [paneId]: el }; }
-      if (!(paneId in prev)) return prev;
-      const next = { ...prev }; delete next[paneId]; return next;
-    });
+  // `registerSlot(paneId)` returns a STABLE ref callback (cached per pane). A fresh
+  // inline `ref={(el) => ...}` each render would make React detach+reattach the ref
+  // every render — and since the callback calls setState, that's an infinite loop
+  // ("Maximum update depth exceeded"). Caching keeps the ref identity stable so React
+  // only invokes it on real mount/unmount.
+  const slotCbs = useRef(new Map<string, (el: HTMLElement | null) => void>());
+  const registerSlot = useCallback((paneId: string) => {
+    const m = slotCbs.current;
+    let cb = m.get(paneId);
+    if (!cb) {
+      cb = (el: HTMLElement | null) =>
+        setSlots((prev) => {
+          if (el) { if (prev[paneId] === el) return prev; return { ...prev, [paneId]: el }; }
+          if (!(paneId in prev)) return prev;
+          const next = { ...prev }; delete next[paneId]; return next;
+        });
+      m.set(paneId, cb);
+    }
+    return cb;
   }, []);
 
   // Kill the PTY + logtail of panes that were actually removed (closed), NOT panes
@@ -32,7 +45,7 @@ export function CockpitView() {
   useEffect(() => {
     const now = livePaneIds(layout);
     for (const id of prevIds.current) {
-      if (!now.has(id)) { void killPty(id); void stopLogtail(id); }
+      if (!now.has(id)) { void killPty(id); void stopLogtail(id); slotCbs.current.delete(id); }
     }
     prevIds.current = now;
   }, [layout]);

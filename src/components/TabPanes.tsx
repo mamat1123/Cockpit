@@ -3,7 +3,7 @@ import type { Action, Row, Tab } from "../layout/paneLayout";
 import { Divider } from "./Divider";
 
 function RowPanes({ row, dispatch, registerSlot }: {
-  row: Row; dispatch: (a: Action) => void; registerSlot: (paneId: string, el: HTMLElement | null) => void;
+  row: Row; dispatch: (a: Action) => void; registerSlot: (paneId: string) => (el: HTMLElement | null) => void;
 }) {
   const rowRef = useRef<HTMLDivElement>(null);
   return (
@@ -11,7 +11,7 @@ function RowPanes({ row, dispatch, registerSlot }: {
       {row.panes.map((p, pi) => (
         <Fragment key={p.id}>
           <div
-            ref={(el) => registerSlot(p.id, el)}
+            ref={registerSlot(p.id)}
             style={{ flex: `${p.size} 1 0`, display: "flex", minWidth: 0 }}
           />
           {pi < row.panes.length - 1 && (
@@ -35,7 +35,7 @@ function RowPanes({ row, dispatch, registerSlot }: {
 }
 
 export function TabPanes({ tab, active, dispatch, registerSlot }: {
-  tab: Tab; active: boolean; dispatch: (a: Action) => void; registerSlot: (paneId: string, el: HTMLElement | null) => void;
+  tab: Tab; active: boolean; dispatch: (a: Action) => void; registerSlot: (paneId: string) => (el: HTMLElement | null) => void;
 }) {
   const colRef = useRef<HTMLDivElement>(null);
   return (
