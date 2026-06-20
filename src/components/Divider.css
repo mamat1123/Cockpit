@@ -1,8 +1,33 @@
-.cockpit-divider__line {
-  background: #2A2F3A;
-  border-radius: 2px;
-  transition: background 0.15s;
+/* wide, invisible grab zone — overlaps neighbouring panes so the gutter is
+   forgiving to hit, while the visible gap stays a slim 6px. */
+.cockpit-divider__hit {
+  position: absolute;
+  cursor: inherit;
 }
-.cockpit-divider--x .cockpit-divider__line { width: 2px; height: 100%; }
-.cockpit-divider--y .cockpit-divider__line { width: 100%; height: 2px; }
-.cockpit-divider:hover .cockpit-divider__line { background: #F5A623; }
+.cockpit-divider--x .cockpit-divider__hit { top: 0; bottom: 0; left: -6px; right: -6px; }
+.cockpit-divider--y .cockpit-divider__hit { left: 0; right: 0; top: -6px; bottom: -6px; }
+
+/* thin visible line, centered inside the 6px track */
+.cockpit-divider__line {
+  position: absolute;
+  background: #3A4150;
+  border-radius: 2px;
+  transition: background 0.12s, box-shadow 0.12s, width 0.12s, height 0.12s;
+}
+.cockpit-divider--x .cockpit-divider__line {
+  top: 0; bottom: 0; left: 50%; transform: translateX(-50%); width: 2px;
+}
+.cockpit-divider--y .cockpit-divider__line {
+  left: 0; right: 0; top: 50%; transform: translateY(-50%); height: 2px;
+}
+
+/* hover / active: brighten + thicken so it's obvious you can grab it */
+.cockpit-divider:hover .cockpit-divider__line {
+  background: #F5A623;
+  box-shadow: 0 0 8px -1px rgba(245, 166, 35, 0.7);
+}
+.cockpit-divider--x:hover .cockpit-divider__line { width: 4px; }
+.cockpit-divider--y:hover .cockpit-divider__line { height: 4px; }
+
+/* while dragging, the whole window shows the resize cursor and the line stays lit */
+body.cockpit-resizing .cockpit-divider__line { background: #F5A623; }
