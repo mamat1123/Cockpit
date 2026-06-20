@@ -6,6 +6,7 @@ import { TabPanes } from "./TabPanes";
 import { PaneHost } from "./PaneHost";
 import { killPty } from "../lib/ptyClient";
 import { stopLogtail } from "../lib/logClient";
+import { releaseTerminal } from "../lib/terminalRegistry";
 
 const DEFAULT_CWD = "/Users/theerametsaengsin/Work/mee-tang/app";
 
@@ -45,7 +46,7 @@ export function CockpitView() {
   useEffect(() => {
     const now = livePaneIds(layout);
     for (const id of prevIds.current) {
-      if (!now.has(id)) { void killPty(id); void stopLogtail(id); slotCbs.current.delete(id); }
+      if (!now.has(id)) { void killPty(id); void stopLogtail(id); slotCbs.current.delete(id); releaseTerminal(id); }
     }
     prevIds.current = now;
   }, [layout]);

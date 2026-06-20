@@ -1,11 +1,8 @@
-import { useState, useRef, useEffect } from "react";
-import { Terminal } from "@xterm/xterm";
-import { FitAddon } from "@xterm/addon-fit";
-import "@xterm/xterm/css/xterm.css";
-import { spawnPty, writePty, resizePty, onPtyOutput, onPtyExit } from "../lib/ptyClient";
-import { paneTopic, startLogtail, stopLogtail } from "../lib/logClient";
+import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { debounce } from "../lib/debounce";
 import { deriveState, type PaneState } from "../lib/paneState";
+import { paneTopic } from "../lib/logClient";
+import { acquireTerminal, attachTerminal, parkTerminalNode, refit } from "../lib/terminalRegistry";
 import { PaneHeader } from "./PaneHeader";
 import "./TerminalPane.css";
 
@@ -22,82 +19,45 @@ export function TerminalPane({ paneId, cwd, sessionId, title, focused, onFocus, 
   onClose: () => void;
   dragProps?: React.HTMLAttributes<HTMLDivElement> & { draggable?: boolean };
 }) {
-  const hostRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<PaneState>("idle");
-  const lastLineAt = useRef<number | null>(null);
-  const lastInputAt = useRef(0);
-  const lastResizeAt = useRef(0);
   const onAutoTitleRef = useRef(onAutoTitle);
   onAutoTitleRef.current = onAutoTitle;
 
-  useEffect(() => {
-    const host = hostRef.current!;
-    const term = new Terminal({ fontFamily: "Menlo, monospace", fontSize: 13, cursorBlink: true });
-    const fit = new FitAddon();
-    term.loadAddon(fit);
-    term.open(host);
-    term.attachCustomKeyEventHandler((e) => {
-      if (e.metaKey && !e.ctrlKey && !e.altKey && ["t", "d", "w"].includes(e.key.toLowerCase())) {
-        return false;
-      }
-      return true;
-    });
-    fit.fit();
+  // The xterm + PTY live in the registry (persistent across tab moves). A pop-out or
+  // drag remounts THIS wrapper (a portal-container change remounts — verified), so if
+  // the terminal lived here it would be destroyed and respawn an empty shell (the
+  // "pop-out = black screen" bug). Instead we just move the persistent host node into
+  // this pane's container; on unmount we park it (never dispose) so the session survives.
+  useLayoutEffect(() => {
+    const entry = acquireTerminal(paneId, cwd, sessionId);
+    const container = containerRef.current!;
+    attachTerminal(paneId, container);
 
-    const unlisteners: Array<Promise<() => void>> = [];
-    unlisteners.push(onPtyOutput(paneId, (chunk) => {
-      term.write(chunk);
-      const now = Date.now();
-      if (now - lastInputAt.current > 150 && now - lastResizeAt.current > 500) {
-        lastLineAt.current = now;
-      }
-    }));
-    unlisteners.push(onPtyExit(paneId, () => term.write("\r\n[claude exited]\r\n")));
-
-    const onData = term.onData((data) => {
-      lastInputAt.current = Date.now();
-      void writePty(paneId, data);
-    });
-
-    void spawnPty(paneId, cwd, term.cols, term.rows, `claude --session-id ${sessionId}`);
-    void startLogtail(paneId, cwd, sessionId);
-
-    // Settle-to-fit: a drag/window-resize fires a STORM of ResizeObserver events.
-    // Resizing the PTY on every one floods the shell with SIGWINCH faster than it
-    // can redraw its prompt -> cascading/duplicated prompts. Debounce so the shell
-    // gets ONE resize at the settled size, and skip it if the char grid is unchanged.
-    let lastCols = term.cols;
-    let lastRows = term.rows;
-    const settleResize = debounce(() => {
-      fit.fit();
-      if (term.cols !== lastCols || term.rows !== lastRows) {
-        lastCols = term.cols;
-        lastRows = term.rows;
-        void resizePty(paneId, term.cols, term.rows);
-      }
-    }, 100);
+    // Settle-to-fit: a drag/window-resize fires a STORM of ResizeObserver events; one
+    // SIGWINCH per event floods the shell faster than it can redraw. Debounce to a
+    // single resize at the settled size.
+    const settle = debounce(() => refit(paneId), 100);
     const ro = new ResizeObserver(() => {
-      lastResizeAt.current = Date.now();
-      settleResize();
+      entry.lastResizeAt.current = Date.now();
+      settle();
     });
-    ro.observe(host);
+    ro.observe(container);
 
     const tick = setInterval(
-      () => setState(deriveState({ lastLineAt: lastLineAt.current }, Date.now(), 800)),
+      () => setState(deriveState({ lastLineAt: entry.lastLineAt.current }, Date.now(), 800)),
       400,
     );
 
     return () => {
       ro.disconnect();
-      settleResize.cancel();
-      onData.dispose();
-      unlisteners.forEach((p) => p.then((un) => un()));
-      term.dispose();
+      settle.cancel();
       clearInterval(tick);
-      void stopLogtail(paneId);
+      parkTerminalNode(paneId);
     };
   }, [paneId, cwd, sessionId]);
 
+  // Auto-name: poll this pane's OWN session log for its topic.
   useEffect(() => {
     let alive = true;
     let last = "";
@@ -134,7 +94,7 @@ export function TerminalPane({ paneId, cwd, sessionId, title, focused, onFocus, 
         onClose={onClose}
         dragProps={dragProps}
       />
-      <div ref={hostRef} className="cockpit-pane__host" />
+      <div ref={containerRef} className="cockpit-pane__host" />
       <div className="cockpit-pane__vignette" />
     </div>
   );
