@@ -7,7 +7,7 @@ import { startLogtail, stopLogtail, onLogLine } from "../lib/logClient";
 import { deriveState, type PaneState } from "../lib/paneState";
 import "./TerminalPane.css";
 
-export function TerminalPane({ paneId, cwd }: { paneId: string; cwd: string }) {
+export function TerminalPane({ paneId, cwd, focused, onFocus }: { paneId: string; cwd: string; focused: boolean; onFocus: () => void }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<PaneState>("idle");
   const lastLineAt = useRef<number | null>(null);
@@ -59,7 +59,7 @@ export function TerminalPane({ paneId, cwd }: { paneId: string; cwd: string }) {
   }, [paneId, cwd]);
 
   return (
-    <div className={`cockpit-pane${state === "working" ? " is-working" : ""}`}>
+    <div className={`cockpit-pane${state === "working" ? " is-working" : ""}${focused ? " is-focused" : ""}`} onMouseDown={onFocus}>
       <div ref={hostRef} className="cockpit-pane__host" />
       <div className="cockpit-chip">
         <span className="cockpit-chip__dot" />

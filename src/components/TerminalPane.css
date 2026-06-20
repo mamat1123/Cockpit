@@ -50,3 +50,6 @@
   }
   .cockpit-chip__bars i { animation: none; height: 8px; }
 }
+
+.cockpit-pane { min-width: 0; flex: 1 1 0; }
+.cockpit-pane.is-focused { outline: 1px solid #f5a62355; outline-offset: -1px; }

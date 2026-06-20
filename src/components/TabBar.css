@@ -1,0 +1,8 @@
+.cockpit-tabs { display: flex; gap: 4px; padding: 6px 8px; background: #0E1014;
+  border-bottom: 1px solid #262A33; }
+.cockpit-tab { font: 600 11px/1 ui-monospace, Menlo, monospace;
+  letter-spacing: .06em; color: #6B7280; background: transparent; border: 1px solid transparent;
+  border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+.cockpit-tab.is-active { color: #C8CDD6; background: #1b1f27; border-color: #262A33; }
+.cockpit-tab--new { color: #6B7280; padding: 6px 10px; }
+.cockpit-tab:focus-visible { outline: 2px solid #f5a623; outline-offset: 1px; }
