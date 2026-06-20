@@ -1,4 +1,4 @@
-export interface Pane { id: string; cwd: string; size: number }
+export interface Pane { id: string; cwd: string; size: number; title: string }
 export interface Row { id: string; panes: Pane[]; size: number }
 export interface Tab { id: string; rows: Row[] }
 export interface Layout { tabs: Tab[]; activeTabId: string; focusedPaneId: string }
@@ -13,11 +13,15 @@ export type Action =
   | { type: "setCwd"; paneId: string; cwd: string }
   | { type: "moveTab"; tabId: string; toIndex: number }
   | { type: "setRowSizes"; tabId: string; sizes: number[] }
-  | { type: "setPaneSizes"; rowId: string; sizes: number[] };
+  | { type: "setPaneSizes"; rowId: string; sizes: number[] }
+  | { type: "renamePane"; paneId: string; title: string }
+  | { type: "popOut"; paneId: string }
+  | { type: "movePaneAfter"; paneId: string; targetPaneId: string };
 
 let counter = 0;
 const nextId = (p: string) => `${p}-${++counter}`;
-const makePane = (cwd: string): Pane => ({ id: nextId("pane"), cwd, size: 1 });
+const defaultTitle = (cwd: string) => cwd.split("/").filter(Boolean).pop() ?? "shell";
+const makePane = (cwd: string): Pane => ({ id: nextId("pane"), cwd, size: 1, title: defaultTitle(cwd) });
 const makeRow = (cwd: string): Row => ({ id: nextId("row"), panes: [makePane(cwd)], size: 1 });
 
 export function initLayout(cwd: string): Layout {
@@ -33,6 +37,23 @@ function focusedCwd(l: Layout): string {
     for (const r of t.rows)
       for (const p of r.panes) if (p.id === l.focusedPaneId) return p.cwd;
   return l.tabs[0].rows[0].panes[0].cwd;
+}
+
+function removePane(tabs: Tab[], paneId: string): { tabs: Tab[]; pane: Pane | null } {
+  let pane: Pane | null = null;
+  const out = tabs
+    .map((t) => ({
+      ...t,
+      rows: t.rows
+        .map((r) => {
+          const hit = r.panes.find((p) => p.id === paneId);
+          if (hit) pane = hit;
+          return { ...r, panes: r.panes.filter((p) => p.id !== paneId) };
+        })
+        .filter((r) => r.panes.length > 0),
+    }))
+    .filter((t) => t.rows.length > 0);
+  return { tabs: out, pane };
 }
 
 export function reduce(l: Layout, a: Action): Layout {
@@ -128,6 +149,41 @@ export function reduce(l: Layout, a: Action): Layout {
         ),
       }));
       return { ...l, tabs };
+    }
+    case "renamePane": {
+      const tabs = l.tabs.map((t) => ({
+        ...t,
+        rows: t.rows.map((r) => ({
+          ...r,
+          panes: r.panes.map((p) => (p.id === a.paneId ? { ...p, title: a.title } : p)),
+        })),
+      }));
+      return { ...l, tabs };
+    }
+    case "popOut": {
+      const { tabs, pane } = removePane(l.tabs, a.paneId);
+      if (!pane) return l;
+      const tab: Tab = { id: nextId("tab"), rows: [{ id: nextId("row"), panes: [pane], size: 1 }] };
+      return { tabs: [...tabs, tab], activeTabId: tab.id, focusedPaneId: pane.id };
+    }
+    case "movePaneAfter": {
+      if (a.paneId === a.targetPaneId) return l;
+      const { tabs, pane } = removePane(l.tabs, a.paneId);
+      if (!pane) return l;
+      let destTabId = l.activeTabId;
+      const out = tabs.map((t) => ({
+        ...t,
+        rows: t.rows.map((r) => {
+          const idx = r.panes.findIndex((p) => p.id === a.targetPaneId);
+          if (idx < 0) return r;
+          destTabId = t.id;
+          const panes = [...r.panes];
+          panes.splice(idx + 1, 0, pane);
+          return { ...r, panes };
+        }),
+      }));
+      if (!out.some((t) => t.rows.some((r) => r.panes.some((p) => p.id === a.paneId)))) return l;
+      return { ...l, tabs: out, activeTabId: destTabId, focusedPaneId: pane.id };
     }
   }
 }

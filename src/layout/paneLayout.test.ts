@@ -79,4 +79,41 @@ describe("paneLayout (rows model)", () => {
     l = reduce(l, { type: "setRowSizes", tabId, sizes: [3, 1] });
     expect(l.tabs[0].rows.map((r) => r.size)).toEqual([3, 1]);
   });
+  it("a pane has a default title from its cwd basename", () => {
+    const l = initLayout(CWD);
+    expect(l.tabs[0].rows[0].panes[0].title).toBe("app");
+  });
+  it("renamePane sets a custom title", () => {
+    let l = initLayout(CWD);
+    const id = l.focusedPaneId;
+    l = reduce(l, { type: "renamePane", paneId: id, title: "frontend" });
+    expect(l.tabs[0].rows[0].panes[0].title).toBe("frontend");
+  });
+  it("popOut moves a pane into a brand-new active tab", () => {
+    let l = initLayout(CWD);
+    l = reduce(l, { type: "split" });
+    const moved = l.focusedPaneId;
+    l = reduce(l, { type: "popOut", paneId: moved });
+    expect(l.tabs.length).toBe(2);
+    expect(l.tabs[0].rows[0].panes.length).toBe(1);
+    expect(l.tabs[1].rows[0].panes.map((p) => p.id)).toEqual([moved]);
+    expect(l.activeTabId).toBe(l.tabs[1].id);
+    expect(l.focusedPaneId).toBe(moved);
+  });
+  it("movePaneAfter reorders within a row", () => {
+    let l = initLayout(CWD);
+    l = reduce(l, { type: "split" });
+    const [A, B] = l.tabs[0].rows[0].panes.map((p) => p.id);
+    l = reduce(l, { type: "movePaneAfter", paneId: A, targetPaneId: B });
+    expect(l.tabs[0].rows[0].panes.map((p) => p.id)).toEqual([B, A]);
+  });
+  it("movePaneAfter across rows moves the pane and drops the emptied row", () => {
+    let l = initLayout(CWD);
+    l = reduce(l, { type: "splitDown" });
+    const A = l.tabs[0].rows[0].panes[0].id;
+    const B = l.tabs[0].rows[1].panes[0].id;
+    l = reduce(l, { type: "movePaneAfter", paneId: B, targetPaneId: A });
+    expect(l.tabs[0].rows.length).toBe(1);
+    expect(l.tabs[0].rows[0].panes.map((p) => p.id)).toEqual([A, B]);
+  });
 });
