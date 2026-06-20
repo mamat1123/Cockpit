@@ -5,6 +5,7 @@ import "@xterm/xterm/css/xterm.css";
 import { spawnPty, writePty, resizePty, onPtyOutput, onPtyExit } from "../lib/ptyClient";
 import { startLogtail, stopLogtail, onLogLine } from "../lib/logClient";
 import { deriveState, type PaneState } from "../lib/paneState";
+import "./TerminalPane.css";
 
 export function TerminalPane({ paneId, cwd }: { paneId: string; cwd: string }) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -51,24 +52,15 @@ export function TerminalPane({ paneId, cwd }: { paneId: string; cwd: string }) {
   }, [paneId, cwd]);
 
   return (
-    <div style={{ position: "relative", width: "100%", height: "100%" }}>
-      <div ref={hostRef} style={{ width: "100%", height: "100%" }} />
-      <span
-        aria-label={state}
-        style={{
-          position: "absolute", top: 6, right: 8, width: 10, height: 10, borderRadius: "50%",
-          background: state === "working" ? "#f5a623" : "#3ecf8e",
-          boxShadow: state === "working" ? "0 0 8px 2px #f5a62388" : "none",
-          transition: "background 200ms, box-shadow 200ms",
-        }}
-      />
-      <div
-        style={{
-          position: "absolute", inset: 0, pointerEvents: "none", borderRadius: 6,
-          boxShadow: state === "working" ? "inset 0 0 24px 0 #f5a62333" : "inset 0 0 0 0 transparent",
-          transition: "box-shadow 300ms",
-        }}
-      />
+    <div className={`cockpit-pane${state === "working" ? " is-working" : ""}`}>
+      <div ref={hostRef} className="cockpit-pane__host" />
+      <div className="cockpit-chip">
+        <span className="cockpit-chip__dot" />
+        <span className="cockpit-chip__bars"><i /><i /><i /></span>
+        <span className="cockpit-chip__label-idle">idle</span>
+        <span className="cockpit-chip__label-work">working</span>
+      </div>
+      <div className="cockpit-pane__vignette" />
     </div>
   );
 }
