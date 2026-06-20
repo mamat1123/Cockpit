@@ -36,13 +36,25 @@
 }
 .cockpit-pane.is-drop-target .cockpit-pane__drop {
   opacity: 1;
-  background: rgba(245, 166, 35, 0.07);
-  box-shadow: inset 0 0 0 2px #F5A623, inset 0 0 34px -8px rgba(245, 166, 35, 0.55);
+  box-shadow: inset 0 0 0 2px rgba(245, 166, 35, 0.5);
 }
+/* a ghost "drop here" box slides in on the side the pane will land (it's inserted
+   AFTER the target, i.e. to its right) — a clear preview of the destination slot. */
 .cockpit-pane.is-drop-target .cockpit-pane__drop::after {
-  content: ""; position: absolute; top: 6px; bottom: 6px; right: 2px; width: 3px;
-  border-radius: 2px; background: #F5A623; box-shadow: 0 0 10px 1px rgba(245, 166, 35, 0.85);
+  content: "▸ วางที่นี่";
+  position: absolute; top: 8px; bottom: 8px; right: 8px; width: 44%;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px dashed #F5A623; border-radius: 10px;
+  background: rgba(245, 166, 35, 0.12);
+  color: #F5A623; font: 700 12px/1 ui-monospace, Menlo, monospace; letter-spacing: .12em;
+  box-shadow: 0 0 24px -6px rgba(245, 166, 35, 0.7);
+  animation: cockpit-drop-in 0.18s ease both;
+}
+@keyframes cockpit-drop-in {
+  from { opacity: 0; transform: translateX(22px) scale(0.96); }
+  to   { opacity: 1; transform: translateX(0) scale(1); }
 }
 @media (prefers-reduced-motion: reduce) {
   .cockpit-pane { transition: none; }
+  .cockpit-pane.is-drop-target .cockpit-pane__drop::after { animation: none; }
 }
