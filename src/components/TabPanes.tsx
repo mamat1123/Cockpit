@@ -1,6 +1,7 @@
-import { Fragment, useRef } from "react";
+import { Fragment, useEffect, useRef } from "react";
 import type { Action, Row, Tab } from "../layout/paneLayout";
 import { Divider } from "./Divider";
+import { refit } from "../lib/terminalRegistry";
 
 function RowPanes({ row, dispatch, registerSlot }: {
   row: Row; dispatch: (a: Action) => void; registerSlot: (paneId: string) => (el: HTMLElement | null) => void;
@@ -38,6 +39,21 @@ export function TabPanes({ tab, active, dispatch, registerSlot }: {
   tab: Tab; active: boolean; dispatch: (a: Action) => void; registerSlot: (paneId: string) => (el: HTMLElement | null) => void;
 }) {
   const colRef = useRef<HTMLDivElement>(null);
+
+  // Force every pane in this tab to refit when the tab becomes active or its pane
+  // membership changes (pop-out / close / split). A ResizeObserver alone misses the
+  // display:none -> flex transition in the webview, leaving a freshly-revealed or
+  // newly-widened pane stuck at its old (smaller) grid until the next manual resize.
+  const paneIdsKey = tab.rows.flatMap((r) => r.panes.map((p) => p.id)).join(",");
+  useEffect(() => {
+    if (!active) return;
+    const id = requestAnimationFrame(() => {
+      tab.rows.flatMap((r) => r.panes).forEach((p) => refit(p.id));
+    });
+    return () => cancelAnimationFrame(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, paneIdsKey]);
+
   return (
     <div
       ref={colRef}

@@ -101,12 +101,16 @@ export function parkTerminalNode(paneId: string) {
 export function refit(paneId: string) {
   const e = registry.get(paneId);
   if (!e) return;
+  // Skip while the host is unsized (its tab is display:none, or not laid out yet).
+  // Fitting to 0 would resize the PTY to a tiny grid and corrupt the running TUI;
+  // the refit on tab-activation / ResizeObserver catches up once it's visible again.
+  if (e.hostEl.clientWidth === 0 || e.hostEl.clientHeight === 0) return;
   try {
     e.fit.fit();
     void resizePty(paneId, e.term.cols, e.term.rows);
     e.term.refresh(0, e.term.rows - 1);
   } catch {
-    /* container not laid out yet — a later refit will catch up */
+    /* not laid out yet — a later refit will catch up */
   }
 }
 
