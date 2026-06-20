@@ -4,6 +4,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import { spawnPty, writePty, resizePty, onPtyOutput, onPtyExit } from "../lib/ptyClient";
 import { paneTopic } from "../lib/logClient";
+import { debounce } from "../lib/debounce";
 import { deriveState, type PaneState } from "../lib/paneState";
 import { PaneHeader } from "./PaneHeader";
 import "./TerminalPane.css";
@@ -59,10 +60,23 @@ export function TerminalPane({ paneId, cwd, title, focused, onFocus, onRename, o
 
     void spawnPty(paneId, cwd, term.cols, term.rows);
 
+    // Settle-to-fit: a drag/window-resize fires a STORM of ResizeObserver events.
+    // Resizing the PTY on every one floods the shell with SIGWINCH faster than it
+    // can redraw its prompt -> cascading/duplicated prompts. Debounce so the shell
+    // gets ONE resize at the settled size, and skip it if the char grid is unchanged.
+    let lastCols = term.cols;
+    let lastRows = term.rows;
+    const settleResize = debounce(() => {
+      fit.fit();
+      if (term.cols !== lastCols || term.rows !== lastRows) {
+        lastCols = term.cols;
+        lastRows = term.rows;
+        void resizePty(paneId, term.cols, term.rows);
+      }
+    }, 100);
     const ro = new ResizeObserver(() => {
       lastResizeAt.current = Date.now();
-      fit.fit();
-      void resizePty(paneId, term.cols, term.rows);
+      settleResize();
     });
     ro.observe(host);
 
@@ -73,6 +87,7 @@ export function TerminalPane({ paneId, cwd, title, focused, onFocus, onRename, o
 
     return () => {
       ro.disconnect();
+      settleResize.cancel();
       onData.dispose();
       unlisteners.forEach((p) => p.then((un) => un()));
       term.dispose();
