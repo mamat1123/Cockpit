@@ -28,10 +28,7 @@ export function TerminalPane({ paneId, cwd, focused, onFocus }: { paneId: string
     fit.fit();
 
     const unlisteners: Array<Promise<() => void>> = [];
-    unlisteners.push(onPtyOutput(paneId, (chunk) => {
-      term.write(chunk);
-      lastLineAt.current = Date.now();
-    }));
+    unlisteners.push(onPtyOutput(paneId, (chunk) => term.write(chunk)));
     unlisteners.push(onPtyExit(paneId, () => term.write("\r\n[claude exited]\r\n")));
 
     const onData = term.onData((data) => { void writePty(paneId, data); });
