@@ -122,3 +122,8 @@ export function releaseTerminal(paneId: string) {
   e.hostEl.remove();
   registry.delete(paneId);
 }
+
+/** Live activity timestamp for a pane (last meaningful PTY output), or null. */
+export function paneLastLineAt(paneId: string): number | null {
+  return registry.get(paneId)?.lastLineAt.current ?? null;
+}
