@@ -21,6 +21,11 @@ pub fn project_log_dir(home: &Path, cwd: &str) -> PathBuf {
     home.join(".claude").join("projects").join(encode_project_dir(cwd))
 }
 
+/// Exact log file for a known claude session under a cwd.
+pub fn session_log_path(home: &Path, cwd: &str, session_id: &str) -> PathBuf {
+    project_log_dir(home, cwd).join(format!("{session_id}.jsonl"))
+}
+
 /// Newest *.jsonl in `dir` by mtime, or None if the dir is missing/empty.
 pub fn newest_session_file(dir: &Path) -> Option<PathBuf> {
     let mut newest: Option<(std::time::SystemTime, PathBuf)> = None;
@@ -92,10 +97,9 @@ pub fn first_user_topic(path: &Path) -> Option<String> {
 }
 
 #[tauri::command]
-pub fn pane_topic(cwd: String) -> Option<String> {
+pub fn pane_topic(cwd: String, session_id: String) -> Option<String> {
     let home = dirs_home()?;
-    let path = newest_session_file(&project_log_dir(&home, &cwd))?;
-    first_user_topic(&path)
+    first_user_topic(&session_log_path(&home, &cwd, &session_id))
 }
 
 #[derive(Default)]
@@ -111,8 +115,8 @@ pub fn logtail_start(
     mgr: State<LogtailManager>,
     pane_id: String,
     cwd: String,
+    session_id: String,
 ) -> Result<(), String> {
-    // restart-safe: stop any existing tail for this pane first (inlined)
     if let Some(prev) = mgr.0.lock().unwrap().remove(&pane_id) {
         prev.store(true, Ordering::Relaxed);
     }
@@ -120,29 +124,23 @@ pub fn logtail_start(
     mgr.0.lock().unwrap().insert(pane_id.clone(), stop.clone());
 
     let home = dirs_home().ok_or("no home dir")?;
-    let dir = project_log_dir(&home, &cwd);
+    let path = session_log_path(&home, &cwd, &session_id);
     let evt = log_event(&pane_id);
 
     std::thread::spawn(move || {
-        let mut current: Option<PathBuf> = None;
+        // Our own fresh session: the file is created by `claude --session-id <id>` and
+        // starts empty, so tail from the start (offset 0) once it appears.
         let mut offset: u64 = 0;
+        let mut seen = false;
         while !stop.load(Ordering::Relaxed) {
-            let newest = newest_session_file(&dir);
-            if newest != current {
-                current = newest.clone();
-                // Start at EOF: only emit lines appended after we attach, so opening a
-                // pane with a pre-existing session log doesn't replay old lines (which
-                // would falsely show "working"). Activity = growth from now on.
-                offset = current
-                    .as_ref()
-                    .and_then(|p| std::fs::metadata(p).ok())
-                    .map(|m| m.len())
-                    .unwrap_or(0);
-            }
-            if let Some(path) = &current {
-                if let Ok(mut f) = std::fs::File::open(path) {
-                    let len = f.metadata().map(|m| m.len()).unwrap_or(0);
-                    if len > offset {
+            if let Ok(meta) = std::fs::metadata(&path) {
+                if !seen {
+                    seen = true;
+                    offset = 0;
+                }
+                let len = meta.len();
+                if len > offset {
+                    if let Ok(mut f) = std::fs::File::open(&path) {
                         let _ = f.seek(SeekFrom::Start(offset));
                         let reader = BufReader::new(&mut f);
                         for line in reader.lines().map_while(Result::ok) {
@@ -222,5 +220,18 @@ mod tests {
         assert!(got.ends_with('…'));
         assert_eq!(got.chars().count(), 61);
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn session_log_path_builds_the_uuid_file() {
+        let p = session_log_path(
+            std::path::Path::new("/home/u"),
+            "/Users/x/Work/app",
+            "abc-123",
+        );
+        assert_eq!(
+            p,
+            std::path::Path::new("/home/u/.claude/projects/-Users-x-Work-app/abc-123.jsonl")
+        );
     }
 }
