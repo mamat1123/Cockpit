@@ -1,10 +1,40 @@
-.cockpit-tabs { display: flex; gap: 4px; padding: 6px 8px; background: #0E1014;
-  border-bottom: 1px solid #262A33; }
-.cockpit-tab { font: 600 11px/1 ui-monospace, Menlo, monospace;
-  letter-spacing: .06em; color: #6B7280; background: transparent; border: 1px solid transparent;
-  border-radius: 6px; padding: 6px 12px; cursor: pointer; }
-.cockpit-tab.is-active { color: #C8CDD6; background: #1b1f27; border-color: #262A33; }
-.cockpit-tab--new { color: #6B7280; padding: 6px 10px; }
+.cockpit-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  height: 38px;
+  padding: 6px 8px 0;
+  background: #0E1014;
+  border-bottom: 1px solid #262A33;
+}
+.cockpit-tab {
+  display: flex;
+  align-items: center;
+  max-width: 220px;
+  font: 600 12px/1 ui-monospace, Menlo, monospace;
+  color: #9AA1AD;
+  background: #181B22;
+  border: 1px solid #262A33;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  padding: 0 14px;
+  cursor: pointer;
+}
+.cockpit-tab:hover { color: #C8CDD6; }
+.cockpit-tab.is-active {
+  color: #F5F2EC;
+  background: #1f2530;
+  box-shadow: inset 0 -2px 0 0 #F5A623;
+}
+.cockpit-tab__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cockpit-tab--new {
+  color: #6B7280;
+  font-size: 16px;
+  padding: 0 12px;
+  background: transparent;
+  border-color: transparent;
+}
+.cockpit-tab--new:hover { color: #C8CDD6; }
+.cockpit-tab[draggable="true"]:active { cursor: grabbing; }
 .cockpit-tab:focus-visible { outline: 2px solid #f5a623; outline-offset: 1px; }
 .cockpit-tabs__drag { flex: 1; align-self: stretch; }
-.cockpit-tab[draggable="true"]:active { cursor: grabbing; }
