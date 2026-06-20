@@ -20,7 +20,10 @@ export function TerminalPane({ paneId, cwd }: { paneId: string; cwd: string }) {
     fit.fit();
 
     const unlisteners: Array<Promise<() => void>> = [];
-    unlisteners.push(onPtyOutput(paneId, (chunk) => term.write(chunk)));
+    unlisteners.push(onPtyOutput(paneId, (chunk) => {
+      term.write(chunk);
+      lastLineAt.current = Date.now();
+    }));
     unlisteners.push(onPtyExit(paneId, () => term.write("\r\n[claude exited]\r\n")));
 
     const onData = term.onData((data) => { void writePty(paneId, data); });
