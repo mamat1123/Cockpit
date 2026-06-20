@@ -18,6 +18,13 @@ export function TerminalPane({ paneId, cwd }: { paneId: string; cwd: string }) {
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(host);
+    // Let app-level Cmd+T/D/W shortcuts through instead of sending them to the shell.
+    term.attachCustomKeyEventHandler((e) => {
+      if (e.metaKey && !e.ctrlKey && !e.altKey && ["t", "d", "w"].includes(e.key.toLowerCase())) {
+        return false; // xterm ignores it; the window handler acts
+      }
+      return true;
+    });
     fit.fit();
 
     const unlisteners: Array<Promise<() => void>> = [];
