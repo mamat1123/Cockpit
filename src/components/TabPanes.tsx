@@ -15,8 +15,12 @@ function RowPanes({ row, focusedPaneId, dispatch }: {
             <TerminalPane
               paneId={p.id}
               cwd={p.cwd}
+              title={p.title}
               focused={p.id === focusedPaneId}
               onFocus={() => dispatch({ type: "focusPane", paneId: p.id })}
+              onRename={(t) => dispatch({ type: "renamePane", paneId: p.id, title: t })}
+              onPopOut={() => dispatch({ type: "popOut", paneId: p.id })}
+              onClose={() => { dispatch({ type: "focusPane", paneId: p.id }); dispatch({ type: "close" }); }}
             />
           </div>
           {pi < row.panes.length - 1 && (

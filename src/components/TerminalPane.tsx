@@ -4,9 +4,20 @@ import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import { spawnPty, writePty, resizePty, onPtyOutput, onPtyExit } from "../lib/ptyClient";
 import { deriveState, type PaneState } from "../lib/paneState";
+import { PaneHeader } from "./PaneHeader";
 import "./TerminalPane.css";
 
-export function TerminalPane({ paneId, cwd, focused, onFocus }: { paneId: string; cwd: string; focused: boolean; onFocus: () => void }) {
+export function TerminalPane({ paneId, cwd, title, focused, onFocus, onRename, onPopOut, onClose, dragProps }: {
+  paneId: string;
+  cwd: string;
+  title: string;
+  focused: boolean;
+  onFocus: () => void;
+  onRename: (title: string) => void;
+  onPopOut: () => void;
+  onClose: () => void;
+  dragProps?: React.HTMLAttributes<HTMLDivElement> & { draggable?: boolean };
+}) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<PaneState>("idle");
   const lastLineAt = useRef<number | null>(null);
@@ -21,7 +32,7 @@ export function TerminalPane({ paneId, cwd, focused, onFocus }: { paneId: string
     term.open(host);
     term.attachCustomKeyEventHandler((e) => {
       if (e.metaKey && !e.ctrlKey && !e.altKey && ["t", "d", "w"].includes(e.key.toLowerCase())) {
-        return false; // let app-level Cmd+T/D/W shortcuts act instead of typing into the shell
+        return false;
       }
       return true;
     });
@@ -30,10 +41,6 @@ export function TerminalPane({ paneId, cwd, focused, onFocus }: { paneId: string
     const unlisteners: Array<Promise<() => void>> = [];
     unlisteners.push(onPtyOutput(paneId, (chunk) => {
       term.write(chunk);
-      // "working" = Claude actively emitting output (its thinking spinner / streaming).
-      // Ignore output that is merely the echo of the user's own keystrokes, or a redraw
-      // triggered by a resize (e.g. when a hidden tab becomes visible) — those are not
-      // Claude working.
       const now = Date.now();
       if (now - lastInputAt.current > 150 && now - lastResizeAt.current > 500) {
         lastLineAt.current = now;
@@ -70,14 +77,19 @@ export function TerminalPane({ paneId, cwd, focused, onFocus }: { paneId: string
   }, [paneId, cwd]);
 
   return (
-    <div className={`cockpit-pane${state === "working" ? " is-working" : ""}${focused ? " is-focused" : ""}`} onMouseDown={onFocus}>
+    <div
+      className={`cockpit-pane${state === "working" ? " is-working" : ""}${focused ? " is-focused" : ""}`}
+      onMouseDown={onFocus}
+    >
+      <PaneHeader
+        title={title}
+        working={state === "working"}
+        onRename={onRename}
+        onPopOut={onPopOut}
+        onClose={onClose}
+        dragProps={dragProps}
+      />
       <div ref={hostRef} className="cockpit-pane__host" />
-      <div className="cockpit-chip">
-        <span className="cockpit-chip__dot" />
-        <span className="cockpit-chip__bars"><i /><i /><i /></span>
-        <span className="cockpit-chip__label-idle">idle</span>
-        <span className="cockpit-chip__label-work">working</span>
-      </div>
       <div className="cockpit-pane__vignette" />
     </div>
   );
