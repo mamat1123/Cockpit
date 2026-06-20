@@ -8,6 +8,11 @@
 - **Bug A:** ชื่อ tab/pane (และ working-state) เปลี่ยนพร้อมกันทุกแพน เพราะระบบ resolve session จาก "log ล่าสุดของ cwd" — หลายแพน cwd เดียวกัน → log ไฟล์เดียวกัน. แก้: แต่ละแพนมี **session uuid ของตัวเอง** (cockpit รัน `claude --session-id <uuid>`) แล้ว topic/activity อ่านจากไฟล์ uuid นั้นตรงๆ.
 - **Bug B:** pop-out แพนไป tab ใหม่แล้ว claude session หาย เพราะแพนถูก remount → spawn shell ใหม่. แก้: **React portals** — mount แพนครั้งเดียวที่ top level, portal เข้า slot ตามตำแหน่ง → ย้าย tab ไม่ remount → xterm+PTY+scrollback+claude รอดครบ.
 
+## ⚠️ Correction (as implemented 2026-06-20)
+The portal assumption below was **wrong**: changing `createPortal`'s `container` **remounts** the children (verified empirically with Playwright — the pane's host DOM node was destroyed, `isConnected === false`, xterm reset → black screen). React reconciles a portal by the container node, not by moving DOM across containers.
+
+**Actual fix shipped:** the xterm is owned by a module-level **terminal registry** (`src/lib/terminalRegistry.ts`), OUTSIDE React. Each pane's persistent host `<div>` (with its live xterm + PTY + scrollback) is created once and **moved with `appendChild`** into whatever container is currently mounted (`attachTerminal`) — `appendChild` relocates the live node intact. On a wrapper remount we `parkTerminalNode` (detach to a hidden node, never dispose); `releaseTerminal` disposes only on real pane close (wired in `CockpitView`'s removed-panes cleanup). The `PaneHost` portal structure stays, but persistence no longer depends on it — even though the wrapper remounts on a move, re-running `attachTerminal` re-homes the same node. Verified with Playwright: post-pop-out the same host node is still connected, still holds its `.xterm`, and sits inside the now-active tab. The portal description below is kept for history.
+
 ## Bug B — pop-out preserves session (React portals)
 
 **Root cause (confirmed):** `CockpitView` renders one `<TabPanes>` per tab; each `TerminalPane` (keyed by paneId) lives under its tab's subtree. `popOut` moves the pane to a *new* tab subtree → React unmounts/remounts it → its `useEffect` re-runs `spawnPty` → fresh shell. Also `pty_spawn` (`pty.rs:127`) `insert`s over the old `PtySession`, dropping it → the old child (claude) is killed.
