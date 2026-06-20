@@ -1,4 +1,4 @@
-export interface Pane { id: string; cwd: string; size: number; title: string; autoTitle: boolean }
+export interface Pane { id: string; cwd: string; size: number; title: string; autoTitle: boolean; sessionId: string }
 export interface Row { id: string; panes: Pane[]; size: number }
 export interface Tab { id: string; rows: Row[] }
 export interface Layout { tabs: Tab[]; activeTabId: string; focusedPaneId: string }
@@ -22,7 +22,7 @@ export type Action =
 let counter = 0;
 const nextId = (p: string) => `${p}-${++counter}`;
 const defaultTitle = (cwd: string) => cwd.split("/").filter(Boolean).pop() ?? "shell";
-const makePane = (cwd: string): Pane => ({ id: nextId("pane"), cwd, size: 1, title: defaultTitle(cwd), autoTitle: true });
+const makePane = (cwd: string): Pane => ({ id: nextId("pane"), cwd, size: 1, title: defaultTitle(cwd), autoTitle: true, sessionId: crypto.randomUUID() });
 const makeRow = (cwd: string): Row => ({ id: nextId("row"), panes: [makePane(cwd)], size: 1 });
 
 export function initLayout(cwd: string): Layout {

@@ -130,3 +130,14 @@ describe("paneLayout (rows model)", () => {
     expect(l.tabs[0].rows[0].panes[0].title).toBe("frontend");
   });
 });
+
+describe("sessionId", () => {
+  it("gives each pane a unique uuid sessionId", () => {
+    const l0 = initLayout("/x");
+    const p0 = l0.tabs[0].rows[0].panes[0];
+    expect(p0.sessionId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+    const l1 = reduce({ ...l0, focusedPaneId: p0.id }, { type: "split" });
+    const ids = l1.tabs[0].rows[0].panes.map((p) => p.sessionId);
+    expect(new Set(ids).size).toBe(2);
+  });
+});
