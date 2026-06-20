@@ -66,3 +66,6 @@
 .cockpit-bay:hover .cockpit-bay__jump { opacity: 1; }
 
 @media (prefers-reduced-motion: reduce) { .cockpit-dash, .cockpit-bay__bars i, .cockpit-bay.is-working::after { animation: none; } }
+.cockpit-dash__stat.is-cost b { color: #EDEFF3; }
+.cockpit-bay__cost { margin-left: 8px; font-size: 11.5px; font-weight: 700; color: #C8CDD6; font-variant-numeric: tabular-nums; }
+.cockpit-bay.is-working .cockpit-bay__cost { color: #F5A623; }

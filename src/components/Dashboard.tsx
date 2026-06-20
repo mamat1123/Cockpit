@@ -3,6 +3,8 @@ import type { Layout } from "../layout/paneLayout";
 import { overviewItems } from "./paneFlatten";
 import { paneLastLineAt } from "../lib/terminalRegistry";
 import { deriveState } from "../lib/paneState";
+import { sessionUsage } from "../lib/costClient";
+import { costOf } from "../lib/pricing";
 import "./Dashboard.css";
 
 function ago(last: number | null, now: number): string {
@@ -26,6 +28,25 @@ export function Dashboard({ layout, onJump, onClose }: {
     return () => { clearInterval(id); window.removeEventListener("keydown", onKey, true); };
   }, [onClose]);
 
+  const [costs, setCosts] = useState<Record<string, number>>({});
+  useEffect(() => {
+    let alive = true;
+    const fetchAll = async () => {
+      const list = overviewItems(layout);
+      const pairs = await Promise.all(list.map(async (it) => {
+        try { return [it.paneId, costOf(await sessionUsage(it.cwd, it.sessionId))] as const; }
+        catch { return [it.paneId, 0] as const; }
+      }));
+      if (alive) setCosts(Object.fromEntries(pairs));
+    };
+    void fetchAll();
+    const id = setInterval(() => void fetchAll(), 3000);
+    return () => { alive = false; clearInterval(id); };
+  }, [layout]);
+
+  const fmt = (n: number) => `$${n > 0 && n < 0.01 ? n.toFixed(3) : n.toFixed(2)}`;
+  const totalCost = Object.values(costs).reduce((s, v) => s + v, 0);
+
   const items = overviewItems(layout).map((it) => {
     const last = paneLastLineAt(it.paneId);
     return { ...it, working: deriveState({ lastLineAt: last }, now, 800) === "working", when: ago(last, now) };
@@ -44,6 +65,7 @@ export function Dashboard({ layout, onJump, onClose }: {
             <div className="cockpit-dash__stat"><b>{items.length}</b><span>sessions</span></div>
             <div className="cockpit-dash__stat is-work"><b>{workCount}</b><span>working</span></div>
             <div className="cockpit-dash__stat is-idle"><b>{items.length - workCount}</b><span>idle</span></div>
+            <div className="cockpit-dash__stat is-cost"><b>{fmt(totalCost)}</b><span>total</span></div>
           </div>
         </div>
         <div className="cockpit-dash__grid">
@@ -67,6 +89,7 @@ export function Dashboard({ layout, onJump, onClose }: {
                     {it.working ? "working" : "idle"}
                   </span>
                   <span className="cockpit-bay__when">{it.when}</span>
+                  <span className="cockpit-bay__cost">{fmt(costs[it.paneId] ?? 0)}</span>
                 </span>
                 <span className="cockpit-bay__jump">↵ jump</span>
               </span>
