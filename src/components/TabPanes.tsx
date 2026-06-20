@@ -21,6 +21,16 @@ function RowPanes({ row, focusedPaneId, dispatch }: {
               onRename={(t) => dispatch({ type: "renamePane", paneId: p.id, title: t })}
               onPopOut={() => dispatch({ type: "popOut", paneId: p.id })}
               onClose={() => { dispatch({ type: "focusPane", paneId: p.id }); dispatch({ type: "close" }); }}
+              dragProps={{
+                draggable: true,
+                onDragStart: (e) => { e.dataTransfer.setData("text/plain", p.id); e.dataTransfer.effectAllowed = "move"; },
+                onDragOver: (e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; },
+                onDrop: (e) => {
+                  e.preventDefault();
+                  const fromId = e.dataTransfer.getData("text/plain");
+                  if (fromId && fromId !== p.id) dispatch({ type: "movePaneAfter", paneId: fromId, targetPaneId: p.id });
+                },
+              }}
             />
           </div>
           {pi < row.panes.length - 1 && (
