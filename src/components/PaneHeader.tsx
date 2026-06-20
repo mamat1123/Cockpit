@@ -1,13 +1,13 @@
 import { useState } from "react";
 import "./PaneHeader.css";
 
-export function PaneHeader({ title, working, onRename, onPopOut, onClose, dragProps }: {
+export function PaneHeader({ title, working, onRename, onPopOut, onClose, dragHandleProps }: {
   title: string;
   working: boolean;
   onRename: (title: string) => void;
   onPopOut: () => void;
   onClose: () => void;
-  dragProps?: React.HTMLAttributes<HTMLDivElement> & { draggable?: boolean };
+  dragHandleProps?: React.HTMLAttributes<HTMLDivElement> & { draggable?: boolean };
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(title);
@@ -18,7 +18,7 @@ export function PaneHeader({ title, working, onRename, onPopOut, onClose, dragPr
     else setDraft(title);
   };
   return (
-    <div className="pane-head" {...dragProps}>
+    <div className="pane-head" {...dragHandleProps}>
       {editing ? (
         <input
           className="pane-head__input"

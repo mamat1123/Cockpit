@@ -6,18 +6,21 @@ import { acquireTerminal, attachTerminal, parkTerminalNode, refit } from "../lib
 import { PaneHeader } from "./PaneHeader";
 import "./TerminalPane.css";
 
-export function TerminalPane({ paneId, cwd, sessionId, title, focused, onFocus, onRename, onAutoTitle, onPopOut, onClose, dragProps }: {
+export function TerminalPane({ paneId, cwd, sessionId, title, focused, isDragging, isDropTarget, onFocus, onRename, onAutoTitle, onPopOut, onClose, dragHandleProps, dropZoneProps }: {
   paneId: string;
   cwd: string;
   sessionId: string;
   title: string;
   focused: boolean;
+  isDragging?: boolean;
+  isDropTarget?: boolean;
   onFocus: () => void;
   onRename: (title: string) => void;
   onAutoTitle: (title: string) => void;
   onPopOut: () => void;
   onClose: () => void;
-  dragProps?: React.HTMLAttributes<HTMLDivElement> & { draggable?: boolean };
+  dragHandleProps?: React.HTMLAttributes<HTMLDivElement> & { draggable?: boolean };
+  dropZoneProps?: React.HTMLAttributes<HTMLDivElement>;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<PaneState>("idle");
@@ -83,8 +86,9 @@ export function TerminalPane({ paneId, cwd, sessionId, title, focused, onFocus, 
 
   return (
     <div
-      className={`cockpit-pane${state === "working" ? " is-working" : ""}${focused ? " is-focused" : ""}`}
+      className={`cockpit-pane${state === "working" ? " is-working" : ""}${focused ? " is-focused" : ""}${isDragging ? " is-dragging" : ""}${isDropTarget ? " is-drop-target" : ""}`}
       onMouseDown={onFocus}
+      {...dropZoneProps}
     >
       <PaneHeader
         title={title}
@@ -92,10 +96,11 @@ export function TerminalPane({ paneId, cwd, sessionId, title, focused, onFocus, 
         onRename={onRename}
         onPopOut={onPopOut}
         onClose={onClose}
-        dragProps={dragProps}
+        dragHandleProps={dragHandleProps}
       />
       <div ref={containerRef} className="cockpit-pane__host" />
       <div className="cockpit-pane__vignette" />
+      <div className="cockpit-pane__drop" />
     </div>
   );
 }

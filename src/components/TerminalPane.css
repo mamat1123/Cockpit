@@ -22,3 +22,27 @@
 @media (prefers-reduced-motion: reduce) {
   .cockpit-pane.is-working .cockpit-pane__vignette { animation: none; box-shadow: inset 0 0 30px 0 rgba(245,166,35,.22); }
 }
+
+/* ---- drag-to-reposition feedback ---- */
+.cockpit-pane { transition: opacity .14s ease, transform .14s ease; }
+/* the pane being dragged dims and lifts slightly */
+.cockpit-pane.is-dragging { opacity: .35; transform: scale(.985); }
+
+/* drop-target highlight: amber ring + tint, with an insertion marker on the right edge
+   (a dragged pane lands AFTER the highlighted target). */
+.cockpit-pane__drop {
+  position: absolute; inset: 0; border-radius: 6px; pointer-events: none;
+  opacity: 0; transition: opacity .12s ease;
+}
+.cockpit-pane.is-drop-target .cockpit-pane__drop {
+  opacity: 1;
+  background: rgba(245, 166, 35, 0.07);
+  box-shadow: inset 0 0 0 2px #F5A623, inset 0 0 34px -8px rgba(245, 166, 35, 0.55);
+}
+.cockpit-pane.is-drop-target .cockpit-pane__drop::after {
+  content: ""; position: absolute; top: 6px; bottom: 6px; right: 2px; width: 3px;
+  border-radius: 2px; background: #F5A623; box-shadow: 0 0 10px 1px rgba(245, 166, 35, 0.85);
+}
+@media (prefers-reduced-motion: reduce) {
+  .cockpit-pane { transition: none; }
+}
