@@ -116,4 +116,17 @@ describe("paneLayout (rows model)", () => {
     expect(l.tabs[0].rows.length).toBe(1);
     expect(l.tabs[0].rows[0].panes.map((p) => p.id)).toEqual([A, B]);
   });
+  it("autoTitlePane updates the title while auto-naming is on", () => {
+    let l = initLayout(CWD);
+    const id = l.focusedPaneId;
+    l = reduce(l, { type: "autoTitlePane", paneId: id, title: "fix crypto bug" });
+    expect(l.tabs[0].rows[0].panes[0].title).toBe("fix crypto bug");
+  });
+  it("a manual renamePane stops further auto-naming", () => {
+    let l = initLayout(CWD);
+    const id = l.focusedPaneId;
+    l = reduce(l, { type: "renamePane", paneId: id, title: "frontend" });
+    l = reduce(l, { type: "autoTitlePane", paneId: id, title: "should be ignored" });
+    expect(l.tabs[0].rows[0].panes[0].title).toBe("frontend");
+  });
 });

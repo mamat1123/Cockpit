@@ -1,4 +1,4 @@
-export interface Pane { id: string; cwd: string; size: number; title: string }
+export interface Pane { id: string; cwd: string; size: number; title: string; autoTitle: boolean }
 export interface Row { id: string; panes: Pane[]; size: number }
 export interface Tab { id: string; rows: Row[] }
 export interface Layout { tabs: Tab[]; activeTabId: string; focusedPaneId: string }
@@ -15,13 +15,14 @@ export type Action =
   | { type: "setRowSizes"; tabId: string; sizes: number[] }
   | { type: "setPaneSizes"; rowId: string; sizes: number[] }
   | { type: "renamePane"; paneId: string; title: string }
+  | { type: "autoTitlePane"; paneId: string; title: string }
   | { type: "popOut"; paneId: string }
   | { type: "movePaneAfter"; paneId: string; targetPaneId: string };
 
 let counter = 0;
 const nextId = (p: string) => `${p}-${++counter}`;
 const defaultTitle = (cwd: string) => cwd.split("/").filter(Boolean).pop() ?? "shell";
-const makePane = (cwd: string): Pane => ({ id: nextId("pane"), cwd, size: 1, title: defaultTitle(cwd) });
+const makePane = (cwd: string): Pane => ({ id: nextId("pane"), cwd, size: 1, title: defaultTitle(cwd), autoTitle: true });
 const makeRow = (cwd: string): Row => ({ id: nextId("row"), panes: [makePane(cwd)], size: 1 });
 
 export function initLayout(cwd: string): Layout {
@@ -155,7 +156,19 @@ export function reduce(l: Layout, a: Action): Layout {
         ...t,
         rows: t.rows.map((r) => ({
           ...r,
-          panes: r.panes.map((p) => (p.id === a.paneId ? { ...p, title: a.title } : p)),
+          panes: r.panes.map((p) => (p.id === a.paneId ? { ...p, title: a.title, autoTitle: false } : p)),
+        })),
+      }));
+      return { ...l, tabs };
+    }
+    case "autoTitlePane": {
+      const tabs = l.tabs.map((t) => ({
+        ...t,
+        rows: t.rows.map((r) => ({
+          ...r,
+          panes: r.panes.map((p) =>
+            p.id === a.paneId && p.autoTitle ? { ...p, title: a.title } : p,
+          ),
         })),
       }));
       return { ...l, tabs };
