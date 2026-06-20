@@ -127,3 +127,9 @@ export function releaseTerminal(paneId: string) {
 export function paneLastLineAt(paneId: string): number | null {
   return registry.get(paneId)?.lastLineAt.current ?? null;
 }
+
+/** Focus a pane's terminal so keystrokes go straight to it (e.g. after a dashboard
+ *  jump or programmatic tab switch, where no click lands inside the xterm). */
+export function focusTerminal(paneId: string) {
+  registry.get(paneId)?.term.focus();
+}

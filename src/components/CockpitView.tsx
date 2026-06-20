@@ -7,7 +7,7 @@ import { PaneHost } from "./PaneHost";
 import { Dashboard } from "./Dashboard";
 import { killPty } from "../lib/ptyClient";
 import { stopLogtail } from "../lib/logClient";
-import { releaseTerminal } from "../lib/terminalRegistry";
+import { releaseTerminal, focusTerminal } from "../lib/terminalRegistry";
 
 const DEFAULT_CWD = "/Users/theerametsaengsin/Work/mee-tang/app";
 
@@ -58,7 +58,11 @@ export function CockpitView() {
     <div style={{ position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: "#14161B" }}>
       <TabBar
         layout={layout}
-        onSelect={(tabId) => dispatch({ type: "focusTab", tabId })}
+        onSelect={(tabId) => {
+          dispatch({ type: "focusTab", tabId });
+          const pid = layout.tabs.find((t) => t.id === tabId)?.rows[0]?.panes[0]?.id;
+          if (pid) requestAnimationFrame(() => requestAnimationFrame(() => focusTerminal(pid)));
+        }}
         onNewTab={() => dispatch({ type: "newTab" })}
         onReorder={(tabId, toIndex) => dispatch({ type: "moveTab", tabId, toIndex })}
         onOpenDashboard={() => setDashOpen(true)}
@@ -83,6 +87,8 @@ export function CockpitView() {
             dispatch({ type: "focusTab", tabId });
             dispatch({ type: "focusPane", paneId });
             setDashOpen(false);
+            // focus the xterm after the tab becomes visible so you can type immediately
+            requestAnimationFrame(() => requestAnimationFrame(() => focusTerminal(paneId)));
           }}
         />
       )}
