@@ -1,0 +1,8 @@
+.cockpit-divider__line {
+  background: #2A2F3A;
+  border-radius: 2px;
+  transition: background 0.15s;
+}
+.cockpit-divider--x .cockpit-divider__line { width: 2px; height: 100%; }
+.cockpit-divider--y .cockpit-divider__line { width: 100%; height: 2px; }
+.cockpit-divider:hover .cockpit-divider__line { background: #F5A623; }
