@@ -4,6 +4,7 @@ import { useKeybindings } from "../layout/useKeybindings";
 import { TabBar } from "./TabBar";
 import { TabPanes } from "./TabPanes";
 import { PaneHost } from "./PaneHost";
+import { Dashboard } from "./Dashboard";
 import { killPty } from "../lib/ptyClient";
 import { stopLogtail } from "../lib/logClient";
 import { releaseTerminal } from "../lib/terminalRegistry";
@@ -16,7 +17,9 @@ function livePaneIds(l: Layout): Set<string> {
 
 export function CockpitView() {
   const [layout, dispatch] = useReducer(reduce, DEFAULT_CWD, initLayout);
-  useKeybindings(dispatch);
+  const [dashOpen, setDashOpen] = useState(false);
+  const toggleDash = useCallback(() => setDashOpen((o) => !o), []);
+  useKeybindings(dispatch, toggleDash);
 
   const [slots, setSlots] = useState<Record<string, HTMLElement>>({});
   // `registerSlot(paneId)` returns a STABLE ref callback (cached per pane). A fresh
@@ -58,6 +61,7 @@ export function CockpitView() {
         onSelect={(tabId) => dispatch({ type: "focusTab", tabId })}
         onNewTab={() => dispatch({ type: "newTab" })}
         onReorder={(tabId, toIndex) => dispatch({ type: "moveTab", tabId, toIndex })}
+        onOpenDashboard={() => setDashOpen(true)}
       />
       <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
         {layout.tabs.map((t) => (
@@ -71,6 +75,17 @@ export function CockpitView() {
         ))}
       </div>
       <PaneHost layout={layout} slots={slots} dispatch={dispatch} />
+      {dashOpen && (
+        <Dashboard
+          layout={layout}
+          onClose={() => setDashOpen(false)}
+          onJump={(tabId, paneId) => {
+            dispatch({ type: "focusTab", tabId });
+            dispatch({ type: "focusPane", paneId });
+            setDashOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }

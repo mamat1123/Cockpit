@@ -8,11 +8,12 @@ function tabTitle(t: Tab): string {
   return panes.length > 1 ? `${name} · ${panes.length}` : name;
 }
 
-export function TabBar({ layout, onSelect, onNewTab, onReorder }: {
+export function TabBar({ layout, onSelect, onNewTab, onReorder, onOpenDashboard }: {
   layout: Layout;
   onSelect: (tabId: string) => void;
   onNewTab: () => void;
   onReorder: (tabId: string, toIndex: number) => void;
+  onOpenDashboard: () => void;
 }) {
   return (
     <div className="cockpit-tabs">
@@ -33,6 +34,7 @@ export function TabBar({ layout, onSelect, onNewTab, onReorder }: {
           <span className="cockpit-tab__title">{tabTitle(t)}</span>
         </button>
       ))}
+      <button className="cockpit-tab cockpit-tab--new" onClick={onOpenDashboard} aria-label="Mission Control (Cmd+0)" title="Mission Control (⌘0)">▦</button>
       <button className="cockpit-tab cockpit-tab--new" onClick={onNewTab} aria-label="New tab (Cmd+T)">+</button>
       <div className="cockpit-tabs__drag" data-tauri-drag-region></div>
     </div>
