@@ -12,7 +12,7 @@ export function TabBar({ layout, onSelect, onNewTab }: {
           className={`cockpit-tab${t.id === layout.activeTabId ? " is-active" : ""}`}
           onClick={() => onSelect(t.id)}
         >
-          {`${i + 1} · ${t.panes.length}▦`}
+          {`${i + 1} · ${t.rows.reduce((n, r) => n + r.panes.length, 0)}▦`}
         </button>
       ))}
       <button className="cockpit-tab cockpit-tab--new" onClick={onNewTab} aria-label="New tab (Cmd+T)">+</button>

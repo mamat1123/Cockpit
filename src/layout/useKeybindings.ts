@@ -8,7 +8,7 @@ export function useKeybindings(dispatch: (a: Action) => void) {
       if (!e.metaKey || e.ctrlKey || e.altKey) return;
       const k = e.key.toLowerCase();
       if (k === "t") { e.preventDefault(); dispatch({ type: "newTab" }); }
-      else if (k === "d") { e.preventDefault(); dispatch({ type: "split" }); }
+      else if (k === "d") { e.preventDefault(); dispatch({ type: e.shiftKey ? "splitDown" : "split" }); }
       else if (k === "w") { e.preventDefault(); dispatch({ type: "close" }); }
     };
     window.addEventListener("keydown", onKey, true);
