@@ -75,6 +75,11 @@ rendered to feel satisfying. "Game-like" = aesthetic JUICE, not game mechanics (
   `dragDropEnabled:false` + has drop-preview feedback.
 - **M4 — Dashboard ("Mission Control")**: ⌘0 (or a ▦ tab-bar button) opens an overlay listing every
   session across tabs as a bay (name, repo, live working/idle, tab #, last-active); click → jump to that
-  pane. Activity from the registry; cost-per-bay deferred.
+  pane + focus its terminal (also focus-on-tab-switch). Activity from the registry.
+- **M5 — Cost**: Rust `session_usage` reads each pane's `<uuid>.jsonl` incrementally → per-model token
+  tiers (input/output/cache-read/cache-write-5m/cache-write-1h, split because 1h writes cost 2x vs 5m
+  1.25x). Frontend `pricing.ts` (editable table, localStorage, defaults) × tokens = USD. Dashboard shows
+  per-session `$` per bay + a grand total. (Per-project grouping, a price-table editor UI, and
+  server-tool costs are fast-follow.)
 
-**Next candidates:** cost-by-project (ADR 0005), layout persistence (#4), project/cwd picker for new panes.
+**Next candidates:** per-project cost grouping + price-editor UI, layout persistence (#4), project/cwd picker for new panes, combo/juice on send (#5).
