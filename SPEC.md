@@ -62,5 +62,19 @@ rendered to feel satisfying. "Game-like" = aesthetic JUICE, not game mechanics (
   pane lifecycle (so unmount stops the process; also re-enables StrictMode), dead-session
   cleanup from the manager map, and per-pane auto-launch of `claude`.
 
-Next: **M2 — log-tail → working state** (the differentiator: per-pane working/idle/waiting + the
-start of cost). Risk #2 (log-tail → state) is the spike there.
+## Status — updated 2026-06-20
+
+**M1 → M4 DONE & GUI-verified.** Shipped, all on `main` (attribution-free):
+- **M1** PTY foundation · **M2** working/idle from per-pane signal (HUD chip + breathing vignette) ·
+  **M3** tabs/splits/keybindings (⌘T/D/⇧D/W) · **M3b** resize/window-drag/tab-reorder ·
+  **M3c** per-pane header (editable name + status + pop-out ↗ + close) · **M3d** auto-name from session topic.
+- **pane-session-identity**: each pane has a uuid `sessionId`, auto-runs `claude --session-id <uuid>`,
+  reads that exact log for name/activity (fixes same-cwd panes sharing a name). Pop-out/drag preserve the
+  running session via a terminal **registry** (xterm lives outside React; React-portal container changes
+  remount, so the host `<div>` is moved with `appendChild`). Pane drag-and-drop needs Tauri
+  `dragDropEnabled:false` + has drop-preview feedback.
+- **M4 — Dashboard ("Mission Control")**: ⌘0 (or a ▦ tab-bar button) opens an overlay listing every
+  session across tabs as a bay (name, repo, live working/idle, tab #, last-active); click → jump to that
+  pane. Activity from the registry; cost-per-bay deferred.
+
+**Next candidates:** cost-by-project (ADR 0005), layout persistence (#4), project/cwd picker for new panes.
