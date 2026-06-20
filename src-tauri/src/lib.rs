@@ -1,5 +1,6 @@
 mod pty;
 mod logtail;
+mod cost;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -13,6 +14,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(pty::PtyManager::default())
         .manage(logtail::LogtailManager::default())
+        .manage(cost::CostManager::default())
         .invoke_handler(tauri::generate_handler![
             greet,
             pty::pty_spawn,
@@ -21,7 +23,8 @@ pub fn run() {
             pty::pty_kill,
             logtail::logtail_start,
             logtail::logtail_stop,
-            logtail::pane_topic
+            logtail::pane_topic,
+            cost::session_usage
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
