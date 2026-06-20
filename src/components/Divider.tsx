@@ -1,5 +1,5 @@
-import { useRef } from "react";
 import "./Divider.css";
+import { createDrag } from "./dragMath";
 
 /** Draggable splitter. Reports drag delta as a FRACTION of the container's size
  *  along its axis; the parent converts it to flex-weight changes.
@@ -12,18 +12,18 @@ export function Divider({ axis, containerPx, onResize }: {
   containerPx: () => number;
   onResize: (deltaFraction: number) => void;
 }) {
-  const start = useRef(0);
   const isX = axis === "x";
 
   const onDown = (e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    start.current = isX ? e.clientX : e.clientY;
+    // cumulative fraction from the drag's start (origin fixed for the whole drag) —
+    // the parent applies it to the sizes captured at drag-start, so size =
+    // startSize + cumulativeFraction. Advancing the origin per move (the old bug)
+    // made only the last increment stick and the pane snapped back.
+    const frac = createDrag(isX ? e.clientX : e.clientY, containerPx);
     const move = (ev: PointerEvent) => {
-      const now = isX ? ev.clientX : ev.clientY;
-      const total = containerPx() || 1;
-      onResize((now - start.current) / total);
-      start.current = now;
+      onResize(frac(isX ? ev.clientX : ev.clientY));
     };
     const up = () => {
       // capture-phase removal must match capture-phase add
