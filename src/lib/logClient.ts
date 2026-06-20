@@ -11,3 +11,6 @@ export function stopLogtail(paneId: string) {
 export function onLogLine(paneId: string, onLine: (line: string) => void): Promise<UnlistenFn> {
   return listen<string>(`pane://log/${paneId}`, (e) => onLine(e.payload));
 }
+export function paneTopic(cwd: string): Promise<string | null> {
+  return invoke("pane_topic", { cwd });
+}

@@ -3,17 +3,19 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import { spawnPty, writePty, resizePty, onPtyOutput, onPtyExit } from "../lib/ptyClient";
+import { paneTopic } from "../lib/logClient";
 import { deriveState, type PaneState } from "../lib/paneState";
 import { PaneHeader } from "./PaneHeader";
 import "./TerminalPane.css";
 
-export function TerminalPane({ paneId, cwd, title, focused, onFocus, onRename, onPopOut, onClose, dragProps }: {
+export function TerminalPane({ paneId, cwd, title, focused, onFocus, onRename, onAutoTitle, onPopOut, onClose, dragProps }: {
   paneId: string;
   cwd: string;
   title: string;
   focused: boolean;
   onFocus: () => void;
   onRename: (title: string) => void;
+  onAutoTitle: (title: string) => void;
   onPopOut: () => void;
   onClose: () => void;
   dragProps?: React.HTMLAttributes<HTMLDivElement> & { draggable?: boolean };
@@ -23,6 +25,8 @@ export function TerminalPane({ paneId, cwd, title, focused, onFocus, onRename, o
   const lastLineAt = useRef<number | null>(null);
   const lastInputAt = useRef(0);
   const lastResizeAt = useRef(0);
+  const onAutoTitleRef = useRef(onAutoTitle);
+  onAutoTitleRef.current = onAutoTitle;
 
   useEffect(() => {
     const host = hostRef.current!;
@@ -75,6 +79,29 @@ export function TerminalPane({ paneId, cwd, title, focused, onFocus, onRename, o
       clearInterval(tick);
     };
   }, [paneId, cwd]);
+
+  useEffect(() => {
+    let alive = true;
+    let last = "";
+    const poll = async () => {
+      try {
+        const t = await paneTopic(cwd);
+        if (alive && t && t !== last) {
+          last = t;
+          onAutoTitleRef.current(t);
+        }
+      } catch {
+        /* not under Tauri / no log yet — ignore */
+      }
+    };
+    const first = setTimeout(poll, 1200);
+    const id = setInterval(poll, 6000);
+    return () => {
+      alive = false;
+      clearTimeout(first);
+      clearInterval(id);
+    };
+  }, [cwd]);
 
   return (
     <div

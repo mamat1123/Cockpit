@@ -19,6 +19,7 @@ function RowPanes({ row, focusedPaneId, dispatch }: {
               focused={p.id === focusedPaneId}
               onFocus={() => dispatch({ type: "focusPane", paneId: p.id })}
               onRename={(t) => dispatch({ type: "renamePane", paneId: p.id, title: t })}
+              onAutoTitle={(t) => dispatch({ type: "autoTitlePane", paneId: p.id, title: t })}
               onPopOut={() => dispatch({ type: "popOut", paneId: p.id })}
               onClose={() => { dispatch({ type: "focusPane", paneId: p.id }); dispatch({ type: "close" }); }}
               dragProps={{

@@ -2,10 +2,10 @@ import type { Layout, Tab } from "../layout/paneLayout";
 import "./TabBar.css";
 
 function tabTitle(t: Tab): string {
-  const cwd = t.rows[0]?.panes[0]?.cwd ?? "";
-  const name = cwd.split("/").filter(Boolean).slice(-2).join("/") || "shell";
-  const count = t.rows.reduce((n, r) => n + r.panes.length, 0);
-  return count > 1 ? `${name} · ${count}` : name;
+  const panes = t.rows.flatMap((r) => r.panes);
+  const base = panes[0]?.title || "shell";
+  const name = base.length > 28 ? base.slice(0, 28) + "…" : base;
+  return panes.length > 1 ? `${name} · ${panes.length}` : name;
 }
 
 export function TabBar({ layout, onSelect, onNewTab, onReorder }: {
