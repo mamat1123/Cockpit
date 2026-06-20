@@ -16,6 +16,7 @@ export function CockpitView() {
         layout={layout}
         onSelect={(tabId) => dispatch({ type: "focusTab", tabId })}
         onNewTab={() => dispatch({ type: "newTab" })}
+        onReorder={(tabId, toIndex) => dispatch({ type: "moveTab", tabId, toIndex })}
       />
       <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
         {layout.tabs.map((t) => (

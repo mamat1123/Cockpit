@@ -6,3 +6,5 @@
 .cockpit-tab.is-active { color: #C8CDD6; background: #1b1f27; border-color: #262A33; }
 .cockpit-tab--new { color: #6B7280; padding: 6px 10px; }
 .cockpit-tab:focus-visible { outline: 2px solid #f5a623; outline-offset: 1px; }
+.cockpit-tabs__drag { flex: 1; align-self: stretch; }
+.cockpit-tab[draggable="true"]:active { cursor: grabbing; }
