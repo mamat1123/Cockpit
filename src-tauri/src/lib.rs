@@ -19,7 +19,8 @@ pub fn run() {
             pty::pty_write,
             pty::pty_resize,
             logtail::logtail_start,
-            logtail::logtail_stop
+            logtail::logtail_stop,
+            logtail::pane_topic
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

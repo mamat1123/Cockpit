@@ -39,6 +39,65 @@ pub fn newest_session_file(dir: &Path) -> Option<PathBuf> {
     newest.map(|(_, p)| p)
 }
 
+/// Collapse whitespace to single spaces and cap at 60 chars (… suffix if cut).
+fn truncate_topic(s: &str) -> String {
+    let one_line = s.split_whitespace().collect::<Vec<_>>().join(" ");
+    let max = 60;
+    if one_line.chars().count() <= max {
+        one_line
+    } else {
+        let mut out: String = one_line.chars().take(max).collect();
+        out.push('…');
+        out
+    }
+}
+
+/// First natural-language user message in a session log, or None.
+/// Skips `<…>` command-wrappers, tool_results, and blanks.
+pub fn first_user_topic(path: &Path) -> Option<String> {
+    let file = std::fs::File::open(path).ok()?;
+    for line in BufReader::new(file).lines().map_while(Result::ok) {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let v: serde_json::Value = match serde_json::from_str(line) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        if v.get("type").and_then(|t| t.as_str()) != Some("user") {
+            continue;
+        }
+        let content = v.get("message").and_then(|m| m.get("content"));
+        let text = match content {
+            Some(serde_json::Value::String(s)) => Some(s.clone()),
+            Some(serde_json::Value::Array(arr)) => arr.iter().find_map(|b| {
+                if b.get("type").and_then(|t| t.as_str()) == Some("text") {
+                    b.get("text").and_then(|t| t.as_str()).map(str::to_string)
+                } else {
+                    None
+                }
+            }),
+            _ => None,
+        };
+        if let Some(t) = text {
+            let t = t.trim();
+            if t.is_empty() || t.starts_with('<') {
+                continue;
+            }
+            return Some(truncate_topic(t));
+        }
+    }
+    None
+}
+
+#[tauri::command]
+pub fn pane_topic(cwd: String) -> Option<String> {
+    let home = dirs_home()?;
+    let path = newest_session_file(&project_log_dir(&home, &cwd))?;
+    first_user_topic(&path)
+}
+
 #[derive(Default)]
 pub struct LogtailManager(pub Mutex<HashMap<String, Arc<AtomicBool>>>);
 
@@ -134,6 +193,34 @@ mod tests {
         std::fs::write(dir.join("ignore.txt"), "x").unwrap();
         let got = newest_session_file(&dir).unwrap();
         assert_eq!(got.file_name().unwrap().to_str().unwrap(), "b.jsonl");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn first_user_topic_skips_wrappers_and_collapses_ws() {
+        let dir = std::env::temp_dir().join(format!("cockpit-topic-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("s.jsonl");
+        let content = concat!(
+            "{\"type\":\"summary\",\"summary\":\"ignore me\"}\n",
+            "{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"<local-command-caveat>skip\"}]}}\n",
+            "{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":\"  Fix the   crypto\\n pricing bug  \"}}\n"
+        );
+        std::fs::write(&path, content).unwrap();
+        assert_eq!(first_user_topic(&path).as_deref(), Some("Fix the crypto pricing bug"));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn first_user_topic_truncates_long_text() {
+        let dir = std::env::temp_dir().join(format!("cockpit-topic2-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("s.jsonl");
+        let long = "a ".repeat(80);
+        std::fs::write(&path, format!("{{\"type\":\"user\",\"message\":{{\"role\":\"user\",\"content\":\"{}\"}}}}\n", long)).unwrap();
+        let got = first_user_topic(&path).unwrap();
+        assert!(got.ends_with('…'));
+        assert_eq!(got.chars().count(), 61);
         std::fs::remove_dir_all(&dir).ok();
     }
 }
