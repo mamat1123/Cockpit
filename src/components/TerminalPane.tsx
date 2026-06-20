@@ -3,15 +3,16 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import { spawnPty, writePty, resizePty, onPtyOutput, onPtyExit } from "../lib/ptyClient";
-import { paneTopic } from "../lib/logClient";
+import { paneTopic, startLogtail, stopLogtail } from "../lib/logClient";
 import { debounce } from "../lib/debounce";
 import { deriveState, type PaneState } from "../lib/paneState";
 import { PaneHeader } from "./PaneHeader";
 import "./TerminalPane.css";
 
-export function TerminalPane({ paneId, cwd, title, focused, onFocus, onRename, onAutoTitle, onPopOut, onClose, dragProps }: {
+export function TerminalPane({ paneId, cwd, sessionId, title, focused, onFocus, onRename, onAutoTitle, onPopOut, onClose, dragProps }: {
   paneId: string;
   cwd: string;
+  sessionId: string;
   title: string;
   focused: boolean;
   onFocus: () => void;
@@ -58,7 +59,8 @@ export function TerminalPane({ paneId, cwd, title, focused, onFocus, onRename, o
       void writePty(paneId, data);
     });
 
-    void spawnPty(paneId, cwd, term.cols, term.rows);
+    void spawnPty(paneId, cwd, term.cols, term.rows, `claude --session-id ${sessionId}`);
+    void startLogtail(paneId, cwd, sessionId);
 
     // Settle-to-fit: a drag/window-resize fires a STORM of ResizeObserver events.
     // Resizing the PTY on every one floods the shell with SIGWINCH faster than it
@@ -92,15 +94,16 @@ export function TerminalPane({ paneId, cwd, title, focused, onFocus, onRename, o
       unlisteners.forEach((p) => p.then((un) => un()));
       term.dispose();
       clearInterval(tick);
+      void stopLogtail(paneId);
     };
-  }, [paneId, cwd]);
+  }, [paneId, cwd, sessionId]);
 
   useEffect(() => {
     let alive = true;
     let last = "";
     const poll = async () => {
       try {
-        const t = await paneTopic(cwd);
+        const t = await paneTopic(cwd, sessionId);
         if (alive && t && t !== last) {
           last = t;
           onAutoTitleRef.current(t);
@@ -116,7 +119,7 @@ export function TerminalPane({ paneId, cwd, title, focused, onFocus, onRename, o
       clearTimeout(first);
       clearInterval(id);
     };
-  }, [cwd]);
+  }, [cwd, sessionId]);
 
   return (
     <div
