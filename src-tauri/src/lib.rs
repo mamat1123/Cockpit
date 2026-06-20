@@ -18,6 +18,7 @@ pub fn run() {
             pty::pty_spawn,
             pty::pty_write,
             pty::pty_resize,
+            pty::pty_kill,
             logtail::logtail_start,
             logtail::logtail_stop,
             logtail::pane_topic

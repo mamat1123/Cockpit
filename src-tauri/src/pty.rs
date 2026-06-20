@@ -61,7 +61,12 @@ pub fn pty_spawn(
     cwd: String,
     cols: u16,
     rows: u16,
+    launch: Option<String>,
 ) -> Result<(), String> {
+    // Idempotent: a pane that re-mounts must NOT respawn (would kill its session).
+    if mgr.0.lock().unwrap().contains_key(&pane_id) {
+        return Ok(());
+    }
     let cwd = validate_cwd(&cwd)?;
     let pty = native_pty_system();
     let pair = pty
@@ -124,6 +129,14 @@ pub fn pty_spawn(
         let _ = app2.emit(&exit_evt, ());
     });
 
+    // Auto-run the pane's claude session (or any launch command). Written to the PTY's
+    // stdin so the user's login-shell `claude` function + PATH resolve normally.
+    let mut writer = writer;
+    if let Some(cmd) = launch {
+        let _ = writer.write_all(format!("{cmd}\r").as_bytes());
+        let _ = writer.flush();
+    }
+
     mgr.0.lock().unwrap().insert(
         pane_id,
         PtySession { master: pair.master, writer, _child: child },
@@ -146,4 +159,10 @@ pub fn pty_resize(mgr: State<PtyManager>, pane_id: String, cols: u16, rows: u16)
     s.master
         .resize(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn pty_kill(mgr: State<PtyManager>, pane_id: String) {
+    // Dropping the PtySession drops its child -> portable-pty kills the process.
+    mgr.0.lock().unwrap().remove(&pane_id);
 }
