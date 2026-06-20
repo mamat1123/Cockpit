@@ -3,7 +3,6 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import { spawnPty, writePty, resizePty, onPtyOutput, onPtyExit } from "../lib/ptyClient";
-import { startLogtail, stopLogtail, onLogLine } from "../lib/logClient";
 import { deriveState, type PaneState } from "../lib/paneState";
 import "./TerminalPane.css";
 
@@ -11,6 +10,8 @@ export function TerminalPane({ paneId, cwd, focused, onFocus }: { paneId: string
   const hostRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<PaneState>("idle");
   const lastLineAt = useRef<number | null>(null);
+  const lastInputAt = useRef(0);
+  const lastResizeAt = useRef(0);
 
   useEffect(() => {
     const host = hostRef.current!;
@@ -18,32 +19,46 @@ export function TerminalPane({ paneId, cwd, focused, onFocus }: { paneId: string
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(host);
-    // Let app-level Cmd+T/D/W shortcuts through instead of sending them to the shell.
     term.attachCustomKeyEventHandler((e) => {
       if (e.metaKey && !e.ctrlKey && !e.altKey && ["t", "d", "w"].includes(e.key.toLowerCase())) {
-        return false; // xterm ignores it; the window handler acts
+        return false; // let app-level Cmd+T/D/W shortcuts act instead of typing into the shell
       }
       return true;
     });
     fit.fit();
 
     const unlisteners: Array<Promise<() => void>> = [];
-    unlisteners.push(onPtyOutput(paneId, (chunk) => term.write(chunk)));
+    unlisteners.push(onPtyOutput(paneId, (chunk) => {
+      term.write(chunk);
+      // "working" = Claude actively emitting output (its thinking spinner / streaming).
+      // Ignore output that is merely the echo of the user's own keystrokes, or a redraw
+      // triggered by a resize (e.g. when a hidden tab becomes visible) — those are not
+      // Claude working.
+      const now = Date.now();
+      if (now - lastInputAt.current > 150 && now - lastResizeAt.current > 500) {
+        lastLineAt.current = now;
+      }
+    }));
     unlisteners.push(onPtyExit(paneId, () => term.write("\r\n[claude exited]\r\n")));
 
-    const onData = term.onData((data) => { void writePty(paneId, data); });
+    const onData = term.onData((data) => {
+      lastInputAt.current = Date.now();
+      void writePty(paneId, data);
+    });
 
     void spawnPty(paneId, cwd, term.cols, term.rows);
 
     const ro = new ResizeObserver(() => {
+      lastResizeAt.current = Date.now();
       fit.fit();
       void resizePty(paneId, term.cols, term.rows);
     });
     ro.observe(host);
 
-    void startLogtail(paneId, cwd);
-    unlisteners.push(onLogLine(paneId, () => { lastLineAt.current = Date.now(); }));
-    const tick = setInterval(() => setState(deriveState({ lastLineAt: lastLineAt.current }, Date.now(), 2000)), 500);
+    const tick = setInterval(
+      () => setState(deriveState({ lastLineAt: lastLineAt.current }, Date.now(), 800)),
+      400,
+    );
 
     return () => {
       ro.disconnect();
@@ -51,7 +66,6 @@ export function TerminalPane({ paneId, cwd, focused, onFocus }: { paneId: string
       unlisteners.forEach((p) => p.then((un) => un()));
       term.dispose();
       clearInterval(tick);
-      void stopLogtail(paneId);
     };
   }, [paneId, cwd]);
 
