@@ -1,5 +1,5 @@
-export interface Pane { id: string; cwd: string }
-export interface Row { id: string; panes: Pane[] }
+export interface Pane { id: string; cwd: string; size: number }
+export interface Row { id: string; panes: Pane[]; size: number }
 export interface Tab { id: string; rows: Row[] }
 export interface Layout { tabs: Tab[]; activeTabId: string; focusedPaneId: string }
 
@@ -10,12 +10,15 @@ export type Action =
   | { type: "close" }
   | { type: "focusPane"; paneId: string }
   | { type: "focusTab"; tabId: string }
-  | { type: "setCwd"; paneId: string; cwd: string };
+  | { type: "setCwd"; paneId: string; cwd: string }
+  | { type: "moveTab"; tabId: string; toIndex: number }
+  | { type: "setRowSizes"; tabId: string; sizes: number[] }
+  | { type: "setPaneSizes"; rowId: string; sizes: number[] };
 
 let counter = 0;
 const nextId = (p: string) => `${p}-${++counter}`;
-const makePane = (cwd: string): Pane => ({ id: nextId("pane"), cwd });
-const makeRow = (cwd: string): Row => ({ id: nextId("row"), panes: [makePane(cwd)] });
+const makePane = (cwd: string): Pane => ({ id: nextId("pane"), cwd, size: 1 });
+const makeRow = (cwd: string): Row => ({ id: nextId("row"), panes: [makePane(cwd)], size: 1 });
 
 export function initLayout(cwd: string): Layout {
   const row = makeRow(cwd);
@@ -96,6 +99,33 @@ export function reduce(l: Layout, a: Action): Layout {
           ...r,
           panes: r.panes.map((p) => (p.id === a.paneId ? { ...p, cwd: a.cwd } : p)),
         })),
+      }));
+      return { ...l, tabs };
+    }
+    case "moveTab": {
+      const from = l.tabs.findIndex((t) => t.id === a.tabId);
+      if (from < 0) return l;
+      const tabs = [...l.tabs];
+      const [moved] = tabs.splice(from, 1);
+      tabs.splice(Math.max(0, Math.min(a.toIndex, tabs.length)), 0, moved);
+      return { ...l, tabs };
+    }
+    case "setRowSizes": {
+      const tabs = l.tabs.map((t) =>
+        t.id === a.tabId && a.sizes.length === t.rows.length
+          ? { ...t, rows: t.rows.map((r, i) => ({ ...r, size: a.sizes[i] })) }
+          : t,
+      );
+      return { ...l, tabs };
+    }
+    case "setPaneSizes": {
+      const tabs = l.tabs.map((t) => ({
+        ...t,
+        rows: t.rows.map((r) =>
+          r.id === a.rowId && a.sizes.length === r.panes.length
+            ? { ...r, panes: r.panes.map((p, i) => ({ ...p, size: a.sizes[i] })) }
+            : r,
+        ),
       }));
       return { ...l, tabs };
     }

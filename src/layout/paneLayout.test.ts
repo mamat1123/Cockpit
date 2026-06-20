@@ -51,4 +51,32 @@ describe("paneLayout (rows model)", () => {
     expect(l.tabs.length).toBe(1);
     expect(l.tabs[0].rows[0].panes.length).toBe(1);
   });
+  it("panes and rows start with size 1", () => {
+    let l = initLayout(CWD);
+    l = reduce(l, { type: "split" });
+    expect(l.tabs[0].rows[0].panes.every((p) => p.size === 1)).toBe(true);
+    expect(l.tabs[0].rows.every((r) => r.size === 1)).toBe(true);
+  });
+  it("moveTab reorders tabs, keeping active", () => {
+    let l = initLayout(CWD);
+    l = reduce(l, { type: "newTab" });
+    const [t1, t2] = l.tabs.map((t) => t.id);
+    l = reduce(l, { type: "moveTab", tabId: t2, toIndex: 0 });
+    expect(l.tabs.map((t) => t.id)).toEqual([t2, t1]);
+    expect(l.activeTabId).toBe(t2);
+  });
+  it("setPaneSizes updates the row's pane weights", () => {
+    let l = initLayout(CWD);
+    l = reduce(l, { type: "split" });
+    const rowId = l.tabs[0].rows[0].id;
+    l = reduce(l, { type: "setPaneSizes", rowId, sizes: [2, 1] });
+    expect(l.tabs[0].rows[0].panes.map((p) => p.size)).toEqual([2, 1]);
+  });
+  it("setRowSizes updates the tab's row weights", () => {
+    let l = initLayout(CWD);
+    l = reduce(l, { type: "splitDown" });
+    const tabId = l.tabs[0].id;
+    l = reduce(l, { type: "setRowSizes", tabId, sizes: [3, 1] });
+    expect(l.tabs[0].rows.map((r) => r.size)).toEqual([3, 1]);
+  });
 });
