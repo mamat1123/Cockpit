@@ -3,6 +3,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import { spawnPty, writePty, resizePty, onPtyOutput, onPtyExit } from "./ptyClient";
 import { startLogtail } from "./logClient";
+import { emitSend } from "./juiceBus";
 
 /** A pane's terminal lives OUTSIDE React. React only remounts a thin wrapper when a
  *  pane moves tabs (a portal-container change remounts — verified); if the xterm lived
@@ -70,6 +71,7 @@ export function acquireTerminal(paneId: string, cwd: string, sessionId: string, 
   onPtyExit(paneId, () => term.write("\r\n[claude exited]\r\n"));
   term.onData((data) => {
     lastInputAt.current = Date.now();
+    if (data.includes("\r")) emitSend();
     void writePty(paneId, data);
   });
 
