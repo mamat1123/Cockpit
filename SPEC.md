@@ -105,4 +105,10 @@ rendered to feel satisfying. "Game-like" = aesthetic JUICE, not game mechanics (
   and loads/deletes them; loading replaces the layout with fresh claude sessions. `serializeLayout`/
   `deserializeLayout` + `loadLayout` action; `src/lib/persistence.ts`.
 
-**Next candidates:** native folder dialog in the picker, price-editor UI, combo/juice on send (#5), per-pane cost in the dashboard bays.
+- **M10 — Juice** (ADR 0002, pure visual): retargeted from keypress-combo (wrong rhythm) to the real
+  async flow — a **launch flash** on send (Enter), a **swarm meter** whose intensity escalates with the
+  number of panes working concurrently (the "combo" reframed to real parallelism), and a **completion
+  pull-back** glow on a background tab when a pane there finishes (clears when you view it). Thinking
+  ambient = the existing breathing vignette. `juiceBus` + a `<Juice>` overlay polling registry state.
+
+**Next candidates:** native folder dialog in the picker, price-editor UI, tool-use blips (needs log tool_use parsing), per-pane cost in the dashboard bays.
