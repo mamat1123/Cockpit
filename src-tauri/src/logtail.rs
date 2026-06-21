@@ -102,6 +102,14 @@ pub fn pane_topic(cwd: String, session_id: String) -> Option<String> {
     first_user_topic(&session_log_path(&home, &cwd, &session_id))
 }
 
+/// True if the pane's own session log exists and is non-empty (i.e. resumable).
+#[tauri::command]
+pub fn session_exists(cwd: String, session_id: String) -> bool {
+    let home = match dirs_home() { Some(h) => h, None => return false };
+    let path = session_log_path(&home, &cwd, &session_id);
+    std::fs::metadata(&path).map(|m| m.len() > 0).unwrap_or(false)
+}
+
 #[derive(Default)]
 pub struct LogtailManager(pub Mutex<HashMap<String, Arc<AtomicBool>>>);
 
@@ -233,5 +241,12 @@ mod tests {
             p,
             std::path::Path::new("/home/u/.claude/projects/-Users-x-Work-app/abc-123.jsonl")
         );
+    }
+
+    #[test]
+    fn session_exists_helper_path_logic() {
+        // session_log_path builds the file; existence is just metadata — sanity-check the path joins.
+        let p = session_log_path(std::path::Path::new("/h"), "/c", "id1");
+        assert!(p.ends_with("id1.jsonl"));
     }
 }

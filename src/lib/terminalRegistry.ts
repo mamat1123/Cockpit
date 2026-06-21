@@ -2,7 +2,7 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import { spawnPty, writePty, resizePty, onPtyOutput, onPtyExit } from "./ptyClient";
-import { startLogtail } from "./logClient";
+import { startLogtail, sessionExists } from "./logClient";
 import { emitSend } from "./juiceBus";
 
 /** A pane's terminal lives OUTSIDE React. React only remounts a thin wrapper when a
@@ -75,8 +75,15 @@ export function acquireTerminal(paneId: string, cwd: string, sessionId: string, 
     void writePty(paneId, data);
   });
 
-  const launch = resume ? `claude --resume ${sessionId}` : `claude --session-id ${sessionId}`;
-  void spawnPty(paneId, cwd, term.cols, term.rows, launch);
+  // Resume only if the session log actually exists; otherwise start fresh pinned to
+  // this id (so it's resumable next time). Avoids "No conversation found" dead panes.
+  void (async () => {
+    let launch = `claude --session-id ${sessionId}`;
+    if (resume) {
+      try { if (await sessionExists(cwd, sessionId)) launch = `claude --resume ${sessionId}`; } catch { /* not under tauri */ }
+    }
+    void spawnPty(paneId, cwd, term.cols, term.rows, launch);
+  })();
   void startLogtail(paneId, cwd, sessionId);
 
   const entry: TermEntry = { term, hostEl, fit, lastLineAt, lastInputAt, lastResizeAt };

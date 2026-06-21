@@ -14,3 +14,6 @@ export function onLogLine(paneId: string, onLine: (line: string) => void): Promi
 export function paneTopic(cwd: string, sessionId: string): Promise<string | null> {
   return invoke("pane_topic", { cwd, sessionId });
 }
+export function sessionExists(cwd: string, sessionId: string): Promise<boolean> {
+  return invoke("session_exists", { cwd, sessionId });
+}

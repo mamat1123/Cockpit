@@ -25,6 +25,7 @@ pub fn run() {
             logtail::logtail_start,
             logtail::logtail_stop,
             logtail::pane_topic,
+            logtail::session_exists,
             cost::session_usage,
             cost::cost_report,
             cost::list_projects,
