@@ -8,7 +8,7 @@
   overflow: hidden;
   border-radius: 6px;
 }
-.cockpit-pane.is-focused { outline: 1px solid #f5a62355; outline-offset: -1px; }
+.cockpit-pane.is-focused { outline: 1px solid color-mix(in srgb, var(--ck-accent) 33%, transparent); outline-offset: -1px; }
 .cockpit-pane__host { flex: 1 1 0; min-height: 0; min-width: 0; }
 .cockpit-pane__vignette {
   position: absolute; inset: 0; border-radius: 6px; pointer-events: none;
@@ -16,11 +16,11 @@
 }
 .cockpit-pane.is-working .cockpit-pane__vignette { animation: cockpit-breathe 2.1s ease-in-out infinite; }
 @keyframes cockpit-breathe {
-  0%, 100% { box-shadow: inset 0 0 22px -2px rgba(245,166,35,.14); }
-  50%      { box-shadow: inset 0 0 40px 2px rgba(245,166,35,.30); }
+  0%, 100% { box-shadow: inset 0 0 22px -2px color-mix(in srgb, var(--ck-accent) 14%, transparent); }
+  50%      { box-shadow: inset 0 0 40px 2px color-mix(in srgb, var(--ck-accent) 30%, transparent); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .cockpit-pane.is-working .cockpit-pane__vignette { animation: none; box-shadow: inset 0 0 30px 0 rgba(245,166,35,.22); }
+  .cockpit-pane.is-working .cockpit-pane__vignette { animation: none; box-shadow: inset 0 0 30px 0 color-mix(in srgb, var(--ck-accent) 22%, transparent); }
 }
 
 /* ---- drag-to-reposition feedback ---- */
@@ -36,7 +36,7 @@
 }
 .cockpit-pane.is-drop-target .cockpit-pane__drop {
   opacity: 1;
-  box-shadow: inset 0 0 0 2px rgba(245, 166, 35, 0.5);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--ck-accent) 50%, transparent);
 }
 /* a ghost "drop here" box slides in on the side the pane will land (it's inserted
    AFTER the target, i.e. to its right) — a clear preview of the destination slot. */
@@ -44,10 +44,10 @@
   content: "▸ วางที่นี่";
   position: absolute; top: 8px; bottom: 8px; right: 8px; width: 44%;
   display: flex; align-items: center; justify-content: center;
-  border: 2px dashed #F5A623; border-radius: 10px;
-  background: rgba(245, 166, 35, 0.12);
-  color: #F5A623; font: 700 12px/1 ui-monospace, Menlo, monospace; letter-spacing: .12em;
-  box-shadow: 0 0 24px -6px rgba(245, 166, 35, 0.7);
+  border: 2px dashed var(--ck-accent); border-radius: 10px;
+  background: color-mix(in srgb, var(--ck-accent) 12%, transparent);
+  color: var(--ck-accent); font: 700 12px/1 ui-monospace, Menlo, monospace; letter-spacing: .12em;
+  box-shadow: 0 0 24px -6px color-mix(in srgb, var(--ck-accent) 70%, transparent);
   animation: cockpit-drop-in 0.18s ease both;
 }
 @keyframes cockpit-drop-in {

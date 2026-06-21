@@ -10,7 +10,7 @@
 /* thin visible line, centered inside the 6px track */
 .cockpit-divider__line {
   position: absolute;
-  background: #3A4150;
+  background: var(--ck-surface-2);
   border-radius: 2px;
   transition: background 0.12s, box-shadow 0.12s, width 0.12s, height 0.12s;
 }
@@ -23,11 +23,11 @@
 
 /* hover / active: brighten + thicken so it's obvious you can grab it */
 .cockpit-divider:hover .cockpit-divider__line {
-  background: #F5A623;
-  box-shadow: 0 0 8px -1px rgba(245, 166, 35, 0.7);
+  background: var(--ck-accent);
+  box-shadow: 0 0 8px -1px color-mix(in srgb, var(--ck-accent) 70%, transparent);
 }
 .cockpit-divider--x:hover .cockpit-divider__line { width: 4px; }
 .cockpit-divider--y:hover .cockpit-divider__line { height: 4px; }
 
 /* while dragging, the whole window shows the resize cursor and the line stays lit */
-body.cockpit-resizing .cockpit-divider__line { background: #F5A623; }
+body.cockpit-resizing .cockpit-divider__line { background: var(--ck-accent); }
