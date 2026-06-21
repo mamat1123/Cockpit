@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import * as echarts from "echarts";
-import { costReport, type Bucket } from "../lib/costClient";
-import { filterByPeriod, byProject, byModel, byDay, totalCost, tierTokens, type Period } from "../lib/costAggregate";
+import { costReport, type CostReport, type SessionMeta } from "../lib/costClient";
+import { filterByPeriod, byProject, byModel, byDay, bySession, totalCost, tierTokens, type Period } from "../lib/costAggregate";
 import { EChart } from "./EChart";
 import "./CostView.css";
 
@@ -14,18 +14,18 @@ const axis = { axisLine: { lineStyle: { color: "#262A33" } }, axisLabel: { color
 const tip = { backgroundColor: "#181B22", borderColor: "#262A33", textStyle: { color: "#C8CDD6", fontFamily: "ui-monospace, Menlo, monospace" } };
 const base = { backgroundColor: "transparent", textStyle: { fontFamily: "ui-monospace, Menlo, monospace" }, animationDuration: 600, animationEasing: "cubicOut" as const };
 
-export function CostView() {
-  const [buckets, setBuckets] = useState<Bucket[]>([]);
+export function CostView({ onJump }: { onJump: (sessionId: string, cwd: string) => void }) {
+  const [report, setReport] = useState<CostReport>({ buckets: [], sessions: [] });
   const [period, setPeriod] = useState<Period>("7d");
   useEffect(() => {
     let alive = true;
-    const load = async () => { try { const b = await costReport(); if (alive) setBuckets(b); } catch { /* not under tauri */ } };
+    const load = async () => { try { const r = await costReport(); if (alive) setReport(r); } catch { /* not under tauri */ } };
     void load();
     const id = setInterval(() => void load(), 5000);
     return () => { alive = false; clearInterval(id); };
   }, []);
 
-  const f = useMemo(() => filterByPeriod(buckets, period), [buckets, period]);
+  const f = useMemo(() => filterByPeriod(report.buckets, period), [report, period]);
   const total = totalCost(f);
   const days = byDay(f), projects = byProject(f), models = byModel(f), tiers = tierTokens(f);
   const projectCount = new Set(f.map((b) => b.project)).size;
@@ -58,6 +58,9 @@ export function CostView() {
 
   const tierTotal = tiers.cacheRead + tiers.input + tiers.cacheWrite + tiers.output || 1;
   const pct = (n: number) => (n / tierTotal) * 100;
+
+  const metaBy = useMemo(() => Object.fromEntries(report.sessions.map((s) => [s.session, s])), [report.sessions]);
+  const sessions = bySession(f).map((s) => ({ ...s, meta: metaBy[s.name] as SessionMeta | undefined })).filter((s) => s.usd > 0);
 
   return (
     <div className="cost">
@@ -97,6 +100,23 @@ export function CostView() {
           <span><i style={{ background: "#5a6472" }} />input {pct(tiers.input).toFixed(0)}%</span>
           <span><i style={{ background: "#7C9CFF" }} />cache write {pct(tiers.cacheWrite).toFixed(0)}%</span>
           <span><i style={{ background: "#F5A623" }} />output {pct(tiers.output).toFixed(0)}%</span>
+        </div>
+      </div>
+      <div className="cost__card">
+        <h4>By session</h4>
+        <div className="cost__sessions">
+          {sessions.length === 0 ? (
+            <p className="cost__empty">No sessions in this period.</p>
+          ) : (
+            sessions.map((s) => (
+              <button key={s.name} className="cost__srow" onClick={() => s.meta && onJump(s.name, s.meta.cwd)} title="jump to / resume this session">
+                <span className="cost__sname">{s.meta?.title || s.meta?.project || s.name.slice(0, 8)}</span>
+                <span className="cost__sproj">{s.meta?.project ?? ""}</span>
+                <span className="cost__samt">{usd(s.usd)}</span>
+                <span className="cost__sjump">↵</span>
+              </button>
+            ))
+          )}
         </div>
       </div>
       <p className="cost__foot">Computed from ~/.claude logs · deduped by message id · matches /cost · prices editable</p>

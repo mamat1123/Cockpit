@@ -16,9 +16,10 @@ function ago(last: number | null, now: number): string {
   return `${Math.round(s / 60)}m idle`;
 }
 
-export function Dashboard({ layout, onJump, onClose }: {
+export function Dashboard({ layout, onJump, onJumpSession, onClose }: {
   layout: Layout;
   onJump: (tabId: string, paneId: string) => void;
+  onJumpSession: (sessionId: string, cwd: string) => void;
   onClose: () => void;
 }) {
   const [now, setNow] = useState(() => Date.now());
@@ -106,7 +107,7 @@ export function Dashboard({ layout, onJump, onClose }: {
           ))}
         </div>
         ) : (
-          <CostView />
+          <CostView onJump={onJumpSession} />
         )}
       </div>
     </div>

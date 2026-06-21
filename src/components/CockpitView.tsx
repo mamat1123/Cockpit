@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-import { reduce, initLayout, type Layout } from "../layout/paneLayout";
+import { reduce, initLayout, findPaneBySession, type Layout } from "../layout/paneLayout";
 import { useKeybindings } from "../layout/useKeybindings";
 import { TabBar } from "./TabBar";
 import { TabPanes } from "./TabPanes";
@@ -89,6 +89,17 @@ export function CockpitView() {
             setDashOpen(false);
             // focus the xterm after the tab becomes visible so you can type immediately
             requestAnimationFrame(() => requestAnimationFrame(() => focusTerminal(paneId)));
+          }}
+          onJumpSession={(sessionId, cwd) => {
+            const hit = findPaneBySession(layout, sessionId);
+            if (hit) {
+              dispatch({ type: "focusTab", tabId: hit.tabId });
+              dispatch({ type: "focusPane", paneId: hit.paneId });
+              requestAnimationFrame(() => requestAnimationFrame(() => focusTerminal(hit.paneId)));
+            } else {
+              dispatch({ type: "openSession", cwd, sessionId });
+            }
+            setDashOpen(false);
           }}
         />
       )}

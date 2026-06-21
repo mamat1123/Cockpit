@@ -17,3 +17,13 @@
 .cost__tiers span { display: flex; align-items: center; gap: 7px; }
 .cost__tiers i { width: 10px; height: 10px; border-radius: 3px; }
 .cost__foot { margin-top: 18px; color: #565d68; font-size: 11px; }
+.cost__sessions { display: flex; flex-direction: column; gap: 2px; max-height: 300px; overflow-y: auto; }
+.cost__srow { display: grid; grid-template-columns: 1fr auto auto auto; align-items: center; gap: 12px; width: 100%;
+  background: transparent; border: 0; border-radius: 8px; padding: 9px 10px; cursor: pointer; font-family: inherit; text-align: left; color: #C8CDD6; }
+.cost__srow:hover { background: #181B22; }
+.cost__sname { color: #EDEFF3; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cost__sproj { color: #6B7280; font-size: 11px; white-space: nowrap; }
+.cost__samt { color: #F5A623; font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.cost__sjump { color: #565d68; font-size: 12px; }
+.cost__srow:hover .cost__sjump { color: #F5A623; }
+.cost__empty { color: #6B7280; font-size: 12px; padding: 8px 2px; }
