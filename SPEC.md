@@ -94,4 +94,9 @@ rendered to feel satisfying. "Game-like" = aesthetic JUICE, not game mechanics (
   per-session buckets + metadata (cwd/project/title from the first user message); reducer gains
   `openSession` + `Pane.resume`.
 
-**Next candidates:** price-editor UI, empty-period chart state, layout persistence (#4), project/cwd picker for new panes, combo/juice on send (#5).
+- **M8 — Project picker**: a command-palette launcher (the `+` button or ⌘O) lists recent repos
+  (every cwd you've run claude in, via Rust `list_projects` over the logs, newest first), filters as
+  you type, accepts a pasted absolute path for a new repo, and opens the chosen repo in a new tab
+  (`newTab` now takes an optional cwd). ⌘T still makes an instant tab in the current repo.
+
+**Next candidates:** native folder dialog in the picker, layout persistence (#4), price-editor UI, combo/juice on send (#5).
