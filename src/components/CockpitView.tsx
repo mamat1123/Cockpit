@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { reduce, initLayout, findPaneBySession, serializeLayout, deserializeLayout, type Layout } from "../layout/paneLayout";
 import { loadLast, saveLast, savePreset } from "../lib/persistence";
+import { loadSettings, saveSettings } from "../lib/settings";
 import { useKeybindings } from "../layout/useKeybindings";
 import { TabBar } from "./TabBar";
 import { Juice } from "./Juice";
@@ -9,6 +10,7 @@ import { PaneHost } from "./PaneHost";
 import { Dashboard } from "./Dashboard";
 import { ProjectPicker } from "./ProjectPicker";
 import { WorkspacesMenu } from "./WorkspacesMenu";
+import { SettingsMenu } from "./SettingsMenu";
 import { killPty } from "../lib/ptyClient";
 import { stopLogtail } from "../lib/logClient";
 import { releaseTerminal, focusTerminal } from "../lib/terminalRegistry";
@@ -37,8 +39,11 @@ export function CockpitView() {
   const [dashOpen, setDashOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [wsOpen, setWsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settings, setSettings] = useState(loadSettings);
+  const setBgOpacity = useCallback((v: number) => setSettings((s) => { const n = { ...s, bgOpacity: v }; saveSettings(n); return n; }), []);
   const toggleDash = useCallback(() => setDashOpen((o) => !o), []);
-  useKeybindings(dispatch, { onToggleDashboard: toggleDash, onOpenProject: () => setPickerOpen(true), onOpenWorkspaces: () => setWsOpen(true) });
+  useKeybindings(dispatch, { onToggleDashboard: toggleDash, onOpenProject: () => setPickerOpen(true), onOpenWorkspaces: () => setWsOpen(true), onOpenSettings: () => setSettingsOpen(true) });
 
   // Auto-restore: persist the layout (with session ids) shortly after each change.
   useEffect(() => {
@@ -80,7 +85,7 @@ export function CockpitView() {
   }, [layout]);
 
   return (
-    <div style={{ position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: "rgba(18,20,26,0.62)" }}>
+    <div style={{ position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: `rgba(18,20,26,${settings.bgOpacity})` }}>
       <TabBar
         layout={layout}
         attention={attention}
@@ -94,6 +99,7 @@ export function CockpitView() {
         onOpenDashboard={() => setDashOpen(true)}
         onOpenPicker={() => setPickerOpen(true)}
         onOpenWorkspaces={() => setWsOpen(true)}
+        onOpenSettings={() => setSettingsOpen(true)}
       />
       <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
         {layout.tabs.map((t) => (
@@ -143,6 +149,13 @@ export function CockpitView() {
           onClose={() => setWsOpen(false)}
           onLoad={(saved) => { dispatch({ type: "loadLayout", saved }); setWsOpen(false); }}
           onSaveCurrent={(name) => savePreset(name, serializeLayout(layout, false))}
+        />
+      )}
+      {settingsOpen && (
+        <SettingsMenu
+          bgOpacity={settings.bgOpacity}
+          onBgOpacity={setBgOpacity}
+          onClose={() => setSettingsOpen(false)}
         />
       )}
     </div>

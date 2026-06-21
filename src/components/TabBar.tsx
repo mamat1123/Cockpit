@@ -37,7 +37,15 @@ function tabName(t: Tab): string {
 }
 const paneCount = (t: Tab): number => t.rows.reduce((n, r) => n + r.panes.length, 0);
 
-export function TabBar({ layout, attention, onSelect, onReorder, onOpenDashboard, onOpenPicker, onOpenWorkspaces }: {
+/** Settings — gear. */
+const SettingsIcon = () => (
+  <svg {...svgProps}>
+    <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+  </svg>
+);
+
+export function TabBar({ layout, attention, onSelect, onReorder, onOpenDashboard, onOpenPicker, onOpenWorkspaces, onOpenSettings }: {
   layout: Layout;
   attention: Set<string>;
   onSelect: (tabId: string) => void;
@@ -46,6 +54,7 @@ export function TabBar({ layout, attention, onSelect, onReorder, onOpenDashboard
   onOpenDashboard: () => void;
   onOpenPicker: () => void;
   onOpenWorkspaces: () => void;
+  onOpenSettings: () => void;
 }) {
   // per-tab aggregate working state (any pane in the tab thinking) — drives the dot/equalizer
   const [working, setWorking] = useState<Set<string>>(() => new Set());
@@ -101,6 +110,7 @@ export function TabBar({ layout, attention, onSelect, onReorder, onOpenDashboard
       <div className="cockpit-tabs__tools">
         <button className="cockpit-tool" onClick={onOpenDashboard} aria-label="Mission Control (Cmd+0)" title="Mission Control (⌘0)"><GridIcon /></button>
         <button className="cockpit-tool" onClick={onOpenWorkspaces} aria-label="Workspaces (Cmd+E)" title="Workspaces (⌘E)"><LayersIcon /></button>
+        <button className="cockpit-tool" onClick={onOpenSettings} aria-label="Settings (Cmd+,)" title="Settings (⌘,)"><SettingsIcon /></button>
         <button className="cockpit-tool cockpit-tool--add" onClick={onOpenPicker} aria-label="Open project (Cmd+O)" title="Open project (⌘O)"><FolderPlusIcon /></button>
       </div>
     </div>

@@ -1,10 +1,10 @@
 import { useEffect } from "react";
 import type { Action } from "./paneLayout";
 
-/** Cmd+T new tab, Cmd+D split, Cmd+Shift+D split-down, Cmd+W close, Cmd+0 dashboard, Cmd+O open project, Cmd+E workspaces. */
+/** Cmd+T new tab, Cmd+D split, Cmd+Shift+D split-down, Cmd+W close, Cmd+0 dashboard, Cmd+O open project, Cmd+E workspaces, Cmd+, settings. */
 export function useKeybindings(
   dispatch: (a: Action) => void,
-  opts: { onToggleDashboard?: () => void; onOpenProject?: () => void; onOpenWorkspaces?: () => void } = {},
+  opts: { onToggleDashboard?: () => void; onOpenProject?: () => void; onOpenWorkspaces?: () => void; onOpenSettings?: () => void } = {},
 ) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -16,8 +16,9 @@ export function useKeybindings(
       else if (k === "0") { e.preventDefault(); opts.onToggleDashboard?.(); }
       else if (k === "o") { e.preventDefault(); opts.onOpenProject?.(); }
       else if (k === "e") { e.preventDefault(); opts.onOpenWorkspaces?.(); }
+      else if (k === ",") { e.preventDefault(); opts.onOpenSettings?.(); }
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [dispatch, opts.onToggleDashboard, opts.onOpenProject, opts.onOpenWorkspaces]);
+  }, [dispatch, opts.onToggleDashboard, opts.onOpenProject, opts.onOpenWorkspaces, opts.onOpenSettings]);
 }
