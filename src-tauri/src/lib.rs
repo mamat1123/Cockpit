@@ -15,6 +15,7 @@ pub fn run() {
         .manage(pty::PtyManager::default())
         .manage(logtail::LogtailManager::default())
         .manage(cost::CostManager::default())
+        .manage(cost::CostReportManager::default())
         .invoke_handler(tauri::generate_handler![
             greet,
             pty::pty_spawn,
@@ -24,7 +25,8 @@ pub fn run() {
             logtail::logtail_start,
             logtail::logtail_stop,
             logtail::pane_topic,
-            cost::session_usage
+            cost::session_usage,
+            cost::cost_report,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
