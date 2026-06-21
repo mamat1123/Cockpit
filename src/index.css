@@ -1,3 +1,10 @@
 @import "tailwindcss";
 
 html, body, #root { background: transparent; }
+
+:root {
+  --ck-bg: #14161B; --ck-surface: #181B22; --ck-surface-2: #20242d;
+  --ck-text: #C8CDD6; --ck-bright: #EDEFF3; --ck-muted: #6B7280; --ck-dim: #565d68; --ck-border: #262A33;
+  --ck-accent: #F5A623; --ck-idle: #3ECF8E;
+  --ck-blue: #7C9CFF; --ck-green: #3ECF8E; --ck-red: #ff6b6b; --ck-yellow: #F5A623; --ck-magenta: #c06ad6; --ck-cyan: #56b6c2;
+}

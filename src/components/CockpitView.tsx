@@ -2,6 +2,7 @@ import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { reduce, initLayout, findPaneBySession, serializeLayout, deserializeLayout, type Layout } from "../layout/paneLayout";
 import { loadLast, saveLast, savePreset } from "../lib/persistence";
 import { loadSettings, saveSettings } from "../lib/settings";
+import { themeById, applyTheme } from "../lib/themes";
 import { useKeybindings } from "../layout/useKeybindings";
 import { TabBar } from "./TabBar";
 import { Juice } from "./Juice";
@@ -19,6 +20,13 @@ const DEFAULT_CWD = "/Users/theerametsaengsin/Work/mee-tang/app";
 
 function livePaneIds(l: Layout): Set<string> {
   return new Set(l.tabs.flatMap((t) => t.rows.flatMap((r) => r.panes.map((p) => p.id))));
+}
+
+function hexA(hex: string, a: number): string {
+  const h = hex.replace("#", "");
+  const f = h.length === 3 ? h.replace(/(.)/g, "$1$1") : h;
+  const n = parseInt(f, 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
 }
 
 export function CockpitView() {
@@ -41,7 +49,10 @@ export function CockpitView() {
   const [wsOpen, setWsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settings, setSettings] = useState(loadSettings);
-  const setBgOpacity = useCallback((v: number) => setSettings((s) => { const n = { ...s, bgOpacity: v }; saveSettings(n); return n; }), []);
+  const patchSettings = useCallback((p: Partial<typeof settings>) => setSettings((s) => { const n = { ...s, ...p }; saveSettings(n); return n; }), []);
+  const setBgOpacity = useCallback((v: number) => patchSettings({ bgOpacity: v }), [patchSettings]);
+  const theme = themeById(settings.themeId);
+  useEffect(() => { applyTheme(theme, settings.accent); }, [theme, settings.accent]);
   const toggleDash = useCallback(() => setDashOpen((o) => !o), []);
   useKeybindings(dispatch, { onToggleDashboard: toggleDash, onOpenProject: () => setPickerOpen(true), onOpenWorkspaces: () => setWsOpen(true), onOpenSettings: () => setSettingsOpen(true) });
 
@@ -85,7 +96,7 @@ export function CockpitView() {
   }, [layout]);
 
   return (
-    <div style={{ position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: `rgba(18,20,26,${settings.bgOpacity})` }}>
+    <div style={{ position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: hexA(theme.bg, settings.bgOpacity) }}>
       <TabBar
         layout={layout}
         attention={attention}
