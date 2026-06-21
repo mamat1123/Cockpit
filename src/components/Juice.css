@@ -2,27 +2,27 @@
 
 .juice__launch { position: absolute; inset: 0; animation: juice-launch 0.45s ease-out forwards; }
 @keyframes juice-launch {
-  0%   { box-shadow: inset 0 0 0 2px rgba(245,166,35,.55), inset 0 0 90px -24px #F5A623; opacity: .85; }
+  0%   { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--ck-accent) 55%, transparent), inset 0 0 90px -24px var(--ck-accent); opacity: .85; }
   100% { box-shadow: inset 0 0 0 0 transparent, inset 0 0 90px -24px transparent; opacity: 0; }
 }
 
 .juice__swarm {
   position: absolute; right: 18px; bottom: 16px; display: flex; align-items: center; gap: 8px;
-  padding: 8px 15px; border-radius: 999px; background: rgba(20,22,27,.88);
-  border: 1px solid rgba(245,166,35,.4); color: #F5A623; font: 700 13px ui-monospace, Menlo, monospace;
-  box-shadow: 0 0 20px -7px rgba(245,166,35,.5); transition: border-color .3s, box-shadow .3s, color .3s;
+  padding: 8px 15px; border-radius: 999px; background: color-mix(in srgb, var(--ck-bg) 88%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ck-accent) 40%, transparent); color: var(--ck-accent); font: 700 13px ui-monospace, Menlo, monospace;
+  box-shadow: 0 0 20px -7px color-mix(in srgb, var(--ck-accent) 50%, transparent); transition: border-color .3s, box-shadow .3s, color .3s;
   animation: juice-swarm-in .2s ease-out;
 }
 @keyframes juice-swarm-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 .juice__swarm b { font-size: 16px; font-variant-numeric: tabular-nums; }
 .juice__lbl { font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: #a9803a; }
-.juice__bolt { filter: drop-shadow(0 0 4px #F5A623); }
-.juice__swarm.lv2, .juice__swarm.lv3 { box-shadow: 0 0 28px -5px rgba(245,166,35,.7); }
+.juice__bolt { filter: drop-shadow(0 0 4px var(--ck-accent)); }
+.juice__swarm.lv2, .juice__swarm.lv3 { box-shadow: 0 0 28px -5px color-mix(in srgb, var(--ck-accent) 70%, transparent); }
 .juice__swarm.lv4, .juice__swarm.lv5, .juice__swarm.lv6 {
-  color: #ffd27a; border-color: rgba(255,210,122,.7); animation: juice-swarm-pulse 1.2s ease-in-out infinite;
+  color: color-mix(in srgb, var(--ck-accent), white 35%); border-color: color-mix(in srgb, color-mix(in srgb, var(--ck-accent), white 35%) 70%, transparent); animation: juice-swarm-pulse 1.2s ease-in-out infinite;
 }
 @keyframes juice-swarm-pulse {
-  0%, 100% { box-shadow: 0 0 24px -6px rgba(245,166,35,.55); }
-  50%      { box-shadow: 0 0 40px 0 rgba(255,210,122,.85); }
+  0%, 100% { box-shadow: 0 0 24px -6px color-mix(in srgb, var(--ck-accent) 55%, transparent); }
+  50%      { box-shadow: 0 0 40px 0 color-mix(in srgb, color-mix(in srgb, var(--ck-accent), white 35%) 85%, transparent); }
 }
 @media (prefers-reduced-motion: reduce) { .juice__launch, .juice__swarm { animation: none; } }
