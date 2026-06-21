@@ -99,4 +99,10 @@ rendered to feel satisfying. "Game-like" = aesthetic JUICE, not game mechanics (
   you type, accepts a pasted absolute path for a new repo, and opens the chosen repo in a new tab
   (`newTab` now takes an optional cwd). ⌘T still makes an instant tab in the current repo.
 
-**Next candidates:** native folder dialog in the picker, layout persistence (#4), price-editor UI, combo/juice on send (#5).
+- **M9 — Presets + auto-restore**: the layout is serialized to localStorage and **auto-restored on
+  launch** (with session ids → each pane `claude --resume`s its prior conversation). A **Workspaces**
+  menu (⊞ button / ⌘E) saves the current arrangement as a named preset (cwd/structure, no sessions)
+  and loads/deletes them; loading replaces the layout with fresh claude sessions. `serializeLayout`/
+  `deserializeLayout` + `loadLayout` action; `src/lib/persistence.ts`.
+
+**Next candidates:** native folder dialog in the picker, price-editor UI, combo/juice on send (#5), per-pane cost in the dashboard bays.
