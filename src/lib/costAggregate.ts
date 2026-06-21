@@ -35,6 +35,7 @@ function groupCost(buckets: Bucket[], key: (b: Bucket) => string): Slice[] {
 
 export const byProject = (b: Bucket[]): Slice[] => groupCost(b, (x) => x.project);
 export const byModel = (b: Bucket[]): Slice[] => groupCost(b, (x) => x.model);
+export const bySession = (b: Bucket[]): Slice[] => groupCost(b, (x) => x.session);
 export const byDay = (b: Bucket[]): Slice[] => groupCost(b, (x) => x.date).sort((a, b) => a.name.localeCompare(b.name));
 export const totalCost = (b: Bucket[]): number => costOf(usageByModel(b));
 

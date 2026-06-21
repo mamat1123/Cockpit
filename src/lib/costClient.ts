@@ -5,5 +5,7 @@ export function sessionUsage(cwd: string, sessionId: string): Promise<Record<str
   return invoke("session_usage", { cwd, sessionId });
 }
 
-export interface Bucket { date: string; project: string; model: string; usage: Usage }
-export function costReport(): Promise<Bucket[]> { return invoke("cost_report"); }
+export interface Bucket { date: string; project: string; model: string; session: string; usage: Usage }
+export interface SessionMeta { session: string; cwd: string; project: string; title: string }
+export interface CostReport { buckets: Bucket[]; sessions: SessionMeta[] }
+export function costReport(): Promise<CostReport> { return invoke("cost_report"); }

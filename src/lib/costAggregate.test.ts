@@ -4,9 +4,9 @@ import type { Bucket } from "./costClient";
 
 const U = (input: number, output = 0) => ({ input, output, cacheRead: 0, cacheWrite5m: 0, cacheWrite1h: 0 });
 const data: Bucket[] = [
-  { date: "2026-06-20", project: "mee-tang/app", model: "claude-opus-4-8", usage: U(1e6) },     // $5
-  { date: "2026-06-21", project: "mee-tang/app", model: "claude-opus-4-8", usage: U(0, 1e6) },   // $25
-  { date: "2026-06-21", project: "ai-trading-bot", model: "claude-haiku-4-5", usage: U(1e6) },   // $1
+  { date: "2026-06-20", project: "mee-tang/app", model: "claude-opus-4-8", session: "x", usage: U(1e6) },     // $5
+  { date: "2026-06-21", project: "mee-tang/app", model: "claude-opus-4-8", session: "x", usage: U(0, 1e6) },   // $25
+  { date: "2026-06-21", project: "ai-trading-bot", model: "claude-haiku-4-5", session: "x", usage: U(1e6) },   // $1
 ];
 
 describe("costAggregate", () => {
@@ -29,5 +29,20 @@ describe("costAggregate", () => {
   });
   it("tierTokens sums token tiers", () => {
     expect(tierTokens(data)).toMatchObject({ input: 2e6, output: 1e6 });
+  });
+});
+
+import { bySession } from "./costAggregate";
+
+describe("bySession", () => {
+  it("groups cost by session id, sorted desc", () => {
+    const U = (input: number) => ({ input, output: 0, cacheRead: 0, cacheWrite5m: 0, cacheWrite1h: 0 });
+    const data = [
+      { date: "2026-06-21", project: "p", model: "claude-opus-4-8", session: "s1", usage: U(2e6) }, // $10
+      { date: "2026-06-21", project: "p", model: "claude-opus-4-8", session: "s2", usage: U(1e6) }, // $5
+    ];
+    const r = bySession(data);
+    expect(r[0]).toMatchObject({ name: "s1", usd: 10 });
+    expect(r[1]).toMatchObject({ name: "s2", usd: 5 });
   });
 });
