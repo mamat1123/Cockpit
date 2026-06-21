@@ -245,6 +245,49 @@ pub fn cost_report(mgr: State<CostReportManager>) -> CostReport {
     CostReport { buckets, sessions }
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Project { pub cwd: String, pub label: String, pub last_used: u64 }
+
+/// Dedupe (cwd, mtime-ms) pairs to the newest entry per cwd, newest-first.
+fn pick_recent(mut rows: Vec<(String, u64)>) -> Vec<Project> {
+    rows.sort_by(|a, b| b.1.cmp(&a.1));
+    let mut seen = std::collections::HashSet::new();
+    rows.into_iter()
+        .filter(|(cwd, _)| !cwd.is_empty() && seen.insert(cwd.clone()))
+        .map(|(cwd, last_used)| Project { label: label_from_cwd(&cwd), cwd, last_used })
+        .collect()
+}
+
+/// Recent projects = every cwd you've run claude in, newest first.
+#[tauri::command]
+pub fn list_projects() -> Vec<Project> {
+    let home = match std::env::var_os("HOME") { Some(h) => PathBuf::from(h), None => return vec![] };
+    let root = home.join(".claude").join("projects");
+    let mut rows: Vec<(String, u64)> = Vec::new();
+    let dirs = match std::fs::read_dir(&root) { Ok(d) => d, Err(_) => return vec![] };
+    for d in dirs.flatten() {
+        if !d.path().is_dir() { continue; }
+        let mut newest: Option<(std::time::SystemTime, PathBuf)> = None;
+        if let Ok(files) = std::fs::read_dir(d.path()) {
+            for f in files.flatten() {
+                let p = f.path();
+                if p.extension().and_then(|e| e.to_str()) != Some("jsonl") { continue; }
+                if let Ok(m) = f.metadata().and_then(|m| m.modified()) {
+                    if newest.as_ref().map_or(true, |(t, _)| m > *t) { newest = Some((m, p)); }
+                }
+            }
+        }
+        if let Some((mtime, path)) = newest {
+            if let (Some(cwd), _) = first_meta(&path) {
+                let ms = mtime.duration_since(std::time::UNIX_EPOCH).map(|x| x.as_millis() as u64).unwrap_or(0);
+                rows.push((cwd, ms));
+            }
+        }
+    }
+    pick_recent(rows)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -298,6 +341,15 @@ mod tests {
         let line = r#"{"timestamp":"2026-06-21T10:20:30.000Z","message":{"id":"a","model":"m","usage":{"input_tokens":5,"output_tokens":1,"cache_read_input_tokens":0}}}"#;
         let (id, model, u, date) = parse_turn_full(line).unwrap();
         assert_eq!(id, "a"); assert_eq!(model, "m"); assert_eq!(u.input, 5); assert_eq!(date, "2026-06-21");
+    }
+
+    #[test]
+    fn pick_recent_dedupes_to_newest_per_cwd_desc() {
+        let r = pick_recent(vec![
+            ("/a".into(), 100), ("/b".into(), 300), ("/a".into(), 200), ("".into(), 999),
+        ]);
+        assert_eq!(r.iter().map(|p| p.cwd.as_str()).collect::<Vec<_>>(), vec!["/b", "/a"]);
+        assert_eq!(r[1].last_used, 200);
     }
 
     #[test]

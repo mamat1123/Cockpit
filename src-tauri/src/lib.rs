@@ -27,6 +27,7 @@ pub fn run() {
             logtail::pane_topic,
             cost::session_usage,
             cost::cost_report,
+            cost::list_projects,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
