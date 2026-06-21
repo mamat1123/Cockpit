@@ -181,14 +181,15 @@ struct ReportState {
 pub struct CostReportManager(pub Mutex<ReportState>);
 
 /// Cost across ALL projects, per (date, session, model) + per-session metadata.
-/// Incremental per file (offset) + global message-id dedup.
+/// Incremental per file (offset) + global message-id dedup. `async` so Tauri runs the
+/// (potentially hundreds-of-MB) cold scan OFF the main thread — the UI stays responsive.
 #[tauri::command]
-pub fn cost_report(mgr: State<CostReportManager>) -> CostReport {
-    let home = match std::env::var_os("HOME") { Some(h) => PathBuf::from(h), None => return CostReport { buckets: vec![], sessions: vec![] } };
+pub async fn cost_report(mgr: State<'_, CostReportManager>) -> Result<CostReport, ()> {
+    let home = match std::env::var_os("HOME") { Some(h) => PathBuf::from(h), None => return Ok(CostReport { buckets: vec![], sessions: vec![] }) };
     let root = home.join(".claude").join("projects");
     let mut st = mgr.0.lock().unwrap();
 
-    let dirs = match std::fs::read_dir(&root) { Ok(d) => d, Err(_) => return CostReport { buckets: vec![], sessions: vec![] } };
+    let dirs = match std::fs::read_dir(&root) { Ok(d) => d, Err(_) => return Ok(CostReport { buckets: vec![], sessions: vec![] }) };
     for d in dirs.flatten() {
         let dpath = d.path();
         if !dpath.is_dir() { continue; }
@@ -219,6 +220,7 @@ pub fn cost_report(mgr: State<CostReportManager>) -> CostReport {
                         if fh.take(len - start).read_to_string(&mut buf).is_ok() {
                             if let Some(idx) = buf.rfind('\n') {
                                 for line in buf[..idx].lines() {
+                                    if !line.contains("\"usage\"") { continue; } // cheap skip: only assistant-usage lines
                                     if let Some((id, model, usage, date)) = parse_turn_full(line) {
                                         if !id.is_empty() && !st.seen.insert(id) { continue; }
                                         let e = st.agg.entry((date, session.clone(), model)).or_default();
@@ -242,7 +244,7 @@ pub fn cost_report(mgr: State<CostReportManager>) -> CostReport {
     let sessions = st.meta.iter().map(|(session, (cwd, project, title))| SessionMeta {
         session: session.clone(), cwd: cwd.clone(), project: project.clone(), title: title.clone(),
     }).collect();
-    CostReport { buckets, sessions }
+    Ok(CostReport { buckets, sessions })
 }
 
 #[derive(Serialize)]

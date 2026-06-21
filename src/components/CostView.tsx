@@ -17,9 +17,17 @@ const base = { backgroundColor: "transparent", textStyle: { fontFamily: "ui-mono
 export function CostView({ onJump }: { onJump: (sessionId: string, cwd: string) => void }) {
   const [report, setReport] = useState<CostReport>({ buckets: [], sessions: [] });
   const [period, setPeriod] = useState<Period>("7d");
+  const [loading, setLoading] = useState(true);
   useEffect(() => {
     let alive = true;
-    const load = async () => { try { const r = await costReport(); if (alive) setReport(r); } catch { /* not under tauri */ } };
+    let inFlight = false;
+    const load = async () => {
+      if (inFlight) return; // first scan can take a while (hundreds of MB of logs) — don't pile up
+      inFlight = true;
+      try { const r = await costReport(); if (alive) setReport(r); }
+      catch { /* not under tauri */ }
+      finally { inFlight = false; if (alive) setLoading(false); }
+    };
     void load();
     const id = setInterval(() => void load(), 5000);
     return () => { alive = false; clearInterval(id); };
@@ -76,6 +84,10 @@ export function CostView({ onJump }: { onJump: (sessionId: string, cwd: string) 
           ))}
         </div>
       </div>
+
+      {loading && report.buckets.length === 0 && (
+        <div className="cost__loading">⏳ computing from your ~/.claude logs…</div>
+      )}
 
       <div className="cost__card">
         <h4>Daily spend</h4>
