@@ -108,18 +108,6 @@ fn label_from_cwd(cwd: &str) -> String {
     }
 }
 
-fn first_cwd_label(path: &Path) -> Option<String> {
-    let f = std::fs::File::open(path).ok()?;
-    for line in BufReader::new(f).lines().map_while(Result::ok).take(40) {
-        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&line) {
-            if let Some(cwd) = v.get("cwd").and_then(|x| x.as_str()) {
-                return Some(label_from_cwd(cwd));
-            }
-        }
-    }
-    None
-}
-
 /// (message_id, model, usage, date) for a usage-bearing line; date = YYYY-MM-DD from `timestamp`.
 fn parse_turn_full(line: &str) -> Option<(String, String, Usage, String)> {
     let v: serde_json::Value = serde_json::from_str(line).ok()?;
@@ -132,31 +120,75 @@ fn parse_turn_full(line: &str) -> Option<(String, String, Usage, String)> {
     Some((id, model, usage_from(usage), date))
 }
 
+/// (full cwd, first user-message title) from a session log's opening lines.
+fn first_meta(path: &Path) -> (Option<String>, Option<String>) {
+    let mut cwd = None;
+    let mut title = None;
+    if let Ok(f) = std::fs::File::open(path) {
+        for line in BufReader::new(f).lines().map_while(Result::ok).take(80) {
+            if cwd.is_some() && title.is_some() { break; }
+            let v: serde_json::Value = match serde_json::from_str(&line) { Ok(v) => v, Err(_) => continue };
+            if cwd.is_none() {
+                if let Some(c) = v.get("cwd").and_then(|x| x.as_str()) { cwd = Some(c.to_string()); }
+            }
+            if title.is_none() && v.get("type").and_then(|t| t.as_str()) == Some("user") {
+                if let Some(msg) = v.get("message") {
+                    let txt = match msg.get("content") {
+                        Some(serde_json::Value::String(s)) => Some(s.clone()),
+                        Some(serde_json::Value::Array(a)) => a.iter().find_map(|b| {
+                            if b.get("type").and_then(|t| t.as_str()) == Some("text") {
+                                b.get("text").and_then(|t| t.as_str()).map(str::to_string)
+                            } else { None }
+                        }),
+                        _ => None,
+                    };
+                    if let Some(t) = txt {
+                        let t = t.split_whitespace().collect::<Vec<_>>().join(" ");
+                        if !t.is_empty() && !t.starts_with('<') {
+                            title = Some(if t.chars().count() > 60 { t.chars().take(60).collect::<String>() + "…" } else { t });
+                        }
+                    }
+                }
+            }
+        }
+    }
+    (cwd, title)
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Bucket { pub date: String, pub project: String, pub model: String, pub usage: Usage }
+pub struct Bucket { pub date: String, pub project: String, pub model: String, pub session: String, pub usage: Usage }
 
-struct FileState { offset: u64, project: String }
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionMeta { pub session: String, pub cwd: String, pub project: String, pub title: String }
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CostReport { pub buckets: Vec<Bucket>, pub sessions: Vec<SessionMeta> }
+
+struct FileState { offset: u64, session: String }
 
 #[derive(Default)]
 struct ReportState {
     files: HashMap<PathBuf, FileState>,
     seen: HashSet<String>,
-    agg: HashMap<(String, String, String), Usage>,
+    agg: HashMap<(String, String, String), Usage>,     // (date, session, model) -> tokens
+    meta: HashMap<String, (String, String, String)>,   // session -> (cwd, project, title)
 }
 
 #[derive(Default)]
 pub struct CostReportManager(pub Mutex<ReportState>);
 
-/// Cost buckets across ALL projects. Incremental per file (offset cache) + global
-/// message-id dedup, so repeated calls only parse newly-appended bytes.
+/// Cost across ALL projects, per (date, session, model) + per-session metadata.
+/// Incremental per file (offset) + global message-id dedup.
 #[tauri::command]
-pub fn cost_report(mgr: State<CostReportManager>) -> Vec<Bucket> {
-    let home = match std::env::var_os("HOME") { Some(h) => PathBuf::from(h), None => return vec![] };
+pub fn cost_report(mgr: State<CostReportManager>) -> CostReport {
+    let home = match std::env::var_os("HOME") { Some(h) => PathBuf::from(h), None => return CostReport { buckets: vec![], sessions: vec![] } };
     let root = home.join(".claude").join("projects");
     let mut st = mgr.0.lock().unwrap();
 
-    let dirs = match std::fs::read_dir(&root) { Ok(d) => d, Err(_) => return vec![] };
+    let dirs = match std::fs::read_dir(&root) { Ok(d) => d, Err(_) => return CostReport { buckets: vec![], sessions: vec![] } };
     for d in dirs.flatten() {
         let dpath = d.path();
         if !dpath.is_dir() { continue; }
@@ -167,11 +199,17 @@ pub fn cost_report(mgr: State<CostReportManager>) -> Vec<Bucket> {
             let len = std::fs::metadata(&p).map(|m| m.len()).unwrap_or(0);
 
             if !st.files.contains_key(&p) {
-                let project = first_cwd_label(&p)
-                    .unwrap_or_else(|| dpath.file_name().and_then(|s| s.to_str()).unwrap_or("—").to_string());
-                st.files.insert(p.clone(), FileState { offset: 0, project });
+                let session = p.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_string();
+                let (cwd_opt, title_opt) = first_meta(&p);
+                let cwd = cwd_opt.unwrap_or_default();
+                let project = if cwd.is_empty() {
+                    dpath.file_name().and_then(|s| s.to_str()).unwrap_or("—").to_string()
+                } else { label_from_cwd(&cwd) };
+                let title = title_opt.unwrap_or_default();
+                st.meta.insert(session.clone(), (cwd, project, title));
+                st.files.insert(p.clone(), FileState { offset: 0, session });
             }
-            let (offset, project) = { let fs = &st.files[&p]; (fs.offset, fs.project.clone()) };
+            let (offset, session) = { let fs = &st.files[&p]; (fs.offset, fs.session.clone()) };
             let start = if len < offset { 0 } else { offset };
 
             if len > start {
@@ -183,7 +221,7 @@ pub fn cost_report(mgr: State<CostReportManager>) -> Vec<Bucket> {
                                 for line in buf[..idx].lines() {
                                     if let Some((id, model, usage, date)) = parse_turn_full(line) {
                                         if !id.is_empty() && !st.seen.insert(id) { continue; }
-                                        let e = st.agg.entry((date, project.clone(), model)).or_default();
+                                        let e = st.agg.entry((date, session.clone(), model)).or_default();
                                         e.input += usage.input; e.output += usage.output; e.cache_read += usage.cache_read;
                                         e.cache_write5m += usage.cache_write5m; e.cache_write1h += usage.cache_write1h;
                                     }
@@ -196,9 +234,15 @@ pub fn cost_report(mgr: State<CostReportManager>) -> Vec<Bucket> {
             }
         }
     }
-    st.agg.iter().map(|((date, project, model), usage)| Bucket {
-        date: date.clone(), project: project.clone(), model: model.clone(), usage: usage.clone(),
-    }).collect()
+
+    let buckets = st.agg.iter().map(|((date, session, model), usage)| {
+        let project = st.meta.get(session).map(|m| m.1.clone()).unwrap_or_default();
+        Bucket { date: date.clone(), project, model: model.clone(), session: session.clone(), usage: usage.clone() }
+    }).collect();
+    let sessions = st.meta.iter().map(|(session, (cwd, project, title))| SessionMeta {
+        session: session.clone(), cwd: cwd.clone(), project: project.clone(), title: title.clone(),
+    }).collect();
+    CostReport { buckets, sessions }
 }
 
 #[cfg(test)]
@@ -254,5 +298,17 @@ mod tests {
         let line = r#"{"timestamp":"2026-06-21T10:20:30.000Z","message":{"id":"a","model":"m","usage":{"input_tokens":5,"output_tokens":1,"cache_read_input_tokens":0}}}"#;
         let (id, model, u, date) = parse_turn_full(line).unwrap();
         assert_eq!(id, "a"); assert_eq!(model, "m"); assert_eq!(u.input, 5); assert_eq!(date, "2026-06-21");
+    }
+
+    #[test]
+    fn first_meta_reads_cwd_and_title() {
+        let dir = std::env::temp_dir().join(format!("cockpit-meta-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let p = dir.join("s.jsonl");
+        std::fs::write(&p, "{\"cwd\":\"/Users/x/Work/mee-tang/app\",\"type\":\"user\",\"message\":{\"content\":\"  fix the   login bug  \"}}\n").unwrap();
+        let (cwd, title) = first_meta(&p);
+        assert_eq!(cwd.as_deref(), Some("/Users/x/Work/mee-tang/app"));
+        assert_eq!(title.as_deref(), Some("fix the login bug"));
+        std::fs::remove_dir_all(&dir).ok();
     }
 }
