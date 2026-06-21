@@ -8,25 +8,55 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
-/// Apply a macOS vibrancy material behind the window live (requires the
-/// `macos-private-api` feature). `"none"` clears vibrancy so the transparent
-/// background shows through.
+/// Continuous Ghostty-style background blur via the private CoreGraphics
+/// `CGSSetWindowBackgroundBlurRadius` API. `radius = 0` clears the blur so the
+/// transparent window shows the desktop through unmodified.
+#[cfg(target_os = "macos")]
+mod macos_blur {
+    use objc2::msg_send;
+    use objc2::runtime::AnyObject;
+
+    type CGSConnectionID = i32;
+    type CGWindowID = u32;
+
+    #[link(name = "CoreGraphics", kind = "framework")]
+    extern "C" {
+        fn CGSDefaultConnectionForThread() -> CGSConnectionID;
+        fn CGSSetWindowBackgroundBlurRadius(
+            connection: CGSConnectionID,
+            window: CGWindowID,
+            radius: i32,
+        ) -> i32;
+    }
+
+    pub fn set_blur(ns_window: *mut std::ffi::c_void, radius: i32) {
+        if ns_window.is_null() {
+            return;
+        }
+        unsafe {
+            let win = ns_window as *mut AnyObject;
+            let window_number: isize = msg_send![&*win, windowNumber];
+            let conn = CGSDefaultConnectionForThread();
+            CGSSetWindowBackgroundBlurRadius(conn, window_number as CGWindowID, radius);
+        }
+    }
+}
+
 #[tauri::command]
-fn set_window_effect(window: tauri::WebviewWindow, material: String) -> Result<(), String> {
-    use tauri::window::{Effect, EffectsBuilder};
-    let effect = match material.as_str() {
-        "hudWindow" => Some(Effect::HudWindow),
-        "fullScreenUI" => Some(Effect::FullScreenUI),
-        "sidebar" => Some(Effect::Sidebar),
-        "underWindowBackground" => Some(Effect::UnderWindowBackground),
-        "none" => None,
-        _ => return Err(format!("unknown material: {material}")),
-    };
-    let effects = match effect {
-        Some(e) => EffectsBuilder::new().effect(e).build(),
-        None => EffectsBuilder::new().build(), // clear → no vibrancy, transparent bg shows
-    };
-    window.set_effects(effects).map_err(|e| e.to_string())
+fn set_window_blur(window: tauri::WebviewWindow, radius: u32) -> Result<(), String> {
+    let w = window.clone();
+    window
+        .run_on_main_thread(move || {
+            #[cfg(target_os = "macos")]
+            if let Ok(ns) = w.ns_window() {
+                macos_blur::set_blur(ns, radius as i32);
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                let _ = (&w, radius);
+            }
+        })
+        .map_err(|e| e.to_string())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -39,7 +69,7 @@ pub fn run() {
         .manage(cost::CostReportManager::default())
         .invoke_handler(tauri::generate_handler![
             greet,
-            set_window_effect,
+            set_window_blur,
             pty::pty_spawn,
             pty::pty_write,
             pty::pty_resize,

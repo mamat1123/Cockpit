@@ -1,6 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { BlurMaterial } from "./settings";
 
-export async function setWindowEffect(material: BlurMaterial): Promise<void> {
-  try { await invoke("set_window_effect", { material }); } catch { /* non-tauri / dev browser — ignore */ }
+export async function setWindowBlur(radius: number): Promise<void> {
+  try { await invoke("set_window_blur", { radius: Math.max(0, Math.round(radius)) }); } catch { /* non-tauri / dev browser — ignore */ }
 }

@@ -475,6 +475,7 @@ dependencies = [
 name = "cockpit"
 version = "0.1.0"
 dependencies = [
+ "objc2",
  "portable-pty",
  "serde",
  "serde_json",

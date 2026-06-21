@@ -1,15 +1,7 @@
 import { useEffect } from "react";
 import { THEMES, themeById } from "../lib/themes";
-import { DEFAULT_SETTINGS, type Settings, type BlurMaterial } from "../lib/settings";
+import { DEFAULT_SETTINGS, type Settings } from "../lib/settings";
 import "./SettingsMenu.css";
-
-const BLUR_OPTIONS: { value: BlurMaterial; label: string }[] = [
-  { value: "none", label: "None" },
-  { value: "hudWindow", label: "HUD" },
-  { value: "fullScreenUI", label: "Full-screen UI" },
-  { value: "sidebar", label: "Sidebar" },
-  { value: "underWindowBackground", label: "Under-window" },
-];
 
 export function SettingsMenu({ settings, onPatch, onClose }: {
   settings: Settings;
@@ -104,19 +96,20 @@ export function SettingsMenu({ settings, onPatch, onClose }: {
         <div className="settings__row">
           <div className="settings__label">
             <span className="settings__name">Window blur</span>
-            <span className="settings__desc">macOS vibrancy material behind the cockpit</span>
+            <span className="settings__desc">how much the desktop behind the cockpit is blurred (Ghostty-style)</span>
           </div>
           <div className="settings__control">
-            <select
-              className="settings__select"
-              value={settings.blur}
-              onChange={(e) => onPatch({ blur: e.target.value as BlurMaterial })}
-              aria-label="Window blur"
-            >
-              {BLUR_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
+            <input
+              className="settings__range"
+              type="range"
+              min={0}
+              max={80}
+              step={1}
+              value={settings.blurRadius}
+              onChange={(e) => onPatch({ blurRadius: parseInt(e.target.value, 10) })}
+              aria-label="Window blur radius"
+            />
+            <span className="settings__val">{settings.blurRadius === 0 ? "Off" : `${settings.blurRadius}px`}</span>
           </div>
         </div>
 

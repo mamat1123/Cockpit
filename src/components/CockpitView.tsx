@@ -15,7 +15,7 @@ import { SettingsMenu } from "./SettingsMenu";
 import { killPty } from "../lib/ptyClient";
 import { stopLogtail } from "../lib/logClient";
 import { releaseTerminal, focusTerminal, setTerminalTheme } from "../lib/terminalRegistry";
-import { setWindowEffect } from "../lib/windowClient";
+import { setWindowBlur } from "../lib/windowClient";
 
 const DEFAULT_CWD = "/Users/theerametsaengsin/Work/mee-tang/app";
 
@@ -56,7 +56,7 @@ export function CockpitView() {
     applyTheme(theme, settings.accent);
     setTerminalTheme(settings.accent ? { ...theme, accent: settings.accent } : theme);
   }, [theme, settings.accent]);
-  useEffect(() => { void setWindowEffect(settings.blur); }, [settings.blur]);
+  useEffect(() => { void setWindowBlur(settings.blurRadius); }, [settings.blurRadius]);
   const toggleDash = useCallback(() => setDashOpen((o) => !o), []);
   useKeybindings(dispatch, { onToggleDashboard: toggleDash, onOpenProject: () => setPickerOpen(true), onOpenWorkspaces: () => setWsOpen(true), onOpenSettings: () => setSettingsOpen(true) });
 
