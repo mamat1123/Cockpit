@@ -4,6 +4,33 @@ import { paneLastLineAt } from "../lib/terminalRegistry";
 import { deriveState } from "../lib/paneState";
 import "./TabBar.css";
 
+const svgProps = { width: 19, height: 19, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinejoin: "round" as const, strokeLinecap: "round" as const };
+
+/** Mission Control — 2×2 grid of session cards (one live). */
+const GridIcon = () => (
+  <svg {...svgProps}>
+    <rect x="3" y="3" width="8" height="8" rx="2" />
+    <rect x="13" y="3" width="8" height="8" rx="2" fill="currentColor" stroke="none" />
+    <rect x="3" y="13" width="8" height="8" rx="2" />
+    <rect x="13" y="13" width="8" height="8" rx="2" />
+  </svg>
+);
+/** Workspaces — stacked layers (saved layouts). */
+const LayersIcon = () => (
+  <svg {...svgProps}>
+    <path d="M12 3 L21 8 L12 13 L3 8 Z" />
+    <path d="M3 12 L12 17 L21 12" />
+    <path d="M3 16 L12 21 L21 16" />
+  </svg>
+);
+/** Open project — folder + new. */
+const FolderPlusIcon = () => (
+  <svg {...svgProps}>
+    <path d="M3 7a2 2 0 0 1 2-2h3.5l2 2H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
+    <path d="M12 11v6M9 14h6" />
+  </svg>
+);
+
 function tabName(t: Tab): string {
   const base = t.rows.flatMap((r) => r.panes)[0]?.title || "shell";
   return base.length > 24 ? base.slice(0, 24) + "…" : base;
@@ -72,9 +99,9 @@ export function TabBar({ layout, attention, onSelect, onReorder, onOpenDashboard
       </div>
       <div className="cockpit-tabs__drag" data-tauri-drag-region></div>
       <div className="cockpit-tabs__tools">
-        <button className="cockpit-tool" onClick={onOpenDashboard} aria-label="Mission Control (Cmd+0)" title="Mission Control (⌘0)">▦</button>
-        <button className="cockpit-tool" onClick={onOpenWorkspaces} aria-label="Workspaces (Cmd+E)" title="Workspaces (⌘E)">⊞</button>
-        <button className="cockpit-tool cockpit-tool--add" onClick={onOpenPicker} aria-label="Open project (Cmd+O)" title="Open project (⌘O)">+</button>
+        <button className="cockpit-tool" onClick={onOpenDashboard} aria-label="Mission Control (Cmd+0)" title="Mission Control (⌘0)"><GridIcon /></button>
+        <button className="cockpit-tool" onClick={onOpenWorkspaces} aria-label="Workspaces (Cmd+E)" title="Workspaces (⌘E)"><LayersIcon /></button>
+        <button className="cockpit-tool cockpit-tool--add" onClick={onOpenPicker} aria-label="Open project (Cmd+O)" title="Open project (⌘O)"><FolderPlusIcon /></button>
       </div>
     </div>
   );

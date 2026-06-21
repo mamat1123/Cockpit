@@ -67,6 +67,7 @@
   width: 42px; display: grid; place-items: center; color: #6B7280; font-size: 15px;
   background: transparent; border: 0; cursor: pointer; transition: background 0.12s, color 0.12s;
 }
+.cockpit-tool svg { display: block; }
 .cockpit-tool:hover { color: #C8CDD6; background: #1d222b; }
 .cockpit-tool:focus-visible { outline: 2px solid #F5A623; outline-offset: -2px; }
 .cockpit-tool--add { color: #F5A623; font-size: 18px; }
