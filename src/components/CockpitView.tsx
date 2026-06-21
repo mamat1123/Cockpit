@@ -15,6 +15,7 @@ import { SettingsMenu } from "./SettingsMenu";
 import { killPty } from "../lib/ptyClient";
 import { stopLogtail } from "../lib/logClient";
 import { releaseTerminal, focusTerminal, setTerminalTheme } from "../lib/terminalRegistry";
+import { setWindowEffect } from "../lib/windowClient";
 
 const DEFAULT_CWD = "/Users/theerametsaengsin/Work/mee-tang/app";
 
@@ -50,12 +51,12 @@ export function CockpitView() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settings, setSettings] = useState(loadSettings);
   const patchSettings = useCallback((p: Partial<typeof settings>) => setSettings((s) => { const n = { ...s, ...p }; saveSettings(n); return n; }), []);
-  const setBgOpacity = useCallback((v: number) => patchSettings({ bgOpacity: v }), [patchSettings]);
   const theme = themeById(settings.themeId);
   useEffect(() => {
     applyTheme(theme, settings.accent);
     setTerminalTheme(settings.accent ? { ...theme, accent: settings.accent } : theme);
   }, [theme, settings.accent]);
+  useEffect(() => { void setWindowEffect(settings.blur); }, [settings.blur]);
   const toggleDash = useCallback(() => setDashOpen((o) => !o), []);
   useKeybindings(dispatch, { onToggleDashboard: toggleDash, onOpenProject: () => setPickerOpen(true), onOpenWorkspaces: () => setWsOpen(true), onOpenSettings: () => setSettingsOpen(true) });
 
@@ -167,8 +168,8 @@ export function CockpitView() {
       )}
       {settingsOpen && (
         <SettingsMenu
-          bgOpacity={settings.bgOpacity}
-          onBgOpacity={setBgOpacity}
+          settings={settings}
+          onPatch={patchSettings}
           onClose={() => setSettingsOpen(false)}
         />
       )}

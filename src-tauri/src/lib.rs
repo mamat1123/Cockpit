@@ -8,6 +8,27 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
+/// Apply a macOS vibrancy material behind the window live (requires the
+/// `macos-private-api` feature). `"none"` clears vibrancy so the transparent
+/// background shows through.
+#[tauri::command]
+fn set_window_effect(window: tauri::WebviewWindow, material: String) -> Result<(), String> {
+    use tauri::window::{Effect, EffectsBuilder};
+    let effect = match material.as_str() {
+        "hudWindow" => Some(Effect::HudWindow),
+        "fullScreenUI" => Some(Effect::FullScreenUI),
+        "sidebar" => Some(Effect::Sidebar),
+        "underWindowBackground" => Some(Effect::UnderWindowBackground),
+        "none" => None,
+        _ => return Err(format!("unknown material: {material}")),
+    };
+    let effects = match effect {
+        Some(e) => EffectsBuilder::new().effect(e).build(),
+        None => EffectsBuilder::new().build(), // clear → no vibrancy, transparent bg shows
+    };
+    window.set_effects(effects).map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -18,6 +39,7 @@ pub fn run() {
         .manage(cost::CostReportManager::default())
         .invoke_handler(tauri::generate_handler![
             greet,
+            set_window_effect,
             pty::pty_spawn,
             pty::pty_write,
             pty::pty_resize,
