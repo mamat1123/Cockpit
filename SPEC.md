@@ -82,4 +82,10 @@ rendered to feel satisfying. "Game-like" = aesthetic JUICE, not game mechanics (
   per-session `$` per bay + a grand total. (Per-project grouping, a price-table editor UI, and
   server-tool costs are fast-follow.)
 
-**Next candidates:** per-project cost grouping + price-editor UI, layout persistence (#4), project/cwd picker for new panes, combo/juice on send (#5).
+- **M6 — Cost analytics**: a "Cost" tab in Mission Control with ECharts charts across ALL projects —
+  daily-spend bars, by-project bars, by-model donut, token-tier breakdown — + a period filter
+  (Today/7d/30d/All) and a big total. Rust `cost_report` scans every `~/.claude/projects/*/*.jsonl`
+  incrementally (per-file offset + global message-id dedup); frontend filters/groups/prices via the
+  editable table. `echarts` ^6 via a tiny `<EChart>` wrapper (React 19 → no react-wrapper lib).
+
+**Next candidates:** price-editor UI, empty-period state for charts, layout persistence (#4), project/cwd picker for new panes, combo/juice on send (#5).
