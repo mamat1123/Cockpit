@@ -37,7 +37,7 @@ const registry = new Map<string, TermEntry>();
 
 /** Create (once) or return the persistent terminal for a pane. Spawns the PTY +
  *  `claude --session-id` and starts the logtail exactly once. */
-export function acquireTerminal(paneId: string, cwd: string, sessionId: string): TermEntry {
+export function acquireTerminal(paneId: string, cwd: string, sessionId: string, resume: boolean): TermEntry {
   const existing = registry.get(paneId);
   if (existing) return existing;
 
@@ -73,7 +73,8 @@ export function acquireTerminal(paneId: string, cwd: string, sessionId: string):
     void writePty(paneId, data);
   });
 
-  void spawnPty(paneId, cwd, term.cols, term.rows, `claude --session-id ${sessionId}`);
+  const launch = resume ? `claude --resume ${sessionId}` : `claude --session-id ${sessionId}`;
+  void spawnPty(paneId, cwd, term.cols, term.rows, launch);
   void startLogtail(paneId, cwd, sessionId);
 
   const entry: TermEntry = { term, hostEl, fit, lastLineAt, lastInputAt, lastResizeAt };

@@ -6,10 +6,11 @@ import { acquireTerminal, attachTerminal, parkTerminalNode, refit } from "../lib
 import { PaneHeader } from "./PaneHeader";
 import "./TerminalPane.css";
 
-export function TerminalPane({ paneId, cwd, sessionId, title, focused, isDragging, isDropTarget, onFocus, onRename, onAutoTitle, onPopOut, onClose, dragHandleProps, dropZoneProps }: {
+export function TerminalPane({ paneId, cwd, sessionId, resume, title, focused, isDragging, isDropTarget, onFocus, onRename, onAutoTitle, onPopOut, onClose, dragHandleProps, dropZoneProps }: {
   paneId: string;
   cwd: string;
   sessionId: string;
+  resume?: boolean;
   title: string;
   focused: boolean;
   isDragging?: boolean;
@@ -33,7 +34,7 @@ export function TerminalPane({ paneId, cwd, sessionId, title, focused, isDraggin
   // "pop-out = black screen" bug). Instead we just move the persistent host node into
   // this pane's container; on unmount we park it (never dispose) so the session survives.
   useLayoutEffect(() => {
-    const entry = acquireTerminal(paneId, cwd, sessionId);
+    const entry = acquireTerminal(paneId, cwd, sessionId, !!resume);
     const container = containerRef.current!;
     attachTerminal(paneId, container);
 

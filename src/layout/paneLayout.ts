@@ -1,4 +1,4 @@
-export interface Pane { id: string; cwd: string; size: number; title: string; autoTitle: boolean; sessionId: string }
+export interface Pane { id: string; cwd: string; size: number; title: string; autoTitle: boolean; sessionId: string; resume?: boolean }
 export interface Row { id: string; panes: Pane[]; size: number }
 export interface Tab { id: string; rows: Row[] }
 export interface Layout { tabs: Tab[]; activeTabId: string; focusedPaneId: string }
@@ -17,13 +17,20 @@ export type Action =
   | { type: "renamePane"; paneId: string; title: string }
   | { type: "autoTitlePane"; paneId: string; title: string }
   | { type: "popOut"; paneId: string }
-  | { type: "movePaneAfter"; paneId: string; targetPaneId: string };
+  | { type: "movePaneAfter"; paneId: string; targetPaneId: string }
+  | { type: "openSession"; cwd: string; sessionId: string };
 
 let counter = 0;
 const nextId = (p: string) => `${p}-${++counter}`;
 const defaultTitle = (cwd: string) => cwd.split("/").filter(Boolean).pop() ?? "shell";
 const makePane = (cwd: string): Pane => ({ id: nextId("pane"), cwd, size: 1, title: defaultTitle(cwd), autoTitle: true, sessionId: crypto.randomUUID() });
 const makeRow = (cwd: string): Row => ({ id: nextId("row"), panes: [makePane(cwd)], size: 1 });
+
+export function findPaneBySession(l: Layout, sessionId: string): { tabId: string; paneId: string } | null {
+  for (const t of l.tabs) for (const r of t.rows) for (const p of r.panes)
+    if (p.sessionId === sessionId) return { tabId: t.id, paneId: p.id };
+  return null;
+}
 
 export function initLayout(cwd: string): Layout {
   const row = makeRow(cwd);
@@ -178,6 +185,11 @@ export function reduce(l: Layout, a: Action): Layout {
       if (!pane) return l;
       const tab: Tab = { id: nextId("tab"), rows: [{ id: nextId("row"), panes: [pane], size: 1 }] };
       return { tabs: [...tabs, tab], activeTabId: tab.id, focusedPaneId: pane.id };
+    }
+    case "openSession": {
+      const pane: Pane = { id: nextId("pane"), cwd: a.cwd, size: 1, title: defaultTitle(a.cwd), autoTitle: true, sessionId: a.sessionId, resume: true };
+      const tab: Tab = { id: nextId("tab"), rows: [{ id: nextId("row"), panes: [pane], size: 1 }] };
+      return { tabs: [...l.tabs, tab], activeTabId: tab.id, focusedPaneId: pane.id };
     }
     case "movePaneAfter": {
       if (a.paneId === a.targetPaneId) return l;

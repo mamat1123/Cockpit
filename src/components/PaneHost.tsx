@@ -36,6 +36,7 @@ export function PaneHost({ layout, slots, dispatch }: {
               paneId={pane.id}
               cwd={pane.cwd}
               sessionId={pane.sessionId}
+              resume={pane.resume}
               title={pane.title}
               focused={pane.id === layout.focusedPaneId}
               isDragging={dragId === pane.id}

@@ -129,6 +129,16 @@ describe("paneLayout (rows model)", () => {
     l = reduce(l, { type: "autoTitlePane", paneId: id, title: "should be ignored" });
     expect(l.tabs[0].rows[0].panes[0].title).toBe("frontend");
   });
+  it("openSession adds a tab whose pane resumes the given session", () => {
+    let l = initLayout(CWD);
+    l = reduce(l, { type: "openSession", cwd: "/Users/x/Work/foo", sessionId: "sess-123" });
+    const tab = l.tabs[l.tabs.length - 1];
+    const pane = tab.rows[0].panes[0];
+    expect(l.activeTabId).toBe(tab.id);
+    expect(pane.cwd).toBe("/Users/x/Work/foo");
+    expect(pane.sessionId).toBe("sess-123");
+    expect(pane.resume).toBe(true);
+  });
 });
 
 describe("sessionId", () => {
