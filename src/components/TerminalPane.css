@@ -58,3 +58,10 @@
   .cockpit-pane { transition: none; }
   .cockpit-pane.is-drop-target .cockpit-pane__drop::after { animation: none; }
 }
+
+/* Let the window vibrancy show through the terminal: xterm paints an opaque theme
+   background on .xterm-viewport even with allowTransparency — force it transparent so
+   the translucent cockpit background (and macOS blur) shows behind the text. */
+.xterm,
+.xterm .xterm-viewport,
+.xterm .xterm-screen { background-color: transparent !important; }
