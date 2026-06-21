@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { reduce, initLayout, findPaneBySession, serializeLayout, deserializeLayout, type Layout } from "../layout/paneLayout";
-import { loadLast, saveLast } from "../lib/persistence";
+import { loadLast, saveLast, savePreset } from "../lib/persistence";
 import { useKeybindings } from "../layout/useKeybindings";
 import { TabBar } from "./TabBar";
 import { TabPanes } from "./TabPanes";
 import { PaneHost } from "./PaneHost";
 import { Dashboard } from "./Dashboard";
 import { ProjectPicker } from "./ProjectPicker";
+import { WorkspacesMenu } from "./WorkspacesMenu";
 import { killPty } from "../lib/ptyClient";
 import { stopLogtail } from "../lib/logClient";
 import { releaseTerminal, focusTerminal } from "../lib/terminalRegistry";
@@ -27,8 +28,9 @@ export function CockpitView() {
   });
   const [dashOpen, setDashOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [wsOpen, setWsOpen] = useState(false);
   const toggleDash = useCallback(() => setDashOpen((o) => !o), []);
-  useKeybindings(dispatch, toggleDash, () => setPickerOpen(true));
+  useKeybindings(dispatch, { onToggleDashboard: toggleDash, onOpenProject: () => setPickerOpen(true), onOpenWorkspaces: () => setWsOpen(true) });
 
   // Auto-restore: persist the layout (with session ids) shortly after each change.
   useEffect(() => {
@@ -82,6 +84,7 @@ export function CockpitView() {
         onReorder={(tabId, toIndex) => dispatch({ type: "moveTab", tabId, toIndex })}
         onOpenDashboard={() => setDashOpen(true)}
         onOpenPicker={() => setPickerOpen(true)}
+        onOpenWorkspaces={() => setWsOpen(true)}
       />
       <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
         {layout.tabs.map((t) => (
@@ -123,6 +126,13 @@ export function CockpitView() {
         <ProjectPicker
           onClose={() => setPickerOpen(false)}
           onPick={(cwd) => { dispatch({ type: "newTab", cwd }); setPickerOpen(false); }}
+        />
+      )}
+      {wsOpen && (
+        <WorkspacesMenu
+          onClose={() => setWsOpen(false)}
+          onLoad={(saved) => { dispatch({ type: "loadLayout", saved }); setWsOpen(false); }}
+          onSaveCurrent={(name) => savePreset(name, serializeLayout(layout, false))}
         />
       )}
     </div>
