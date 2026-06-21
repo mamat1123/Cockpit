@@ -5,6 +5,7 @@ import { paneLastLineAt } from "../lib/terminalRegistry";
 import { deriveState } from "../lib/paneState";
 import { sessionUsage } from "../lib/costClient";
 import { costOf } from "../lib/pricing";
+import { CostView } from "./CostView";
 import "./Dashboard.css";
 
 function ago(last: number | null, now: number): string {
@@ -21,6 +22,7 @@ export function Dashboard({ layout, onJump, onClose }: {
   onClose: () => void;
 }) {
   const [now, setNow] = useState(() => Date.now());
+  const [view, setView] = useState<"sessions" | "cost">("sessions");
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 400);
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { e.preventDefault(); onClose(); } };
@@ -61,13 +63,20 @@ export function Dashboard({ layout, onJump, onClose }: {
             <h2>Mission Control</h2>
             <span>every Claude session, one glance · Esc to close</span>
           </div>
+          <div className="cockpit-dash__viewtabs">
+            <button className={view === "sessions" ? "on" : ""} onClick={() => setView("sessions")}>Sessions</button>
+            <button className={view === "cost" ? "on" : ""} onClick={() => setView("cost")}>Cost</button>
+          </div>
+          {view === "sessions" && (
           <div className="cockpit-dash__readout">
             <div className="cockpit-dash__stat"><b>{items.length}</b><span>sessions</span></div>
             <div className="cockpit-dash__stat is-work"><b>{workCount}</b><span>working</span></div>
             <div className="cockpit-dash__stat is-idle"><b>{items.length - workCount}</b><span>idle</span></div>
             <div className="cockpit-dash__stat is-cost"><b>{fmt(totalCost)}</b><span>total</span></div>
           </div>
+          )}
         </div>
+        {view === "sessions" ? (
         <div className="cockpit-dash__grid">
           {items.map((it) => (
             <button
@@ -96,6 +105,9 @@ export function Dashboard({ layout, onJump, onClose }: {
             </button>
           ))}
         </div>
+        ) : (
+          <CostView />
+        )}
       </div>
     </div>
   );
