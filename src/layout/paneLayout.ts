@@ -3,6 +3,11 @@ export interface Row { id: string; panes: Pane[]; size: number }
 export interface Tab { id: string; rows: Row[] }
 export interface Layout { tabs: Tab[]; activeTabId: string; focusedPaneId: string }
 
+export interface SavedPane { cwd: string; title: string; autoTitle: boolean; size: number; sessionId?: string }
+export interface SavedRow { size: number; panes: SavedPane[] }
+export interface SavedTab { rows: SavedRow[] }
+export interface SavedLayout { tabs: SavedTab[]; activeTabIndex: number }
+
 export type Action =
   | { type: "newTab"; cwd?: string }
   | { type: "split" }       // split right: add a column in the focused pane's row
@@ -18,7 +23,8 @@ export type Action =
   | { type: "autoTitlePane"; paneId: string; title: string }
   | { type: "popOut"; paneId: string }
   | { type: "movePaneAfter"; paneId: string; targetPaneId: string }
-  | { type: "openSession"; cwd: string; sessionId: string };
+  | { type: "openSession"; cwd: string; sessionId: string }
+  | { type: "loadLayout"; saved: SavedLayout };
 
 let counter = 0;
 const nextId = (p: string) => `${p}-${++counter}`;
@@ -36,6 +42,37 @@ export function initLayout(cwd: string): Layout {
   const row = makeRow(cwd);
   const tab: Tab = { id: nextId("tab"), rows: [row] };
   return { tabs: [tab], activeTabId: tab.id, focusedPaneId: row.panes[0].id };
+}
+
+export function serializeLayout(l: Layout, keepSessions: boolean): SavedLayout {
+  return {
+    activeTabIndex: Math.max(0, l.tabs.findIndex((t) => t.id === l.activeTabId)),
+    tabs: l.tabs.map((t) => ({
+      rows: t.rows.map((r) => ({
+        size: r.size,
+        panes: r.panes.map((p) => ({
+          cwd: p.cwd, title: p.title, autoTitle: p.autoTitle, size: p.size,
+          ...(keepSessions ? { sessionId: p.sessionId } : {}),
+        })),
+      })),
+    })),
+  };
+}
+
+export function deserializeLayout(s: SavedLayout): Layout {
+  const tabs: Tab[] = s.tabs.map((t) => ({
+    id: nextId("tab"),
+    rows: t.rows.map((r) => ({
+      id: nextId("row"), size: r.size,
+      panes: r.panes.map((p) => ({
+        id: nextId("pane"), cwd: p.cwd, size: p.size, title: p.title, autoTitle: p.autoTitle,
+        sessionId: p.sessionId ?? crypto.randomUUID(), resume: !!p.sessionId,
+      })),
+    })),
+  }));
+  const idx = Math.min(Math.max(0, s.activeTabIndex), tabs.length - 1);
+  const active = tabs[idx];
+  return { tabs, activeTabId: active.id, focusedPaneId: active.rows[0].panes[0].id };
 }
 
 const activeTab = (l: Layout) => l.tabs.find((t) => t.id === l.activeTabId)!;
@@ -186,6 +223,8 @@ export function reduce(l: Layout, a: Action): Layout {
       const tab: Tab = { id: nextId("tab"), rows: [{ id: nextId("row"), panes: [pane], size: 1 }] };
       return { tabs: [...tabs, tab], activeTabId: tab.id, focusedPaneId: pane.id };
     }
+    case "loadLayout":
+      return deserializeLayout(a.saved);
     case "openSession": {
       const pane: Pane = { id: nextId("pane"), cwd: a.cwd, size: 1, title: defaultTitle(a.cwd), autoTitle: true, sessionId: a.sessionId, resume: true };
       const tab: Tab = { id: nextId("tab"), rows: [{ id: nextId("row"), panes: [pane], size: 1 }] };

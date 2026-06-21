@@ -162,3 +162,40 @@ describe("sessionId", () => {
     expect(new Set(ids).size).toBe(2);
   });
 });
+
+import { serializeLayout, deserializeLayout } from "./paneLayout";
+
+describe("serialize/deserialize", () => {
+  it("round-trips structure + cwd/size, fresh ids", () => {
+    let l = initLayout(CWD);
+    l = reduce({ ...l, focusedPaneId: l.tabs[0].rows[0].panes[0].id }, { type: "split" });
+    l = reduce(l, { type: "newTab", cwd: "/two" });
+    const saved = serializeLayout(l, false);
+    const back = deserializeLayout(saved);
+    expect(back.tabs.length).toBe(2);
+    expect(back.tabs[0].rows[0].panes.length).toBe(2);
+    expect(back.tabs[1].rows[0].panes[0].cwd).toBe("/two");
+    expect(back.tabs[0].id).not.toBe(l.tabs[0].id);
+  });
+  it("drops sessionId (fresh) when keepSessions=false → resume false", () => {
+    const l = initLayout(CWD);
+    const back = deserializeLayout(serializeLayout(l, false));
+    const p = back.tabs[0].rows[0].panes[0];
+    expect(p.resume).toBe(false);
+    expect(p.sessionId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(p.sessionId).not.toBe(l.tabs[0].rows[0].panes[0].sessionId);
+  });
+  it("keeps sessionId + resume when keepSessions=true", () => {
+    const l = initLayout(CWD);
+    const orig = l.tabs[0].rows[0].panes[0].sessionId;
+    const back = deserializeLayout(serializeLayout(l, true));
+    const p = back.tabs[0].rows[0].panes[0];
+    expect(p.sessionId).toBe(orig);
+    expect(p.resume).toBe(true);
+  });
+  it("loadLayout action replaces the whole layout", () => {
+    const saved = serializeLayout(initLayout("/x"), false);
+    const l2 = reduce(initLayout(CWD), { type: "loadLayout", saved });
+    expect(l2.tabs[0].rows[0].panes[0].cwd).toBe("/x");
+  });
+});
