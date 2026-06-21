@@ -93,6 +93,7 @@ export function TerminalPane({ paneId, cwd, sessionId, resume, title, focused, i
     >
       <PaneHeader
         title={title}
+        repo={cwd.split("/").filter(Boolean).slice(-2).join("/")}
         working={state === "working"}
         onRename={onRename}
         onPopOut={onPopOut}
