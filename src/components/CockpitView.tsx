@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-import { reduce, initLayout, findPaneBySession, type Layout } from "../layout/paneLayout";
+import { reduce, initLayout, findPaneBySession, serializeLayout, deserializeLayout, type Layout } from "../layout/paneLayout";
+import { loadLast, saveLast } from "../lib/persistence";
 import { useKeybindings } from "../layout/useKeybindings";
 import { TabBar } from "./TabBar";
 import { TabPanes } from "./TabPanes";
@@ -17,11 +18,23 @@ function livePaneIds(l: Layout): Set<string> {
 }
 
 export function CockpitView() {
-  const [layout, dispatch] = useReducer(reduce, DEFAULT_CWD, initLayout);
+  const [layout, dispatch] = useReducer(reduce, null, () => {
+    const last = loadLast();
+    if (last && last.tabs && last.tabs.length > 0) {
+      try { return deserializeLayout(last); } catch { /* fall through to a fresh layout */ }
+    }
+    return initLayout(DEFAULT_CWD);
+  });
   const [dashOpen, setDashOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const toggleDash = useCallback(() => setDashOpen((o) => !o), []);
   useKeybindings(dispatch, toggleDash, () => setPickerOpen(true));
+
+  // Auto-restore: persist the layout (with session ids) shortly after each change.
+  useEffect(() => {
+    const id = setTimeout(() => saveLast(serializeLayout(layout, true)), 600);
+    return () => clearTimeout(id);
+  }, [layout]);
 
   const [slots, setSlots] = useState<Record<string, HTMLElement>>({});
   // `registerSlot(paneId)` returns a STABLE ref callback (cached per pane). A fresh
