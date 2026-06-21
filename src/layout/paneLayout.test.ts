@@ -129,6 +129,17 @@ describe("paneLayout (rows model)", () => {
     l = reduce(l, { type: "autoTitlePane", paneId: id, title: "should be ignored" });
     expect(l.tabs[0].rows[0].panes[0].title).toBe("frontend");
   });
+  it("newTab can open in a specific cwd", () => {
+    let l = initLayout(CWD);
+    l = reduce(l, { type: "newTab", cwd: "/Users/x/Work/other" });
+    const tab = l.tabs[l.tabs.length - 1];
+    expect(tab.rows[0].panes[0].cwd).toBe("/Users/x/Work/other");
+    expect(l.activeTabId).toBe(tab.id);
+  });
+  it("newTab without cwd inherits the focused pane's cwd", () => {
+    const l = reduce(initLayout(CWD), { type: "newTab" });
+    expect(l.tabs[l.tabs.length - 1].rows[0].panes[0].cwd).toBe(CWD);
+  });
   it("openSession adds a tab whose pane resumes the given session", () => {
     let l = initLayout(CWD);
     l = reduce(l, { type: "openSession", cwd: "/Users/x/Work/foo", sessionId: "sess-123" });

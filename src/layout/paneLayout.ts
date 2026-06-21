@@ -4,7 +4,7 @@ export interface Tab { id: string; rows: Row[] }
 export interface Layout { tabs: Tab[]; activeTabId: string; focusedPaneId: string }
 
 export type Action =
-  | { type: "newTab" }
+  | { type: "newTab"; cwd?: string }
   | { type: "split" }       // split right: add a column in the focused pane's row
   | { type: "splitDown" }   // split down: add a new row after the focused pane's row
   | { type: "close" }
@@ -67,7 +67,7 @@ function removePane(tabs: Tab[], paneId: string): { tabs: Tab[]; pane: Pane | nu
 export function reduce(l: Layout, a: Action): Layout {
   switch (a.type) {
     case "newTab": {
-      const row = makeRow(focusedCwd(l));
+      const row = makeRow(a.cwd ?? focusedCwd(l));
       const tab: Tab = { id: nextId("tab"), rows: [row] };
       return { tabs: [...l.tabs, tab], activeTabId: tab.id, focusedPaneId: row.panes[0].id };
     }
