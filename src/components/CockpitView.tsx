@@ -5,6 +5,7 @@ import { TabBar } from "./TabBar";
 import { TabPanes } from "./TabPanes";
 import { PaneHost } from "./PaneHost";
 import { Dashboard } from "./Dashboard";
+import { ProjectPicker } from "./ProjectPicker";
 import { killPty } from "../lib/ptyClient";
 import { stopLogtail } from "../lib/logClient";
 import { releaseTerminal, focusTerminal } from "../lib/terminalRegistry";
@@ -18,8 +19,9 @@ function livePaneIds(l: Layout): Set<string> {
 export function CockpitView() {
   const [layout, dispatch] = useReducer(reduce, DEFAULT_CWD, initLayout);
   const [dashOpen, setDashOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const toggleDash = useCallback(() => setDashOpen((o) => !o), []);
-  useKeybindings(dispatch, toggleDash);
+  useKeybindings(dispatch, toggleDash, () => setPickerOpen(true));
 
   const [slots, setSlots] = useState<Record<string, HTMLElement>>({});
   // `registerSlot(paneId)` returns a STABLE ref callback (cached per pane). A fresh
@@ -66,6 +68,7 @@ export function CockpitView() {
         onNewTab={() => dispatch({ type: "newTab" })}
         onReorder={(tabId, toIndex) => dispatch({ type: "moveTab", tabId, toIndex })}
         onOpenDashboard={() => setDashOpen(true)}
+        onOpenPicker={() => setPickerOpen(true)}
       />
       <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
         {layout.tabs.map((t) => (
@@ -101,6 +104,12 @@ export function CockpitView() {
             }
             setDashOpen(false);
           }}
+        />
+      )}
+      {pickerOpen && (
+        <ProjectPicker
+          onClose={() => setPickerOpen(false)}
+          onPick={(cwd) => { dispatch({ type: "newTab", cwd }); setPickerOpen(false); }}
         />
       )}
     </div>
