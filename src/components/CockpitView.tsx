@@ -80,7 +80,7 @@ export function CockpitView() {
   }, [layout]);
 
   return (
-    <div style={{ position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: "#14161B" }}>
+    <div style={{ position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: "rgba(18,20,26,0.62)" }}>
       <TabBar
         layout={layout}
         attention={attention}

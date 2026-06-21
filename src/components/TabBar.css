@@ -2,7 +2,7 @@
   display: flex;
   align-items: stretch;
   height: 46px;
-  background: #181B22;
+  background: rgba(24, 27, 34, 0.72);
   border-bottom: 1px solid #262A33;
 }
 .cockpit-tabs__list { display: flex; align-items: stretch; min-width: 0; overflow: hidden; }
@@ -27,7 +27,7 @@
 .cockpit-tab:focus-visible { outline: 2px solid #F5A623; outline-offset: -2px; }
 .cockpit-tab[draggable="true"]:active { cursor: grabbing; }
 
-.cockpit-tab.is-active { color: #F5F2EC; background: #0E1014; }
+.cockpit-tab.is-active { color: #F5F2EC; background: rgba(14, 16, 20, 0.5); }
 .cockpit-tab.is-active::before {
   content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px;
   background: #F5A623; box-shadow: 0 1px 10px #F5A623;

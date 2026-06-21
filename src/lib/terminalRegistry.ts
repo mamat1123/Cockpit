@@ -46,7 +46,13 @@ export function acquireTerminal(paneId: string, cwd: string, sessionId: string, 
   Object.assign(hostEl.style, { width: "100%", height: "100%" });
   parkingNode().appendChild(hostEl);
 
-  const term = new Terminal({ fontFamily: "Menlo, monospace", fontSize: 13, cursorBlink: true });
+  const term = new Terminal({
+    fontFamily: "Menlo, monospace",
+    fontSize: 13,
+    cursorBlink: true,
+    allowTransparency: true,
+    theme: { background: "rgba(0,0,0,0)" },
+  });
   const fit = new FitAddon();
   term.loadAddon(fit);
   term.open(hostEl);

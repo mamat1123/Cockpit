@@ -1,5 +1,5 @@
 .pane-head { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 6px 0 12px;
-  background: #181B22; border-bottom: 1px solid #262A33; font: 600 12.5px/1 ui-monospace, Menlo, monospace;
+  background: rgba(24, 27, 34, 0.72); border-bottom: 1px solid #262A33; font: 600 12.5px/1 ui-monospace, Menlo, monospace;
   flex: 0 0 32px; user-select: none; cursor: grab; }
 .pane-head:active { cursor: grabbing; }
 .pane-head__name { color: #EDEFF3; font-weight: 700; padding: 3px 6px; border-radius: 6px; overflow: hidden;
