@@ -51,6 +51,16 @@
   background: var(--ck-surface-2); color: var(--ck-text); border: 1px solid var(--ck-border); outline: none; }
 .settings__select:focus-visible { outline: 2px solid var(--ck-accent); outline-offset: 2px; }
 
+/* --- updates row --- */
+.settings__btn { font-family: inherit; font-size: 12px; font-weight: 600; padding: 7px 14px; border-radius: 8px; cursor: pointer;
+  background: var(--ck-surface-2); color: var(--ck-text); border: 1px solid var(--ck-border);
+  transition: border-color 0.12s ease, color 0.12s ease; }
+.settings__btn:hover:not(:disabled) { border-color: var(--ck-accent); color: var(--ck-accent); }
+.settings__btn:focus-visible { outline: 2px solid var(--ck-accent); outline-offset: 2px; }
+.settings__btn:disabled { opacity: 0.55; cursor: default; }
+.settings__updstatus { font-size: 11.5px; font-weight: 600; color: var(--ck-muted); font-variant-numeric: tabular-nums; }
+.settings__upddone { color: var(--ck-dim); font-weight: 600; }
+
 /* --- footer / reset all --- */
 .settings__foot { display: flex; justify-content: flex-end; padding: 14px 18px; border-top: 1px solid var(--ck-border); }
 .settings__reset { font-family: inherit; font-size: 12px; font-weight: 600; padding: 7px 14px; border-radius: 8px; cursor: pointer;

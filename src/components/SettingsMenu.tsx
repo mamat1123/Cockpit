@@ -1,18 +1,32 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 import { THEMES, themeById } from "../lib/themes";
 import { DEFAULT_SETTINGS, type Settings } from "../lib/settings";
+import { checkForUpdate, type Update } from "../lib/updateClient";
 import "./SettingsMenu.css";
 
-export function SettingsMenu({ settings, onPatch, onClose }: {
+export function SettingsMenu({ settings, onPatch, onClose, onUpdateFound }: {
   settings: Settings;
   onPatch: (p: Partial<Settings>) => void;
   onClose: () => void;
+  onUpdateFound: (u: Update) => void;
 }) {
+  const [version, setVersion] = useState("");
+  const [checkState, setCheckState] = useState<"idle" | "checking" | "uptodate">("idle");
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { e.preventDefault(); onClose(); } };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   }, [onClose]);
+
+  useEffect(() => { getVersion().then(setVersion).catch(() => setVersion("")); }, []);
+
+  async function check() {
+    setCheckState("checking");
+    const u = await checkForUpdate();
+    if (u) { onUpdateFound(u); } else { setCheckState("uptodate"); }
+  }
 
   const accentValue = settings.accent ?? themeById(settings.themeId).accent;
 
@@ -110,6 +124,22 @@ export function SettingsMenu({ settings, onPatch, onClose }: {
               aria-label="Window blur radius"
             />
             <span className="settings__val">{settings.blurRadius === 0 ? "Off" : `${settings.blurRadius}px`}</span>
+          </div>
+        </div>
+
+        <div className="settings__row">
+          <div className="settings__label">
+            <span className="settings__name">Updates</span>
+            <span className="settings__desc">ตรวจหาเวอร์ชันใหม่จาก GitHub</span>
+          </div>
+          <div className="settings__control">
+            <span className="settings__updstatus">
+              {version && `v${version}`}
+              {checkState === "uptodate" && <span className="settings__upddone"> ✓ ใช้เวอร์ชันล่าสุดแล้ว</span>}
+            </span>
+            <button type="button" className="settings__btn" onClick={check} disabled={checkState === "checking"}>
+              {checkState === "checking" ? "กำลังตรวจ…" : "ตรวจหาอัปเดต"}
+            </button>
           </div>
         </div>
 

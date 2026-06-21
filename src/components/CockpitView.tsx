@@ -12,10 +12,13 @@ import { Dashboard } from "./Dashboard";
 import { ProjectPicker } from "./ProjectPicker";
 import { WorkspacesMenu } from "./WorkspacesMenu";
 import { SettingsMenu } from "./SettingsMenu";
+import { UpdateModal } from "./UpdateModal";
 import { killPty } from "../lib/ptyClient";
 import { stopLogtail } from "../lib/logClient";
 import { releaseTerminal, focusTerminal, setTerminalTheme } from "../lib/terminalRegistry";
 import { setWindowBlur } from "../lib/windowClient";
+import { checkForUpdate, type Update } from "../lib/updateClient";
+import { getVersion } from "@tauri-apps/api/app";
 
 const DEFAULT_CWD = "/Users/theerametsaengsin/Work/mee-tang/app";
 
@@ -49,6 +52,8 @@ export function CockpitView() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [wsOpen, setWsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [update, setUpdate] = useState<Update | null>(null);
+  const [appVersion, setAppVersion] = useState("");
   const [settings, setSettings] = useState(loadSettings);
   const patchSettings = useCallback((p: Partial<typeof settings>) => setSettings((s) => { const n = { ...s, ...p }; saveSettings(n); return n; }), []);
   const theme = themeById(settings.themeId);
@@ -57,6 +62,10 @@ export function CockpitView() {
     setTerminalTheme(settings.accent ? { ...theme, accent: settings.accent } : theme);
   }, [theme, settings.accent]);
   useEffect(() => { void setWindowBlur(settings.blurRadius); }, [settings.blurRadius]);
+  useEffect(() => {
+    getVersion().then(setAppVersion).catch(() => {});
+    checkForUpdate().then((u) => { if (u) setUpdate(u); });
+  }, []);
   const toggleDash = useCallback(() => setDashOpen((o) => !o), []);
   useKeybindings(dispatch, { onToggleDashboard: toggleDash, onOpenProject: () => setPickerOpen(true), onOpenWorkspaces: () => setWsOpen(true), onOpenSettings: () => setSettingsOpen(true) });
 
@@ -171,6 +180,14 @@ export function CockpitView() {
           settings={settings}
           onPatch={patchSettings}
           onClose={() => setSettingsOpen(false)}
+          onUpdateFound={(u) => { setUpdate(u); setSettingsOpen(false); }}
+        />
+      )}
+      {update && (
+        <UpdateModal
+          update={update}
+          currentVersion={appVersion}
+          onClose={() => setUpdate(null)}
         />
       )}
     </div>
