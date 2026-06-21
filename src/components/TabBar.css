@@ -1,50 +1,77 @@
 .cockpit-tabs {
   display: flex;
   align-items: stretch;
-  gap: 6px;
-  height: 38px;
-  padding: 6px 8px 0;
-  background: #0E1014;
+  height: 46px;
+  background: #181B22;
   border-bottom: 1px solid #262A33;
 }
+.cockpit-tabs__list { display: flex; align-items: stretch; min-width: 0; overflow: hidden; }
+
+/* ── instrument tabs: flat, active glues to the content with a top amber bar ── */
 .cockpit-tab {
   position: relative;
   display: flex;
   align-items: center;
-  max-width: 220px;
-  font: 600 12px/1 ui-monospace, Menlo, monospace;
-  color: #9AA1AD;
-  background: #181B22;
-  border: 1px solid #262A33;
-  border-bottom: none;
-  border-radius: 8px 8px 0 0;
-  padding: 0 14px;
-  cursor: pointer;
-}
-.cockpit-tab:hover { color: #C8CDD6; }
-.cockpit-tab.is-active {
-  color: #F5F2EC;
-  background: #1f2530;
-  box-shadow: inset 0 -2px 0 0 #F5A623;
-}
-.cockpit-tab__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cockpit-tab--new {
-  color: #6B7280;
-  font-size: 16px;
-  padding: 0 12px;
+  gap: 9px;
+  max-width: 230px;
+  padding: 0 16px;
+  font: 600 12.5px/1 ui-monospace, Menlo, monospace;
+  color: #8b929e;
   background: transparent;
-  border-color: transparent;
+  border: 0;
+  border-right: 1px solid #20242d;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
 }
-.cockpit-tab--new:hover { color: #C8CDD6; }
+.cockpit-tab:hover { color: #C8CDD6; background: #1d222b; }
+.cockpit-tab:focus-visible { outline: 2px solid #F5A623; outline-offset: -2px; }
 .cockpit-tab[draggable="true"]:active { cursor: grabbing; }
-.cockpit-tab:focus-visible { outline: 2px solid #f5a623; outline-offset: 1px; }
-.cockpit-tabs__drag { flex: 1; align-self: stretch; }
-.cockpit-tab.is-attention { animation: cockpit-tab-attn 1.3s ease-in-out infinite; }
-.cockpit-tab.is-attention::after {
-  content: ""; position: absolute; top: 6px; right: 6px; width: 6px; height: 6px; border-radius: 50%;
-  background: #3ECF8E; box-shadow: 0 0 8px 1px #3ECF8E;
+
+.cockpit-tab.is-active { color: #F5F2EC; background: #0E1014; }
+.cockpit-tab.is-active::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: #F5A623; box-shadow: 0 1px 10px #F5A623;
+}
+
+.cockpit-tab__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cockpit-tab__ct {
+  font-size: 10px; letter-spacing: 0.06em; color: #565d68; font-variant-numeric: tabular-nums;
+  background: #20242d; border-radius: 5px; padding: 1px 6px;
+}
+.cockpit-tab.is-active .cockpit-tab__ct { color: #F5A623; background: #2a2113; }
+
+/* status atoms */
+.cockpit-tab__dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: #3ECF8E; }
+.cockpit-tab__eq { display: inline-flex; gap: 2px; align-items: flex-end; height: 10px; flex: none; }
+.cockpit-tab__eq i { width: 2px; background: #F5A623; border-radius: 1px; animation: cockpit-tab-eq 0.9s ease-in-out infinite; }
+.cockpit-tab__eq i:nth-child(2) { animation-delay: 0.15s; }
+.cockpit-tab__eq i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes cockpit-tab-eq { 0%, 100% { height: 3px; } 50% { height: 10px; } }
+
+/* completion pull-back: a background tab whose pane just finished gets a pulsing green top bar */
+.cockpit-tab.is-attention::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: #3ECF8E;
+  animation: cockpit-tab-attn 1.3s ease-in-out infinite;
 }
 @keyframes cockpit-tab-attn {
-  0%, 100% { box-shadow: inset 0 -2px 0 0 #3ECF8E; }
-  50%      { box-shadow: inset 0 -2px 0 0 #3ECF8E, 0 0 16px -3px #3ECF8E; }
+  0%, 100% { box-shadow: 0 0 0 0 transparent; opacity: 0.7; }
+  50%      { box-shadow: 0 1px 14px #3ECF8E; opacity: 1; }
+}
+
+/* draggable window region fills the gap between tabs and the tools */
+.cockpit-tabs__drag { flex: 1; align-self: stretch; min-width: 24px; }
+
+/* tools cluster — separated from tabs, full-height icon buttons */
+.cockpit-tabs__tools { display: flex; align-items: stretch; border-left: 1px solid #2A2F3A; }
+.cockpit-tool {
+  width: 42px; display: grid; place-items: center; color: #6B7280; font-size: 15px;
+  background: transparent; border: 0; cursor: pointer; transition: background 0.12s, color 0.12s;
+}
+.cockpit-tool:hover { color: #C8CDD6; background: #1d222b; }
+.cockpit-tool:focus-visible { outline: 2px solid #F5A623; outline-offset: -2px; }
+.cockpit-tool--add { color: #F5A623; font-size: 18px; }
+.cockpit-tool--add:hover { background: #2a2113; color: #F5A623; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cockpit-tab__eq i, .cockpit-tab.is-attention::before { animation: none; }
 }

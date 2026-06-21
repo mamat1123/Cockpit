@@ -1,12 +1,14 @@
+import { useEffect, useRef, useState } from "react";
 import type { Layout, Tab } from "../layout/paneLayout";
+import { paneLastLineAt } from "../lib/terminalRegistry";
+import { deriveState } from "../lib/paneState";
 import "./TabBar.css";
 
-function tabTitle(t: Tab): string {
-  const panes = t.rows.flatMap((r) => r.panes);
-  const base = panes[0]?.title || "shell";
-  const name = base.length > 28 ? base.slice(0, 28) + "…" : base;
-  return panes.length > 1 ? `${name} · ${panes.length}` : name;
+function tabName(t: Tab): string {
+  const base = t.rows.flatMap((r) => r.panes)[0]?.title || "shell";
+  return base.length > 24 ? base.slice(0, 24) + "…" : base;
 }
+const paneCount = (t: Tab): number => t.rows.reduce((n, r) => n + r.panes.length, 0);
 
 export function TabBar({ layout, attention, onSelect, onReorder, onOpenDashboard, onOpenPicker, onOpenWorkspaces }: {
   layout: Layout;
@@ -18,29 +20,62 @@ export function TabBar({ layout, attention, onSelect, onReorder, onOpenDashboard
   onOpenPicker: () => void;
   onOpenWorkspaces: () => void;
 }) {
+  // per-tab aggregate working state (any pane in the tab thinking) — drives the dot/equalizer
+  const [working, setWorking] = useState<Set<string>>(() => new Set());
+  const layoutRef = useRef(layout);
+  layoutRef.current = layout;
+  useEffect(() => {
+    const id = setInterval(() => {
+      const now = Date.now();
+      const w = new Set<string>();
+      for (const t of layoutRef.current.tabs) {
+        if (t.rows.some((r) => r.panes.some((p) => deriveState({ lastLineAt: paneLastLineAt(p.id) }, now, 800) === "working"))) {
+          w.add(t.id);
+        }
+      }
+      setWorking((prev) => (prev.size === w.size && [...w].every((x) => prev.has(x)) ? prev : w));
+    }, 400);
+    return () => clearInterval(id);
+  }, []);
+
   return (
     <div className="cockpit-tabs">
-      {layout.tabs.map((t, i) => (
-        <button
-          key={t.id}
-          className={`cockpit-tab${t.id === layout.activeTabId ? " is-active" : ""}${attention.has(t.id) && t.id !== layout.activeTabId ? " is-attention" : ""}`}
-          draggable
-          onClick={() => onSelect(t.id)}
-          onDragStart={(e) => e.dataTransfer.setData("text/plain", t.id)}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => {
-            e.preventDefault();
-            const fromId = e.dataTransfer.getData("text/plain");
-            if (fromId && fromId !== t.id) onReorder(fromId, i);
-          }}
-        >
-          <span className="cockpit-tab__title">{tabTitle(t)}</span>
-        </button>
-      ))}
-      <button className="cockpit-tab cockpit-tab--new" onClick={onOpenDashboard} aria-label="Mission Control (Cmd+0)" title="Mission Control (⌘0)">▦</button>
-      <button className="cockpit-tab cockpit-tab--new" onClick={onOpenWorkspaces} aria-label="Workspaces (Cmd+E)" title="Workspaces (⌘E)">⊞</button>
-      <button className="cockpit-tab cockpit-tab--new" onClick={onOpenPicker} aria-label="Open project (Cmd+O)" title="Open project (⌘O)">+</button>
+      <div className="cockpit-tabs__list">
+        {layout.tabs.map((t, i) => {
+          const active = t.id === layout.activeTabId;
+          const isWorking = working.has(t.id);
+          const attn = attention.has(t.id) && !active;
+          return (
+            <button
+              key={t.id}
+              className={`cockpit-tab${active ? " is-active" : ""}${attn ? " is-attention" : ""}`}
+              draggable
+              onClick={() => onSelect(t.id)}
+              onDragStart={(e) => e.dataTransfer.setData("text/plain", t.id)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                const fromId = e.dataTransfer.getData("text/plain");
+                if (fromId && fromId !== t.id) onReorder(fromId, i);
+              }}
+            >
+              {isWorking ? (
+                <span className="cockpit-tab__eq" aria-hidden="true"><i /><i /><i /></span>
+              ) : (
+                <span className="cockpit-tab__dot" aria-hidden="true" />
+              )}
+              <span className="cockpit-tab__title">{tabName(t)}</span>
+              <span className="cockpit-tab__ct">{paneCount(t)}</span>
+            </button>
+          );
+        })}
+      </div>
       <div className="cockpit-tabs__drag" data-tauri-drag-region></div>
+      <div className="cockpit-tabs__tools">
+        <button className="cockpit-tool" onClick={onOpenDashboard} aria-label="Mission Control (Cmd+0)" title="Mission Control (⌘0)">▦</button>
+        <button className="cockpit-tool" onClick={onOpenWorkspaces} aria-label="Workspaces (Cmd+E)" title="Workspaces (⌘E)">⊞</button>
+        <button className="cockpit-tool cockpit-tool--add" onClick={onOpenPicker} aria-label="Open project (Cmd+O)" title="Open project (⌘O)">+</button>
+      </div>
     </div>
   );
 }
