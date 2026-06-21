@@ -88,4 +88,10 @@ rendered to feel satisfying. "Game-like" = aesthetic JUICE, not game mechanics (
   incrementally (per-file offset + global message-id dedup); frontend filters/groups/prices via the
   editable table. `echarts` ^6 via a tiny `<EChart>` wrapper (React 19 → no react-wrapper lib).
 
-**Next candidates:** price-editor UI, empty-period state for charts, layout persistence (#4), project/cwd picker for new panes, combo/juice on send (#5).
+- **M7 — Cost by session + jump/resume**: the Cost view lists every chat session with its cost
+  (period-filtered, sorted), and clicking a session jumps to it — focuses its pane if open, else
+  opens a new tab that resumes it (`claude --resume <id>` in its cwd). `cost_report` now returns
+  per-session buckets + metadata (cwd/project/title from the first user message); reducer gains
+  `openSession` + `Pane.resume`.
+
+**Next candidates:** price-editor UI, empty-period chart state, layout persistence (#4), project/cwd picker for new panes, combo/juice on send (#5).
