@@ -3,6 +3,7 @@ import { reduce, initLayout, findPaneBySession, serializeLayout, deserializeLayo
 import { loadLast, saveLast, savePreset } from "../lib/persistence";
 import { useKeybindings } from "../layout/useKeybindings";
 import { TabBar } from "./TabBar";
+import { Juice } from "./Juice";
 import { TabPanes } from "./TabPanes";
 import { PaneHost } from "./PaneHost";
 import { Dashboard } from "./Dashboard";
@@ -26,6 +27,13 @@ export function CockpitView() {
     }
     return initLayout(DEFAULT_CWD);
   });
+  const [attention, setAttention] = useState<Set<string>>(() => new Set());
+  const addAttention = useCallback((tabId: string) => {
+    setAttention((s) => (s.has(tabId) ? s : new Set(s).add(tabId)));
+  }, []);
+  useEffect(() => {
+    setAttention((s) => { if (!s.has(layout.activeTabId)) return s; const n = new Set(s); n.delete(layout.activeTabId); return n; });
+  }, [layout.activeTabId]);
   const [dashOpen, setDashOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [wsOpen, setWsOpen] = useState(false);
@@ -75,6 +83,7 @@ export function CockpitView() {
     <div style={{ position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: "#14161B" }}>
       <TabBar
         layout={layout}
+        attention={attention}
         onSelect={(tabId) => {
           dispatch({ type: "focusTab", tabId });
           const pid = layout.tabs.find((t) => t.id === tabId)?.rows[0]?.panes[0]?.id;
@@ -98,6 +107,7 @@ export function CockpitView() {
         ))}
       </div>
       <PaneHost layout={layout} slots={slots} dispatch={dispatch} />
+      <Juice layout={layout} onAttention={addAttention} />
       {dashOpen && (
         <Dashboard
           layout={layout}
