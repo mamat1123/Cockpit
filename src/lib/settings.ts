@@ -1,11 +1,16 @@
 const KEY = "cockpit.settings.v1";
 
+export type BlurMaterial = "none" | "hudWindow" | "fullScreenUI" | "sidebar" | "underWindowBackground";
+
 export interface Settings {
   /** Cockpit background opacity (0 = fully see-through to the macOS blur, 1 = opaque). */
   bgOpacity: number;
+  themeId: string;
+  accent: string | null;
+  blur: BlurMaterial;
 }
 
-export const DEFAULT_SETTINGS: Settings = { bgOpacity: 0.62 };
+export const DEFAULT_SETTINGS: Settings = { bgOpacity: 0.62, themeId: "amber-hud", accent: null, blur: "hudWindow" };
 
 export function loadSettings(): Settings {
   try {
