@@ -1,9 +1,39 @@
 import { Terminal } from "@xterm/xterm";
+import type { ITheme } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import { spawnPty, writePty, resizePty, onPtyOutput, onPtyExit } from "./ptyClient";
 import { startLogtail, sessionExists } from "./logClient";
 import { emitSend } from "./juiceBus";
+import { type Theme, themeById, DEFAULT_THEME_ID } from "./themes";
+
+let activeTheme: Theme = themeById(DEFAULT_THEME_ID);
+
+/** Map a Cockpit theme onto an xterm ITheme. The background is ALWAYS transparent —
+ *  window blur depends on the xterm viewport letting the desktop show through — so we
+ *  never use t.bg here. Everything else (fg, cursor, selection, ANSI 16) tracks the theme. */
+function xtermThemeOf(t: Theme): ITheme {
+  return {
+    background: "rgba(0,0,0,0)",
+    foreground: t.text,
+    cursor: t.accent,
+    cursorAccent: t.bg,
+    selectionBackground: t.accent + "44",
+    selectionForeground: t.bright,
+    black: t.surface2, red: t.red, green: t.green, yellow: t.yellow,
+    blue: t.blue, magenta: t.magenta, cyan: t.cyan, white: t.text,
+    brightBlack: t.muted, brightRed: t.red, brightGreen: t.green, brightYellow: t.yellow,
+    brightBlue: t.blue, brightMagenta: t.magenta, brightCyan: t.cyan, brightWhite: t.bright,
+  };
+}
+
+/** Switch every live terminal (and all future ones) to a new theme. xterm 6 applies
+ *  `.options.theme` reactively, so a fresh ITheme on each entry recolors it in place. */
+export function setTerminalTheme(t: Theme): void {
+  activeTheme = t;
+  const next = xtermThemeOf(t);
+  for (const entry of registry.values()) entry.term.options.theme = next;
+}
 
 /** A pane's terminal lives OUTSIDE React. React only remounts a thin wrapper when a
  *  pane moves tabs (a portal-container change remounts — verified); if the xterm lived
@@ -51,7 +81,7 @@ export function acquireTerminal(paneId: string, cwd: string, sessionId: string, 
     fontSize: 13,
     cursorBlink: true,
     allowTransparency: true,
-    theme: { background: "rgba(0,0,0,0)" },
+    theme: xtermThemeOf(activeTheme),
   });
   const fit = new FitAddon();
   term.loadAddon(fit);

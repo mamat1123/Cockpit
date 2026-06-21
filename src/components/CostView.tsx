@@ -9,10 +9,12 @@ const PERIODS: { id: Period; label: string }[] = [
   { id: "today", label: "Today" }, { id: "7d", label: "7 days" }, { id: "30d", label: "30 days" }, { id: "all", label: "All" },
 ];
 const usd = (n: number) => `$${n > 0 && n < 0.01 ? n.toFixed(3) : n.toFixed(2)}`;
-const PALETTE = ["#F5A623", "#3ECF8E", "#7C9CFF", "#5a6472", "#c06ad6"];
-const axis = { axisLine: { lineStyle: { color: "#262A33" } }, axisLabel: { color: "#565d68", fontSize: 10 }, axisTick: { show: false } };
-const tip = { backgroundColor: "#181B22", borderColor: "#262A33", textStyle: { color: "#C8CDD6", fontFamily: "ui-monospace, Menlo, monospace" } };
-const base = { backgroundColor: "transparent", textStyle: { fontFamily: "ui-monospace, Menlo, monospace" }, animationDuration: 600, animationEasing: "cubicOut" as const };
+
+/** Read a live CSS custom property off :root (the active theme), with a fallback for SSR/tests. */
+function cssVar(name: string, fallback = ""): string {
+  if (typeof document === "undefined") return fallback;
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
 
 export function CostView({ onJump }: { onJump: (sessionId: string, cwd: string) => void }) {
   const [report, setReport] = useState<CostReport>({ buckets: [], sessions: [] });
@@ -38,34 +40,54 @@ export function CostView({ onJump }: { onJump: (sessionId: string, cwd: string) 
   const days = byDay(f), projects = byProject(f), models = byModel(f), tiers = tierTokens(f);
   const projectCount = new Set(f.map((b) => b.project)).size;
 
+  // Read live theme tokens off :root each render so a freshly-opened Cost overlay shows
+  // the active theme's colors (the overlay mounts after applyTheme has run).
+  const accent = cssVar("--ck-accent", "#F5A623");
+  const text = cssVar("--ck-text", "#C8CDD6");
+  const bright = cssVar("--ck-bright", "#EDEFF3");
+  const muted = cssVar("--ck-muted", "#565d68");
+  const border = cssVar("--ck-border", "#262A33");
+  const bg = cssVar("--ck-bg", "#0E1014");
+  const surface = cssVar("--ck-surface", "#181B22");
+  const PALETTE = [accent, cssVar("--ck-blue", "#7C9CFF"), cssVar("--ck-idle", "#3ECF8E"), cssVar("--ck-magenta", "#c06ad6"), cssVar("--ck-yellow", "#F5A623"), cssVar("--ck-cyan", "#56b6c2")];
+  const axis = { axisLine: { lineStyle: { color: border } }, axisLabel: { color: muted, fontSize: 10 }, axisTick: { show: false } };
+  const tip = { backgroundColor: surface, borderColor: border, textStyle: { color: text, fontFamily: "ui-monospace, Menlo, monospace" } };
+  const base = { backgroundColor: "transparent", textStyle: { fontFamily: "ui-monospace, Menlo, monospace" }, animationDuration: 600, animationEasing: "cubicOut" as const };
+
   const dailyOpt: echarts.EChartsOption = {
     ...base, grid: { left: 46, right: 14, top: 16, bottom: 24 },
     tooltip: { trigger: "axis", ...tip, valueFormatter: (v) => usd(+(v as number)) },
     xAxis: { type: "category", data: days.map((d) => d.name.slice(5)), ...axis },
-    yAxis: { type: "value", axisLabel: { color: "#565d68", fontSize: 10, formatter: (v: number) => `$${v}` }, splitLine: { lineStyle: { color: "#1a1e26" } } },
+    yAxis: { type: "value", axisLabel: { color: muted, fontSize: 10, formatter: (v: number) => `$${v}` }, splitLine: { lineStyle: { color: border } } },
     series: [{ type: "bar", data: days.map((d) => +d.usd.toFixed(4)),
-      itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: "#F5A623" }, { offset: 1, color: "#c9851d" }]), borderRadius: [4, 4, 0, 0] },
+      itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: accent }, { offset: 1, color: cssVar("--ck-yellow", "#c9851d") }]), borderRadius: [4, 4, 0, 0] },
       animationDelay: (i: number) => i * 28 }],
   };
   const projOpt: echarts.EChartsOption = {
     ...base, grid: { left: 4, right: 56, top: 6, bottom: 6, containLabel: true },
     tooltip: { trigger: "axis", ...tip, valueFormatter: (v) => usd(+(v as number)) },
     xAxis: { type: "value", show: false },
-    yAxis: { type: "category", data: projects.map((p) => p.name).reverse(), axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: "#C8CDD6", fontSize: 11.5 } },
+    yAxis: { type: "category", data: projects.map((p) => p.name).reverse(), axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: text, fontSize: 11.5 } },
     series: [{ type: "bar", data: projects.map((p) => +p.usd.toFixed(4)).reverse(), barWidth: 10,
-      itemStyle: { color: "#F5A623", borderRadius: [0, 5, 5, 0] },
-      label: { show: true, position: "right", formatter: (p: { value?: unknown }) => usd(+(p.value as number)), color: "#EDEFF3", fontSize: 11 } }],
+      itemStyle: { color: accent, borderRadius: [0, 5, 5, 0] },
+      label: { show: true, position: "right", formatter: (p: { value?: unknown }) => usd(+(p.value as number)), color: bright, fontSize: 11 } }],
   };
   const modelOpt: echarts.EChartsOption = {
     ...base, color: PALETTE,
     tooltip: { trigger: "item", ...tip, valueFormatter: (v) => usd(+(v as number)) },
-    legend: { orient: "vertical", right: 4, top: "center", textStyle: { color: "#C8CDD6", fontFamily: "ui-monospace, Menlo, monospace", fontSize: 11 }, icon: "roundRect" },
+    legend: { orient: "vertical", right: 4, top: "center", textStyle: { color: text, fontFamily: "ui-monospace, Menlo, monospace", fontSize: 11 }, icon: "roundRect" },
     series: [{ type: "pie", radius: ["56%", "82%"], center: ["32%", "50%"], data: models.map((m) => ({ name: m.name.replace("claude-", ""), value: +m.usd.toFixed(4) })),
-      label: { show: false }, itemStyle: { borderColor: "#0E1014", borderWidth: 2 } }],
+      label: { show: false }, itemStyle: { borderColor: bg, borderWidth: 2 } }],
   };
 
   const tierTotal = tiers.cacheRead + tiers.input + tiers.cacheWrite + tiers.output || 1;
   const pct = (n: number) => (n / tierTotal) * 100;
+  const tierColors = {
+    cacheRead: cssVar("--ck-surface-2", "#3a4150"),
+    input: cssVar("--ck-dim", "#5a6472"),
+    cacheWrite: cssVar("--ck-blue", "#7C9CFF"),
+    output: accent,
+  };
 
   const metaBy = useMemo(() => Object.fromEntries(report.sessions.map((s) => [s.session, s])), [report.sessions]);
   const sessions = bySession(f).map((s) => ({ ...s, meta: metaBy[s.name] as SessionMeta | undefined })).filter((s) => s.usd > 0);
@@ -102,16 +124,16 @@ export function CostView({ onJump }: { onJump: (sessionId: string, cwd: string) 
       <div className="cost__card">
         <h4>Where the tokens go</h4>
         <div className="cost__stack">
-          <span style={{ width: `${pct(tiers.cacheRead)}%`, background: "#3a4150" }} />
-          <span style={{ width: `${pct(tiers.input)}%`, background: "#5a6472" }} />
-          <span style={{ width: `${pct(tiers.cacheWrite)}%`, background: "#7C9CFF" }} />
-          <span style={{ width: `${pct(tiers.output)}%`, background: "#F5A623" }} />
+          <span style={{ width: `${pct(tiers.cacheRead)}%`, background: tierColors.cacheRead }} />
+          <span style={{ width: `${pct(tiers.input)}%`, background: tierColors.input }} />
+          <span style={{ width: `${pct(tiers.cacheWrite)}%`, background: tierColors.cacheWrite }} />
+          <span style={{ width: `${pct(tiers.output)}%`, background: tierColors.output }} />
         </div>
         <div className="cost__tiers">
-          <span><i style={{ background: "#3a4150" }} />cache read {pct(tiers.cacheRead).toFixed(0)}%</span>
-          <span><i style={{ background: "#5a6472" }} />input {pct(tiers.input).toFixed(0)}%</span>
-          <span><i style={{ background: "#7C9CFF" }} />cache write {pct(tiers.cacheWrite).toFixed(0)}%</span>
-          <span><i style={{ background: "#F5A623" }} />output {pct(tiers.output).toFixed(0)}%</span>
+          <span><i style={{ background: tierColors.cacheRead }} />cache read {pct(tiers.cacheRead).toFixed(0)}%</span>
+          <span><i style={{ background: tierColors.input }} />input {pct(tiers.input).toFixed(0)}%</span>
+          <span><i style={{ background: tierColors.cacheWrite }} />cache write {pct(tiers.cacheWrite).toFixed(0)}%</span>
+          <span><i style={{ background: tierColors.output }} />output {pct(tiers.output).toFixed(0)}%</span>
         </div>
       </div>
       <div className="cost__card">

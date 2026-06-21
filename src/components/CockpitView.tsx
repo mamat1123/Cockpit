@@ -14,7 +14,7 @@ import { WorkspacesMenu } from "./WorkspacesMenu";
 import { SettingsMenu } from "./SettingsMenu";
 import { killPty } from "../lib/ptyClient";
 import { stopLogtail } from "../lib/logClient";
-import { releaseTerminal, focusTerminal } from "../lib/terminalRegistry";
+import { releaseTerminal, focusTerminal, setTerminalTheme } from "../lib/terminalRegistry";
 
 const DEFAULT_CWD = "/Users/theerametsaengsin/Work/mee-tang/app";
 
@@ -52,7 +52,10 @@ export function CockpitView() {
   const patchSettings = useCallback((p: Partial<typeof settings>) => setSettings((s) => { const n = { ...s, ...p }; saveSettings(n); return n; }), []);
   const setBgOpacity = useCallback((v: number) => patchSettings({ bgOpacity: v }), [patchSettings]);
   const theme = themeById(settings.themeId);
-  useEffect(() => { applyTheme(theme, settings.accent); }, [theme, settings.accent]);
+  useEffect(() => {
+    applyTheme(theme, settings.accent);
+    setTerminalTheme(settings.accent ? { ...theme, accent: settings.accent } : theme);
+  }, [theme, settings.accent]);
   const toggleDash = useCallback(() => setDashOpen((o) => !o), []);
   useKeybindings(dispatch, { onToggleDashboard: toggleDash, onOpenProject: () => setPickerOpen(true), onOpenWorkspaces: () => setWsOpen(true), onOpenSettings: () => setSettingsOpen(true) });
 
