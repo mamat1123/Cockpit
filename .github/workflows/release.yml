@@ -1,0 +1,61 @@
+name: release
+
+# Auto-release on push to main — but only when the version in tauri.conf.json
+# has no matching tag yet. Bump the version => the next push ships a release.
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.gate.outputs.version }}
+      go: ${{ steps.gate.outputs.go }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: gate
+        run: |
+          VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null 2>&1; then
+            echo "go=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::v$VERSION already released — skipping."
+          else
+            echo "go=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::New version v$VERSION — building a release."
+          fi
+
+  release:
+    needs: check
+    if: needs.check.outputs.go == 'true'
+    runs-on: macos-14
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - run: npm ci
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: v${{ needs.check.outputs.version }}
+          releaseName: Claude Cockpit ${{ needs.check.outputs.version }}
+          releaseDraft: false
+          prerelease: false
+          args: --target aarch64-apple-darwin
