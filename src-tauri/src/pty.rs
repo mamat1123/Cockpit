@@ -83,6 +83,10 @@ pub fn pty_spawn(
     cmd.arg("-il");
     cmd.cwd(&cwd);
     cmd.env("TERM", "xterm-256color");
+    // Advertise 24-bit color so claude (chalk/supports-color) emits exact truecolor
+    // escapes instead of downsampling to the 256-color palette — matches Ghostty,
+    // which sets COLORTERM=truecolor and is why colors look more intense there.
+    cmd.env("COLORTERM", "truecolor");
 
     let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
     drop(pair.slave);
