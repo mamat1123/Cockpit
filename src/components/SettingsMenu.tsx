@@ -4,6 +4,7 @@ import { THEMES, themeById } from "../lib/themes";
 import { MONO_FONTS, FONT_SIZE_MIN, FONT_SIZE_MAX } from "../lib/fonts";
 import { DEFAULT_SETTINGS, type Settings } from "../lib/settings";
 import { checkForUpdate, type Update } from "../lib/updateClient";
+import { ensureNotifyPermission } from "../lib/osNotify";
 import "./SettingsMenu.css";
 
 export function SettingsMenu({ settings, onPatch, onClose, onUpdateFound }: {
@@ -180,6 +181,50 @@ export function SettingsMenu({ settings, onPatch, onClose, onUpdateFound }: {
             <button type="button" className="settings__btn" onClick={check} disabled={checkState === "checking"}>
               {checkState === "checking" ? "กำลังตรวจ…" : "ตรวจหาอัปเดต"}
             </button>
+          </div>
+        </div>
+
+        <div className="settings__row">
+          <div className="settings__label">
+            <span className="settings__name">Notify when a session finishes</span>
+            <span className="settings__desc">alert you the moment Claude hands a turn back to you</span>
+          </div>
+          <div className="settings__control">
+            <input className="settings__toggle" type="checkbox" checked={settings.notifications.enabled}
+              onChange={(e) => onPatch({ notifications: { ...settings.notifications, enabled: e.target.checked } })}
+              aria-label="Enable completion notifications" />
+          </div>
+        </div>
+        <div className="settings__row settings__row--sub">
+          <div className="settings__label"><span className="settings__name">macOS notification</span></div>
+          <div className="settings__control">
+            <input className="settings__toggle" type="checkbox" disabled={!settings.notifications.enabled} checked={settings.notifications.os}
+              onChange={async (e) => { if (e.target.checked) await ensureNotifyPermission(); onPatch({ notifications: { ...settings.notifications, os: e.target.checked } }); }}
+              aria-label="macOS notification" />
+          </div>
+        </div>
+        <div className="settings__row settings__row--sub2">
+          <div className="settings__label"><span className="settings__name">Play sound</span></div>
+          <div className="settings__control">
+            <input className="settings__toggle" type="checkbox" disabled={!settings.notifications.enabled || !settings.notifications.os} checked={settings.notifications.sound}
+              onChange={(e) => onPatch({ notifications: { ...settings.notifications, sound: e.target.checked } })}
+              aria-label="Play notification sound" />
+          </div>
+        </div>
+        <div className="settings__row settings__row--sub">
+          <div className="settings__label"><span className="settings__name">In-app toast</span></div>
+          <div className="settings__control">
+            <input className="settings__toggle" type="checkbox" disabled={!settings.notifications.enabled} checked={settings.notifications.toast}
+              onChange={(e) => onPatch({ notifications: { ...settings.notifications, toast: e.target.checked } })}
+              aria-label="In-app toast" />
+          </div>
+        </div>
+        <div className="settings__row settings__row--sub">
+          <div className="settings__label"><span className="settings__name">Floating beacon</span></div>
+          <div className="settings__control">
+            <input className="settings__toggle" type="checkbox" disabled={!settings.notifications.enabled} checked={settings.notifications.beacon}
+              onChange={(e) => onPatch({ notifications: { ...settings.notifications, beacon: e.target.checked } })}
+              aria-label="Floating beacon" />
           </div>
         </div>
 

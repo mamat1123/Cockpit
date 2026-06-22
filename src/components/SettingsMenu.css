@@ -66,6 +66,12 @@
 .settings__updstatus { font-size: 11.5px; font-weight: 600; color: var(--ck-muted); font-variant-numeric: tabular-nums; }
 .settings__upddone { color: var(--ck-dim); font-weight: 600; }
 
+/* --- notification toggles --- */
+.settings__toggle { width: 16px; height: 16px; accent-color: var(--ck-accent); cursor: pointer; }
+.settings__toggle:disabled { opacity: 0.4; cursor: default; }
+.settings__row--sub { padding-left: 20px; }
+.settings__row--sub2 { padding-left: 38px; }
+
 /* --- footer / reset all --- */
 .settings__foot { display: flex; justify-content: flex-end; padding: 14px 18px; border-top: 1px solid var(--ck-border); }
 .settings__reset { font-family: inherit; font-size: 12px; font-weight: 600; padding: 7px 14px; border-radius: 8px; cursor: pointer;
