@@ -20,6 +20,7 @@ import { setWindowBlur } from "../lib/windowClient";
 import { checkForUpdate, type Update } from "../lib/updateClient";
 import { getVersion } from "@tauri-apps/api/app";
 import { useCompletionNotifier } from "../hooks/useCompletionNotifier";
+import { ToastHost } from "./ToastHost";
 
 function livePaneIds(l: Layout): Set<string> {
   return new Set(l.tabs.flatMap((t) => t.rows.flatMap((r) => r.panes.map((p) => p.id))));
@@ -116,6 +117,15 @@ export function CockpitView() {
 
   useCompletionNotifier(layout, settings);
 
+  const jumpToSession = useCallback((sessionId: string) => {
+    const hit = findPaneBySession(layout, sessionId);
+    if (hit) {
+      dispatch({ type: "focusTab", tabId: hit.tabId });
+      dispatch({ type: "focusPane", paneId: hit.paneId });
+      requestAnimationFrame(() => requestAnimationFrame(() => focusTerminal(hit.paneId)));
+    }
+  }, [layout]);
+
   return (
     <div style={{ position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: hexA(theme.bg, settings.bgOpacity) }}>
       <TabBar
@@ -154,6 +164,7 @@ export function CockpitView() {
       </div>
       <PaneHost layout={layout} slots={slots} dispatch={dispatch} />
       <Juice layout={layout} onAttention={addAttention} />
+      <ToastHost onJump={(c) => jumpToSession(c.sessionId)} />
       {dashOpen && (
         <Dashboard
           layout={layout}
