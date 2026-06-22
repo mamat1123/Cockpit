@@ -6,6 +6,7 @@ import { deriveState } from "../lib/paneState";
 import { sessionUsage } from "../lib/costClient";
 import { costOf } from "../lib/pricing";
 import { CostView } from "./CostView";
+import { UsagePanel } from "./UsageGauges";
 import "./Dashboard.css";
 
 function ago(last: number | null, now: number): string {
@@ -77,6 +78,7 @@ export function Dashboard({ layout, onJump, onJumpSession, onClose }: {
           </div>
           )}
         </div>
+        <UsagePanel />
         {view === "sessions" ? (
         <div className="cockpit-dash__grid">
           {items.map((it) => (

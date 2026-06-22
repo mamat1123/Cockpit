@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Layout, Tab } from "../layout/paneLayout";
 import { paneLastLineAt } from "../lib/terminalRegistry";
 import { deriveState } from "../lib/paneState";
+import { UsageStrip } from "./UsageGauges";
 import "./TabBar.css";
 
 const svgProps = { width: 19, height: 19, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinejoin: "round" as const, strokeLinecap: "round" as const };
@@ -107,6 +108,7 @@ export function TabBar({ layout, attention, onSelect, onReorder, onOpenDashboard
         })}
       </div>
       <div className="cockpit-tabs__drag" data-tauri-drag-region></div>
+      <UsageStrip />
       <div className="cockpit-tabs__tools">
         <button className="cockpit-tool" onClick={onOpenDashboard} aria-label="Mission Control (Cmd+0)" title="Mission Control (⌘0)"><GridIcon /></button>
         <button className="cockpit-tool" onClick={onOpenWorkspaces} aria-label="Workspaces (Cmd+E)" title="Workspaces (⌘E)"><LayersIcon /></button>

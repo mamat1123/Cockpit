@@ -1,6 +1,7 @@
 mod pty;
 mod logtail;
 mod cost;
+mod usage;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -84,6 +85,7 @@ pub fn run() {
             cost::session_usage,
             cost::cost_report,
             cost::list_projects,
+            usage::usage_report,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

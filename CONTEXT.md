@@ -37,3 +37,14 @@ A Session's live status derived from its log: `working` (turn in progress), `idl
 (turn finished, awaiting you), or `waiting` (blocked on a permission/confirmation).
 Drives the per-pane status + ambient juice.
 _Avoid_: busy, running (be specific: working vs waiting)
+
+**Usage**:
+How much of your Claude account's rate limit you've consumed in a rolling window, as a
+percentage (0–100% utilization) plus a reset time. Read live from your account, NOT derived
+from session logs. Distinct from **Cost** — Cost is USD spent, Usage is % of limit left.
+_Avoid_: cost, quota, tokens-left, rate (be specific)
+
+**5-hour window** / **Weekly window**:
+The two rolling rate-limit windows Usage is reported for: the short rolling 5-hour window
+and the 7-day weekly window, each with its own utilization % and reset time.
+_Avoid_: 5h limit / weekly limit (it's a rolling window, not a fixed limit)

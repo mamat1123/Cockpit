@@ -194,6 +194,16 @@ export function paneLastLineAt(paneId: string): number | null {
   return registry.get(paneId)?.lastLineAt.current ?? null;
 }
 
+/** True if ANY live pane emitted output within `graceMs` — i.e. a turn is in progress.
+ *  Used by the usage store to fetch right after a turn finishes (working→idle edge). */
+export function anyPaneWorking(now: number, graceMs = 1000): boolean {
+  for (const e of registry.values()) {
+    const t = e.lastLineAt.current;
+    if (t != null && now - t < graceMs) return true;
+  }
+  return false;
+}
+
 /** Focus a pane's terminal so keystrokes go straight to it (e.g. after a dashboard
  *  jump or programmatic tab switch, where no click lands inside the xterm). */
 export function focusTerminal(paneId: string) {
