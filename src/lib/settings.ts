@@ -1,5 +1,11 @@
 const KEY = "cockpit.settings.v1";
 
+export interface NotificationSettings {
+  enabled: boolean; os: boolean; sound: boolean; toast: boolean; beacon: boolean;
+}
+
+export const DEFAULT_NOTIFICATIONS: NotificationSettings = { enabled: true, os: true, sound: true, toast: true, beacon: true };
+
 export interface Settings {
   /** Cockpit background opacity (0 = fully see-through to the macOS blur, 1 = opaque). */
   bgOpacity: number;
@@ -11,9 +17,11 @@ export interface Settings {
   fontFamily: string;
   /** Terminal font size in px. */
   fontSize: number;
+  /** Completion-notification switches (see CONTEXT.md). */
+  notifications: NotificationSettings;
 }
 
-export const DEFAULT_SETTINGS: Settings = { bgOpacity: 0.62, themeId: "amber-hud", accent: null, blurRadius: 24, fontFamily: "Menlo", fontSize: 13 };
+export const DEFAULT_SETTINGS: Settings = { bgOpacity: 0.62, themeId: "amber-hud", accent: null, blurRadius: 24, fontFamily: "Menlo", fontSize: 13, notifications: DEFAULT_NOTIFICATIONS };
 
 export function loadSettings(): Settings {
   try {
@@ -27,6 +35,7 @@ export function loadSettings(): Settings {
         blurRadius: typeof m.blurRadius === "number" ? m.blurRadius : DEFAULT_SETTINGS.blurRadius,
         fontFamily: typeof m.fontFamily === "string" && m.fontFamily ? m.fontFamily : DEFAULT_SETTINGS.fontFamily,
         fontSize: typeof m.fontSize === "number" && m.fontSize > 0 ? m.fontSize : DEFAULT_SETTINGS.fontSize,
+        notifications: { ...DEFAULT_NOTIFICATIONS, ...(m.notifications ?? {}) },
       };
     }
   } catch { /* no localStorage / bad json — use defaults */ }
