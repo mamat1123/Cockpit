@@ -30,4 +30,12 @@ export default defineConfig(async () => ({
       ignored: ["**/src-tauri/**"],
     },
   },
+  build: {
+    rollupOptions: {
+      input: {
+        main: new URL("./index.html", import.meta.url).pathname,
+        beacon: new URL("./beacon.html", import.meta.url).pathname,
+      },
+    },
+  },
 }));

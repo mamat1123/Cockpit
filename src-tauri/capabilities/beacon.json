@@ -1,0 +1,15 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "beacon",
+  "description": "Capability for the floating beacon window",
+  "windows": ["beacon"],
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-set-position",
+    "core:window:allow-set-size",
+    "core:window:allow-show",
+    "core:window:allow-set-focus"
+  ]
+}

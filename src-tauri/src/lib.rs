@@ -3,10 +3,23 @@ mod logtail;
 mod cost;
 mod usage;
 
+use tauri::{Emitter, Manager};
+
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
+}
+
+/// Jump back to the main window and emit a cockpit://jump event with the given session ID.
+#[tauri::command]
+fn beacon_jump(app: tauri::AppHandle, session_id: String) -> Result<(), String> {
+    if let Some(main) = app.get_webview_window("main") {
+        let _ = main.show();
+        let _ = main.unminimize();
+        let _ = main.set_focus();
+    }
+    app.emit("cockpit://jump", session_id).map_err(|e| e.to_string())
 }
 
 /// Continuous Ghostty-style background blur via the private CoreGraphics
@@ -75,6 +88,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             set_window_blur,
+            beacon_jump,
             pty::pty_spawn,
             pty::pty_write,
             pty::pty_resize,
@@ -88,6 +102,44 @@ pub fn run() {
             cost::list_projects,
             usage::usage_report,
         ])
+        .setup(|app| {
+            use tauri::{WebviewWindowBuilder, WebviewUrl, WindowEvent};
+            let mut b = WebviewWindowBuilder::new(app, "beacon", WebviewUrl::App("beacon.html".into()))
+                .title("")
+                .inner_size(230.0, 64.0)
+                .decorations(false)
+                .transparent(true)
+                .always_on_top(true)
+                .skip_taskbar(true)
+                .resizable(false)
+                .shadow(false);
+            // Make the beacon a child of the main window so it closes with it (lifecycle B).
+            if let Some(main) = app.get_webview_window("main") {
+                b = b.parent(&main)?;
+            }
+            let beacon = b.build()?;
+            let _ = beacon.set_visible_on_all_workspaces(true);
+            // Position top-right of the primary monitor with a margin.
+            if let Ok(Some(mon)) = beacon.primary_monitor() {
+                let sz = mon.size();
+                let pos = mon.position();
+                let _ = beacon.set_position(tauri::PhysicalPosition::new(
+                    pos.x + sz.width as i32 - 250,
+                    pos.y + 40,
+                ));
+            }
+            // Lifecycle B: closing the main Cockpit window quits the whole app (beacon
+            // included). macOS otherwise keeps a windowless app alive, so make it explicit.
+            if let Some(main) = app.get_webview_window("main") {
+                let handle = app.handle().clone();
+                main.on_window_event(move |e| {
+                    if matches!(e, WindowEvent::CloseRequested { .. }) {
+                        handle.exit(0);
+                    }
+                });
+            }
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
