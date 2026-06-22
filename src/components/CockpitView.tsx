@@ -19,6 +19,7 @@ import { releaseTerminal, focusTerminal, setTerminalTheme, setTerminalFont } fro
 import { setWindowBlur } from "../lib/windowClient";
 import { checkForUpdate, type Update } from "../lib/updateClient";
 import { getVersion } from "@tauri-apps/api/app";
+import { useCompletionNotifier } from "../hooks/useCompletionNotifier";
 
 function livePaneIds(l: Layout): Set<string> {
   return new Set(l.tabs.flatMap((t) => t.rows.flatMap((r) => r.panes.map((p) => p.id))));
@@ -112,6 +113,8 @@ export function CockpitView() {
     }
     prevIds.current = now;
   }, [layout]);
+
+  useCompletionNotifier(layout, settings);
 
   return (
     <div style={{ position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: hexA(theme.bg, settings.bgOpacity) }}>
