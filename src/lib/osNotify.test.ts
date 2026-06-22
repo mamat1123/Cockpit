@@ -29,6 +29,7 @@ describe("notifyCompletion", () => {
   it("requests permission when not granted, and does not send if denied", async () => {
     isPermissionGranted.mockResolvedValue(false); requestPermission.mockResolvedValue("denied");
     await notifyCompletion(c, { sound: true });
+    expect(requestPermission).toHaveBeenCalledOnce();
     expect(sendNotification).not.toHaveBeenCalled();
   });
 });
