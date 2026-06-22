@@ -1,7 +1,7 @@
-// STUB: Task 10 placeholder — Task 11 will replace this with the real Beacon UI.
-import { createRoot } from "react-dom/client";
+import React from "react";
+import ReactDOM from "react-dom/client";
+import { Beacon } from "./Beacon";
 
-const el = document.getElementById("beacon-root");
-if (el) {
-  createRoot(el).render(<div />);
-}
+ReactDOM.createRoot(document.getElementById("beacon-root")!).render(
+  <React.StrictMode><Beacon /></React.StrictMode>,
+);

@@ -22,6 +22,10 @@ import { getVersion } from "@tauri-apps/api/app";
 import { useCompletionNotifier } from "../hooks/useCompletionNotifier";
 import { ToastHost } from "./ToastHost";
 import { useNotifications, unseenByTab, notifications } from "../lib/notifications";
+import { emit, listen } from "@tauri-apps/api/event";
+import { buildBeaconState } from "../lib/beaconState";
+import { paneLastLineAt } from "../lib/terminalRegistry";
+import { deriveState } from "../lib/paneState";
 
 function livePaneIds(l: Layout): Set<string> {
   return new Set(l.tabs.flatMap((t) => t.rows.flatMap((r) => r.panes.map((p) => p.id))));
@@ -130,6 +134,27 @@ export function CockpitView() {
       requestAnimationFrame(() => requestAnimationFrame(() => focusTerminal(hit.paneId)));
     }
   }, [layout]);
+
+  // Emit beacon snapshots on a light interval (covers working-state changes too)
+  useEffect(() => {
+    if (!settings.notifications.beacon) return;
+    const tick = () => {
+      const now = Date.now();
+      const working = new Set<string>();
+      for (const t of layout.tabs) for (const r of t.rows) for (const p of r.panes)
+        if (deriveState({ lastLineAt: paneLastLineAt(p.id) }, now, 800) === "working") working.add(p.id);
+      void emit("cockpit://beacon-state", buildBeaconState(layout, notifications.list(), working));
+    };
+    tick();
+    const id = setInterval(tick, 500);
+    return () => clearInterval(id);
+  }, [layout, entries, settings.notifications.beacon]);
+
+  // Jump requests coming from the beacon window
+  useEffect(() => {
+    const un = listen<string>("cockpit://jump", (e) => jumpToSession(e.payload));
+    return () => { un.then((f) => f()); };
+  }, [jumpToSession]);
 
   return (
     <div style={{ position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: hexA(theme.bg, settings.bgOpacity) }}>
