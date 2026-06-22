@@ -14,7 +14,7 @@ export function ToastHost({ onJump }: { onJump: (c: Completion) => void }) {
   useEffect(() => onToast((c) => {
     const key = ++seq.current;
     setItems((prev) => [{ c, key }, ...prev].slice(0, 3));
-    const t = window.setTimeout(() => dismiss(key), TTL);
+    const t = window.setTimeout(() => dismissRef.current(key), TTL);
     timers.current.set(key, t);
   }), []);
 
@@ -22,13 +22,15 @@ export function ToastHost({ onJump }: { onJump: (c: Completion) => void }) {
     setItems((prev) => prev.filter((i) => i.key !== key));
     const t = timers.current.get(key); if (t) { clearTimeout(t); timers.current.delete(key); }
   };
+  const dismissRef = useRef(dismiss);
+  dismissRef.current = dismiss;
   const pause = (key: number) => { const t = timers.current.get(key); if (t) { clearTimeout(t); timers.current.delete(key); } };
   const resume = (key: number) => { timers.current.set(key, window.setTimeout(() => dismiss(key), TTL)); };
 
   return (
     <div className="toasts" aria-live="polite">
       {items.map(({ c, key }) => (
-        <button key={key} className="toast" onMouseEnter={() => pause(key)} onMouseLeave={() => resume(key)}
+        <button type="button" key={key} className="toast" onMouseEnter={() => pause(key)} onMouseLeave={() => resume(key)}
                 onClick={() => { onJump(c); dismiss(key); }}>
           <span className="toast__check" aria-hidden="true">✓</span>
           <span className="toast__tx">
