@@ -33,10 +33,30 @@ A purely cosmetic flourish when firing prompts — juice only. NO score, streak,
 _Avoid_: combo system, score, multiplier
 
 **Working state**:
-A Session's live status derived from its log: `working` (turn in progress), `idle`
-(turn finished, awaiting you), or `waiting` (blocked on a permission/confirmation).
+A Session's live status: `working` (turn in progress) or `idle` (turn finished,
+awaiting you). A third value `waiting` (blocked on a permission/confirmation) is
+defined but currently inert — panes run with permissions skipped, so it never occurs.
 Drives the per-pane status + ambient juice.
-_Avoid_: busy, running (be specific: working vs waiting)
+_Avoid_: busy, running (be specific: working vs idle)
+
+**Completion**:
+The moment a Session finishes its turn and hands control back to you — Claude *ended*
+the turn, not merely paused mid-tool. The single event that triggers every notification
+surface ([[Beacon]], toast, macOS notification, chime, tab/bell counts).
+_Avoid_: done, finish event, turn-end (when naming the trigger, say Completion)
+
+**Seen / Unseen**:
+A Completion is Unseen until you view its Session (its Tab becomes active) or act on it
+from the [[Beacon]]/bell. Unseen Completions are what the tab badge, bell count, and
+Beacon pulse count. "Mark all read" clears them in bulk.
+_Avoid_: read/unread (say Seen/Unseen), dismissed
+
+**Beacon**:
+A small always-on-top floating window, separate from the Cockpit window, that pulses
+when Sessions have Completions you haven't seen. Clicking it lists every Session with
+its Working state and jumps to one. The always-on sibling of [[Juice]] — ambient, not
+a control surface.
+_Avoid_: widget, tray, popup, HUD (be specific: the Beacon)
 
 **Usage**:
 How much of your Claude account's rate limit you've consumed in a rolling window, as a
