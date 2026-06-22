@@ -42,3 +42,9 @@ export function createNotificationStore() {
 
 /** App-wide singleton store (in-memory; cleared on restart). */
 export const notifications = createNotificationStore();
+
+import { useSyncExternalStore } from "react";
+export function useNotifications() {
+  const entries = useSyncExternalStore(notifications.subscribe, notifications.list);
+  return { entries, total: totalUnseen(entries) };
+}

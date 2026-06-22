@@ -3,6 +3,7 @@ import type { Layout, Tab } from "../layout/paneLayout";
 import { paneLastLineAt } from "../lib/terminalRegistry";
 import { deriveState } from "../lib/paneState";
 import { UsageStrip } from "./UsageGauges";
+import { NotificationBell } from "./NotificationBell";
 import "./TabBar.css";
 
 const svgProps = { width: 19, height: 19, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinejoin: "round" as const, strokeLinecap: "round" as const };
@@ -46,9 +47,13 @@ const SettingsIcon = () => (
   </svg>
 );
 
-export function TabBar({ layout, attention, onSelect, onReorder, onOpenDashboard, onOpenPicker, onOpenWorkspaces, onOpenSettings }: {
+export function TabBar({ layout, attention, unseenByTab, bellOpen, onToggleBell, onJumpSession, onSelect, onReorder, onOpenDashboard, onOpenPicker, onOpenWorkspaces, onOpenSettings }: {
   layout: Layout;
   attention: Set<string>;
+  unseenByTab: Map<string, number>;
+  bellOpen: boolean;
+  onToggleBell: () => void;
+  onJumpSession: (c: import("../lib/notifications").Completion) => void;
   onSelect: (tabId: string) => void;
   onNewTab: () => void;
   onReorder: (tabId: string, toIndex: number) => void;
@@ -103,6 +108,9 @@ export function TabBar({ layout, attention, onSelect, onReorder, onOpenDashboard
               )}
               <span className="cockpit-tab__title">{tabName(t)}</span>
               <span className="cockpit-tab__ct">{paneCount(t)}</span>
+              {!active && (unseenByTab.get(t.id) ?? 0) > 0 && (
+                <span className="cockpit-tab__badge">{unseenByTab.get(t.id)}</span>
+              )}
             </button>
           );
         })}
@@ -112,6 +120,7 @@ export function TabBar({ layout, attention, onSelect, onReorder, onOpenDashboard
       <div className="cockpit-tabs__tools">
         <button className="cockpit-tool" onClick={onOpenDashboard} aria-label="Mission Control (Cmd+0)" title="Mission Control (⌘0)"><GridIcon /></button>
         <button className="cockpit-tool" onClick={onOpenWorkspaces} aria-label="Workspaces (Cmd+E)" title="Workspaces (⌘E)"><LayersIcon /></button>
+        <NotificationBell open={bellOpen} onToggle={onToggleBell} onJump={onJumpSession} />
         <button className="cockpit-tool" onClick={onOpenSettings} aria-label="Settings (Cmd+,)" title="Settings (⌘,)"><SettingsIcon /></button>
         <button className="cockpit-tool cockpit-tool--add" onClick={onOpenPicker} aria-label="Open project (Cmd+O)" title="Open project (⌘O)"><FolderPlusIcon /></button>
       </div>

@@ -73,6 +73,10 @@
 .cockpit-tool--add { color: var(--ck-accent); font-size: 18px; }
 .cockpit-tool--add:hover { background: color-mix(in srgb, var(--ck-accent) 16%, var(--ck-bg)); color: var(--ck-accent); }
 
+.cockpit-tab__badge { font-size: 10.5px; font-weight: 600; line-height: 1; color: var(--ck-bg); background: var(--ck-idle);
+  min-width: 16px; height: 16px; padding: 0 5px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--ck-idle) 45%, transparent); }
+
 @media (prefers-reduced-motion: reduce) {
   .cockpit-tab__eq i, .cockpit-tab.is-attention::before { animation: none; }
 }

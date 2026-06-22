@@ -21,6 +21,7 @@ import { checkForUpdate, type Update } from "../lib/updateClient";
 import { getVersion } from "@tauri-apps/api/app";
 import { useCompletionNotifier } from "../hooks/useCompletionNotifier";
 import { ToastHost } from "./ToastHost";
+import { useNotifications, unseenByTab, notifications } from "../lib/notifications";
 
 function livePaneIds(l: Layout): Set<string> {
   return new Set(l.tabs.flatMap((t) => t.rows.flatMap((r) => r.panes.map((p) => p.id))));
@@ -49,6 +50,7 @@ export function CockpitView() {
   }, []);
   useEffect(() => {
     setAttention((s) => { if (!s.has(layout.activeTabId)) return s; const n = new Set(s); n.delete(layout.activeTabId); return n; });
+    notifications.markTabSeen(layout.activeTabId);
   }, [layout.activeTabId]);
   const [dashOpen, setDashOpen] = useState(false);
   // Open the picker immediately on a fresh start (empty layout) so the user always
@@ -56,6 +58,9 @@ export function CockpitView() {
   const [pickerOpen, setPickerOpen] = useState(() => layout.tabs.length === 0);
   const [wsOpen, setWsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [bellOpen, setBellOpen] = useState(false);
+  const { entries } = useNotifications();
+  const unseen = unseenByTab(entries);
   const [update, setUpdate] = useState<Update | null>(null);
   const [appVersion, setAppVersion] = useState("");
   const [settings, setSettings] = useState(loadSettings);
@@ -74,7 +79,7 @@ export function CockpitView() {
   }, []);
   const toggleDash = useCallback(() => setDashOpen((o) => !o), []);
   // ⌘T opens the picker (a tab must always start in a chosen folder), same as ⌘O / the + button.
-  useKeybindings(dispatch, { onNewTab: () => setPickerOpen(true), onToggleDashboard: toggleDash, onOpenProject: () => setPickerOpen(true), onOpenWorkspaces: () => setWsOpen(true), onOpenSettings: () => setSettingsOpen(true) });
+  useKeybindings(dispatch, { onNewTab: () => setPickerOpen(true), onToggleDashboard: toggleDash, onOpenProject: () => setPickerOpen(true), onOpenWorkspaces: () => setWsOpen(true), onOpenSettings: () => setSettingsOpen(true), onToggleBell: () => setBellOpen((o) => !o) });
 
   // Auto-restore: persist the layout (with session ids) shortly after each change.
   useEffect(() => {
@@ -131,6 +136,10 @@ export function CockpitView() {
       <TabBar
         layout={layout}
         attention={attention}
+        unseenByTab={unseen}
+        bellOpen={bellOpen}
+        onToggleBell={() => setBellOpen((o) => !o)}
+        onJumpSession={(c) => { jumpToSession(c.sessionId); setBellOpen(false); }}
         onSelect={(tabId) => {
           dispatch({ type: "focusTab", tabId });
           const pid = layout.tabs.find((t) => t.id === tabId)?.rows[0]?.panes[0]?.id;
