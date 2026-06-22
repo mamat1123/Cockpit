@@ -8,3 +8,14 @@ html, body, #root { background: transparent; }
   --ck-accent: #F5A623; --ck-idle: #3ECF8E;
   --ck-blue: #7C9CFF; --ck-green: #3ECF8E; --ck-red: #ff6b6b; --ck-yellow: #F5A623; --ck-magenta: #c06ad6; --ck-cyan: #56b6c2;
 }
+
+/* Empty cockpit (no project open) — a single click target that opens the picker. */
+.cockpit-empty { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 10px;
+  align-items: center; justify-content: center; background: transparent; border: 0; cursor: pointer;
+  font-family: ui-monospace, Menlo, monospace; color: var(--ck-dim); }
+.cockpit-empty:hover { color: var(--ck-muted); }
+.cockpit-empty__icon { display: inline-flex; align-items: center; justify-content: center; min-width: 56px;
+  padding: 8px 14px; border: 1px solid var(--ck-border); border-radius: 10px; font-size: 15px; font-weight: 700;
+  color: var(--ck-accent); }
+.cockpit-empty__title { color: var(--ck-bright); font-size: 15px; font-weight: 600; }
+.cockpit-empty__sub { font-size: 12.5px; }

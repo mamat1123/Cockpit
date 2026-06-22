@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { listProjects, type Project } from "../lib/projectsClient";
+import { pickFolder } from "../lib/dialogClient";
 import "./ProjectPicker.css";
 
 interface Row { cwd: string; label: string; sub: string; typed?: boolean }
@@ -33,23 +34,27 @@ export function ProjectPicker({ onPick, onClose }: { onPick: (cwd: string) => vo
 
   useEffect(() => { setSel(0); }, [q]);
   const pick = (i: number) => { const r = rows[i]; if (r) onPick(r.cwd); };
+  const browse = async () => { const dir = await pickFolder(); if (dir) onPick(dir); };
 
   return (
     <div className="picker" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="picker__panel" role="dialog" aria-label="Open project">
-        <input
-          className="picker__input"
-          autoFocus
-          placeholder="Open project — type to filter, or paste an absolute path…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") { e.preventDefault(); onClose(); }
-            else if (e.key === "ArrowDown") { e.preventDefault(); setSel((s) => Math.min(s + 1, rows.length - 1)); }
-            else if (e.key === "ArrowUp") { e.preventDefault(); setSel((s) => Math.max(s - 1, 0)); }
-            else if (e.key === "Enter") { e.preventDefault(); pick(sel); }
-          }}
-        />
+        <div className="picker__top">
+          <input
+            className="picker__input"
+            autoFocus
+            placeholder="Open project — type to filter, or paste an absolute path…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") { e.preventDefault(); onClose(); }
+              else if (e.key === "ArrowDown") { e.preventDefault(); setSel((s) => Math.min(s + 1, rows.length - 1)); }
+              else if (e.key === "ArrowUp") { e.preventDefault(); setSel((s) => Math.max(s - 1, 0)); }
+              else if (e.key === "Enter") { e.preventDefault(); pick(sel); }
+            }}
+          />
+          <button className="picker__browse" type="button" onClick={browse} title="Choose a folder…">Browse…</button>
+        </div>
         <div className="picker__list">
           {rows.length === 0 ? (
             <p className="picker__empty">No recent projects. Paste an absolute path to open one.</p>
@@ -67,7 +72,7 @@ export function ProjectPicker({ onPick, onClose }: { onPick: (cwd: string) => vo
             ))
           )}
         </div>
-        <div className="picker__foot"><kbd>↑↓</kbd> move · <kbd>↵</kbd> open · <kbd>esc</kbd> cancel</div>
+        <div className="picker__foot"><kbd>↑↓</kbd> move · <kbd>↵</kbd> open · <kbd>esc</kbd> cancel · or <strong>Browse…</strong> for a folder</div>
       </div>
     </div>
   );

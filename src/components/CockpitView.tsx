@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-import { reduce, initLayout, findPaneBySession, serializeLayout, deserializeLayout, type Layout } from "../layout/paneLayout";
+import { reduce, emptyLayout, findPaneBySession, serializeLayout, deserializeLayout, type Layout } from "../layout/paneLayout";
 import { loadLast, saveLast, savePreset } from "../lib/persistence";
 import { loadSettings, saveSettings } from "../lib/settings";
 import { themeById, applyTheme } from "../lib/themes";
@@ -15,12 +15,10 @@ import { SettingsMenu } from "./SettingsMenu";
 import { UpdateModal } from "./UpdateModal";
 import { killPty } from "../lib/ptyClient";
 import { stopLogtail } from "../lib/logClient";
-import { releaseTerminal, focusTerminal, setTerminalTheme } from "../lib/terminalRegistry";
+import { releaseTerminal, focusTerminal, setTerminalTheme, setTerminalFont } from "../lib/terminalRegistry";
 import { setWindowBlur } from "../lib/windowClient";
 import { checkForUpdate, type Update } from "../lib/updateClient";
 import { getVersion } from "@tauri-apps/api/app";
-
-const DEFAULT_CWD = "/Users/theerametsaengsin/Work/mee-tang/app";
 
 function livePaneIds(l: Layout): Set<string> {
   return new Set(l.tabs.flatMap((t) => t.rows.flatMap((r) => r.panes.map((p) => p.id))));
@@ -37,9 +35,11 @@ export function CockpitView() {
   const [layout, dispatch] = useReducer(reduce, null, () => {
     const last = loadLast();
     if (last && last.tabs && last.tabs.length > 0) {
-      try { return deserializeLayout(last); } catch { /* fall through to a fresh layout */ }
+      try { return deserializeLayout(last); } catch { /* fall through to an empty layout */ }
     }
-    return initLayout(DEFAULT_CWD);
+    // No saved layout → start empty and let the ProjectPicker create the first pane
+    // in a real folder (never a hardcoded default that may not exist on this machine).
+    return emptyLayout();
   });
   const [attention, setAttention] = useState<Set<string>>(() => new Set());
   const addAttention = useCallback((tabId: string) => {
@@ -49,7 +49,9 @@ export function CockpitView() {
     setAttention((s) => { if (!s.has(layout.activeTabId)) return s; const n = new Set(s); n.delete(layout.activeTabId); return n; });
   }, [layout.activeTabId]);
   const [dashOpen, setDashOpen] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
+  // Open the picker immediately on a fresh start (empty layout) so the user always
+  // begins by choosing a real folder rather than landing on a hardcoded default.
+  const [pickerOpen, setPickerOpen] = useState(() => layout.tabs.length === 0);
   const [wsOpen, setWsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [update, setUpdate] = useState<Update | null>(null);
@@ -62,12 +64,15 @@ export function CockpitView() {
     setTerminalTheme(settings.accent ? { ...theme, accent: settings.accent } : theme);
   }, [theme, settings.accent]);
   useEffect(() => { void setWindowBlur(settings.blurRadius); }, [settings.blurRadius]);
+  // Live font change — mutates every open terminal in place; sessions are untouched (only a grid reflow).
+  useEffect(() => { setTerminalFont(settings.fontFamily, settings.fontSize); }, [settings.fontFamily, settings.fontSize]);
   useEffect(() => {
     getVersion().then(setAppVersion).catch(() => {});
     checkForUpdate().then((u) => { if (u) setUpdate(u); });
   }, []);
   const toggleDash = useCallback(() => setDashOpen((o) => !o), []);
-  useKeybindings(dispatch, { onToggleDashboard: toggleDash, onOpenProject: () => setPickerOpen(true), onOpenWorkspaces: () => setWsOpen(true), onOpenSettings: () => setSettingsOpen(true) });
+  // ⌘T opens the picker (a tab must always start in a chosen folder), same as ⌘O / the + button.
+  useKeybindings(dispatch, { onNewTab: () => setPickerOpen(true), onToggleDashboard: toggleDash, onOpenProject: () => setPickerOpen(true), onOpenWorkspaces: () => setWsOpen(true), onOpenSettings: () => setSettingsOpen(true) });
 
   // Auto-restore: persist the layout (with session ids) shortly after each change.
   useEffect(() => {
@@ -118,7 +123,7 @@ export function CockpitView() {
           const pid = layout.tabs.find((t) => t.id === tabId)?.rows[0]?.panes[0]?.id;
           if (pid) requestAnimationFrame(() => requestAnimationFrame(() => focusTerminal(pid)));
         }}
-        onNewTab={() => dispatch({ type: "newTab" })}
+        onNewTab={() => setPickerOpen(true)}
         onReorder={(tabId, toIndex) => dispatch({ type: "moveTab", tabId, toIndex })}
         onOpenDashboard={() => setDashOpen(true)}
         onOpenPicker={() => setPickerOpen(true)}
@@ -126,15 +131,23 @@ export function CockpitView() {
         onOpenSettings={() => setSettingsOpen(true)}
       />
       <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
-        {layout.tabs.map((t) => (
-          <TabPanes
-            key={t.id}
-            tab={t}
-            active={t.id === layout.activeTabId}
-            dispatch={dispatch}
-            registerSlot={registerSlot}
-          />
-        ))}
+        {layout.tabs.length === 0 ? (
+          <button className="cockpit-empty" onClick={() => setPickerOpen(true)}>
+            <span className="cockpit-empty__icon" aria-hidden="true">⌘O</span>
+            <span className="cockpit-empty__title">No project open</span>
+            <span className="cockpit-empty__sub">Open a folder to start a Claude session</span>
+          </button>
+        ) : (
+          layout.tabs.map((t) => (
+            <TabPanes
+              key={t.id}
+              tab={t}
+              active={t.id === layout.activeTabId}
+              dispatch={dispatch}
+              registerSlot={registerSlot}
+            />
+          ))
+        )}
       </div>
       <PaneHost layout={layout} slots={slots} dispatch={dispatch} />
       <Juice layout={layout} onAttention={addAttention} />

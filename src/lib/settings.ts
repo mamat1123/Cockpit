@@ -7,16 +7,27 @@ export interface Settings {
   accent: string | null;
   /** Background blur radius in px applied via CGS (0 = no blur). */
   blurRadius: number;
+  /** Terminal font family (primary name only; a `, monospace` fallback is appended on apply). */
+  fontFamily: string;
+  /** Terminal font size in px. */
+  fontSize: number;
 }
 
-export const DEFAULT_SETTINGS: Settings = { bgOpacity: 0.62, themeId: "amber-hud", accent: null, blurRadius: 24 };
+export const DEFAULT_SETTINGS: Settings = { bgOpacity: 0.62, themeId: "amber-hud", accent: null, blurRadius: 24, fontFamily: "Menlo", fontSize: 13 };
 
 export function loadSettings(): Settings {
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) {
-      const m = { ...DEFAULT_SETTINGS, ...JSON.parse(raw) } as Settings & { blur?: unknown };
-      return { bgOpacity: m.bgOpacity, themeId: m.themeId, accent: m.accent, blurRadius: typeof m.blurRadius === "number" ? m.blurRadius : DEFAULT_SETTINGS.blurRadius };
+      const m = { ...DEFAULT_SETTINGS, ...JSON.parse(raw) } as Settings;
+      return {
+        bgOpacity: m.bgOpacity,
+        themeId: m.themeId,
+        accent: m.accent,
+        blurRadius: typeof m.blurRadius === "number" ? m.blurRadius : DEFAULT_SETTINGS.blurRadius,
+        fontFamily: typeof m.fontFamily === "string" && m.fontFamily ? m.fontFamily : DEFAULT_SETTINGS.fontFamily,
+        fontSize: typeof m.fontSize === "number" && m.fontSize > 0 ? m.fontSize : DEFAULT_SETTINGS.fontSize,
+      };
     }
   } catch { /* no localStorage / bad json — use defaults */ }
   return DEFAULT_SETTINGS;

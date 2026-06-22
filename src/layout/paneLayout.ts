@@ -38,6 +38,13 @@ export function findPaneBySession(l: Layout, sessionId: string): { tabId: string
   return null;
 }
 
+/** The cockpit before any project is open: no tabs, no panes. The UI shows the
+ *  ProjectPicker over this so the first pane is always created with a real cwd
+ *  (never a hardcoded guess). */
+export function emptyLayout(): Layout {
+  return { tabs: [], activeTabId: "", focusedPaneId: "" };
+}
+
 export function initLayout(cwd: string): Layout {
   const row = makeRow(cwd);
   const tab: Tab = { id: nextId("tab"), rows: [row] };
@@ -81,7 +88,7 @@ function focusedCwd(l: Layout): string {
   for (const t of l.tabs)
     for (const r of t.rows)
       for (const p of r.panes) if (p.id === l.focusedPaneId) return p.cwd;
-  return l.tabs[0].rows[0].panes[0].cwd;
+  return l.tabs[0]?.rows[0]?.panes[0]?.cwd ?? "";
 }
 
 function removePane(tabs: Tab[], paneId: string): { tabs: Tab[]; pane: Pane | null } {
@@ -104,11 +111,17 @@ function removePane(tabs: Tab[], paneId: string): { tabs: Tab[]; pane: Pane | nu
 export function reduce(l: Layout, a: Action): Layout {
   switch (a.type) {
     case "newTab": {
-      const row = makeRow(a.cwd ?? focusedCwd(l));
+      // A tab always opens in a real folder. With no cwd given AND nothing focused
+      // (empty layout), there's nothing to inherit — the caller must pick a folder
+      // (the UI routes ⌘T / + through the ProjectPicker), so this is a no-op.
+      const cwd = a.cwd ?? focusedCwd(l);
+      if (!cwd) return l;
+      const row = makeRow(cwd);
       const tab: Tab = { id: nextId("tab"), rows: [row] };
       return { tabs: [...l.tabs, tab], activeTabId: tab.id, focusedPaneId: row.panes[0].id };
     }
     case "split": {
+      if (l.tabs.length === 0) return l;
       const pane = makePane(focusedCwd(l));
       const tabs = l.tabs.map((t) => {
         if (t.id !== l.activeTabId) return t;
@@ -126,6 +139,7 @@ export function reduce(l: Layout, a: Action): Layout {
       return { ...l, tabs, focusedPaneId: pane.id };
     }
     case "splitDown": {
+      if (l.tabs.length === 0) return l;
       const row = makeRow(focusedCwd(l));
       const tabs = l.tabs.map((t) => {
         if (t.id !== l.activeTabId) return t;
@@ -138,6 +152,7 @@ export function reduce(l: Layout, a: Action): Layout {
       return { ...l, tabs, focusedPaneId: row.panes[0].id };
     }
     case "close": {
+      if (l.tabs.length === 0) return l;
       const tab = activeTab(l);
       const total = l.tabs.reduce((n, t) => n + allPanes(t).length, 0);
       if (total === 1) return l; // never close the last pane anywhere

@@ -8,6 +8,8 @@ import { emitSend } from "./juiceBus";
 import { type Theme, themeById, DEFAULT_THEME_ID } from "./themes";
 
 let activeTheme: Theme = themeById(DEFAULT_THEME_ID);
+let activeFontFamily = "Menlo, monospace";
+let activeFontSize = 13;
 
 /** Map a Cockpit theme onto an xterm ITheme. The background is ALWAYS transparent —
  *  window blur depends on the xterm viewport letting the desktop show through — so we
@@ -33,6 +35,22 @@ export function setTerminalTheme(t: Theme): void {
   activeTheme = t;
   const next = xtermThemeOf(t);
   for (const entry of registry.values()) entry.term.options.theme = next;
+}
+
+/** Switch every live terminal (and all future ones) to a new font family/size. Like
+ *  setTerminalTheme this mutates xterm options IN PLACE — the PTY/session is never
+ *  touched, so the running claude keeps its conversation. Changing glyph size reflows
+ *  the grid, so we refit + resize (SIGWINCH) each visible pane (claude just redraws),
+ *  skipping unsized panes (hidden tabs) exactly like refit() to avoid corrupting them. */
+export function setTerminalFont(family: string, size: number): void {
+  activeFontFamily = `${family}, monospace`;
+  activeFontSize = size;
+  for (const [paneId, e] of registry.entries()) {
+    e.term.options.fontFamily = activeFontFamily;
+    e.term.options.fontSize = size;
+    if (e.hostEl.clientWidth === 0 || e.hostEl.clientHeight === 0) continue;
+    try { e.fit.fit(); void resizePty(paneId, e.term.cols, e.term.rows); } catch { /* host detached mid-resize */ }
+  }
 }
 
 /** A pane's terminal lives OUTSIDE React. React only remounts a thin wrapper when a
@@ -77,8 +95,8 @@ export function acquireTerminal(paneId: string, cwd: string, sessionId: string, 
   parkingNode().appendChild(hostEl);
 
   const term = new Terminal({
-    fontFamily: "Menlo, monospace",
-    fontSize: 13,
+    fontFamily: activeFontFamily,
+    fontSize: activeFontSize,
     cursorBlink: true,
     allowTransparency: true,
     theme: xtermThemeOf(activeTheme),
@@ -114,9 +132,11 @@ export function acquireTerminal(paneId: string, cwd: string, sessionId: string, 
   // Resume only if the session log actually exists; otherwise start fresh pinned to
   // this id (so it's resumable next time). Avoids "No conversation found" dead panes.
   void (async () => {
-    let launch = `claude --session-id ${sessionId}`;
+    // Always skip the permission prompts — Cockpit panes run claude unattended.
+    const flags = "--dangerously-skip-permissions";
+    let launch = `claude ${flags} --session-id ${sessionId}`;
     if (resume) {
-      try { if (await sessionExists(cwd, sessionId)) launch = `claude --resume ${sessionId}`; } catch { /* not under tauri */ }
+      try { if (await sessionExists(cwd, sessionId)) launch = `claude ${flags} --resume ${sessionId}`; } catch { /* not under tauri */ }
     }
     void spawnPty(paneId, cwd, term.cols, term.rows, launch);
   })();

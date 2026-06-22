@@ -1,16 +1,18 @@
 import { useEffect } from "react";
 import type { Action } from "./paneLayout";
 
-/** Cmd+T new tab, Cmd+D split, Cmd+Shift+D split-down, Cmd+W close, Cmd+0 dashboard, Cmd+O open project, Cmd+E workspaces, Cmd+, settings. */
+/** Cmd+T new tab (picks a folder first), Cmd+D split, Cmd+Shift+D split-down, Cmd+W close, Cmd+0 dashboard, Cmd+O open project, Cmd+E workspaces, Cmd+, settings. */
 export function useKeybindings(
   dispatch: (a: Action) => void,
-  opts: { onToggleDashboard?: () => void; onOpenProject?: () => void; onOpenWorkspaces?: () => void; onOpenSettings?: () => void } = {},
+  opts: { onNewTab?: () => void; onToggleDashboard?: () => void; onOpenProject?: () => void; onOpenWorkspaces?: () => void; onOpenSettings?: () => void } = {},
 ) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!e.metaKey || e.ctrlKey || e.altKey) return;
       const k = e.key.toLowerCase();
-      if (k === "t") { e.preventDefault(); dispatch({ type: "newTab" }); }
+      // A new tab must open in a chosen folder, so ⌘T routes through the picker
+      // (falls back to an instant in-place tab only if no handler is wired).
+      if (k === "t") { e.preventDefault(); if (opts.onNewTab) opts.onNewTab(); else dispatch({ type: "newTab" }); }
       else if (k === "d") { e.preventDefault(); dispatch({ type: e.shiftKey ? "splitDown" : "split" }); }
       else if (k === "w") { e.preventDefault(); dispatch({ type: "close" }); }
       else if (k === "0") { e.preventDefault(); opts.onToggleDashboard?.(); }
@@ -20,5 +22,5 @@ export function useKeybindings(
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [dispatch, opts.onToggleDashboard, opts.onOpenProject, opts.onOpenWorkspaces, opts.onOpenSettings]);
+  }, [dispatch, opts.onNewTab, opts.onToggleDashboard, opts.onOpenProject, opts.onOpenWorkspaces, opts.onOpenSettings]);
 }

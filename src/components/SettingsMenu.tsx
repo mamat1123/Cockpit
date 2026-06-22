@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { THEMES, themeById } from "../lib/themes";
+import { MONO_FONTS, FONT_SIZE_MIN, FONT_SIZE_MAX } from "../lib/fonts";
 import { DEFAULT_SETTINGS, type Settings } from "../lib/settings";
 import { checkForUpdate, type Update } from "../lib/updateClient";
 import "./SettingsMenu.css";
@@ -29,6 +30,8 @@ export function SettingsMenu({ settings, onPatch, onClose, onUpdateFound }: {
   }
 
   const accentValue = settings.accent ?? themeById(settings.themeId).accent;
+  // Keep the current family selectable even if it's a custom one not in the curated list.
+  const fontOptions = MONO_FONTS.includes(settings.fontFamily) ? MONO_FONTS : [settings.fontFamily, ...MONO_FONTS];
 
   return (
     <div className="settings" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -84,6 +87,43 @@ export function SettingsMenu({ settings, onPatch, onClose, onUpdateFound }: {
               onChange={(e) => onPatch({ accent: e.target.value })}
               aria-label="Accent override"
             />
+          </div>
+        </div>
+
+        <div className="settings__row">
+          <div className="settings__label">
+            <span className="settings__name">Terminal font</span>
+            <span className="settings__desc">font family for all terminal panes (changes live, sessions keep running)</span>
+          </div>
+          <div className="settings__control">
+            <select
+              className="settings__select"
+              value={settings.fontFamily}
+              onChange={(e) => onPatch({ fontFamily: e.target.value })}
+              aria-label="Terminal font family"
+            >
+              {fontOptions.map((f) => <option key={f} value={f}>{f}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div className="settings__row">
+          <div className="settings__label">
+            <span className="settings__name">Font size</span>
+            <span className="settings__desc">terminal text size in pixels</span>
+          </div>
+          <div className="settings__control">
+            <input
+              className="settings__range"
+              type="range"
+              min={FONT_SIZE_MIN}
+              max={FONT_SIZE_MAX}
+              step={1}
+              value={settings.fontSize}
+              onChange={(e) => onPatch({ fontSize: parseInt(e.target.value, 10) })}
+              aria-label="Font size"
+            />
+            <span className="settings__val">{settings.fontSize}px</span>
           </div>
         </div>
 

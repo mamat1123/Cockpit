@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { initLayout, reduce, type Layout } from "./paneLayout";
+import { initLayout, emptyLayout, reduce, type Layout } from "./paneLayout";
 
 const CWD = "/Users/theerametsaengsin/Work/mee-tang/app";
 const panesOf = (l: Layout, i = 0) => l.tabs[i].rows.flatMap((r) => r.panes);
@@ -197,5 +197,30 @@ describe("serialize/deserialize", () => {
     const saved = serializeLayout(initLayout("/x"), false);
     const l2 = reduce(initLayout(CWD), { type: "loadLayout", saved });
     expect(l2.tabs[0].rows[0].panes[0].cwd).toBe("/x");
+  });
+});
+
+describe("empty layout (no project open yet)", () => {
+  it("emptyLayout has zero tabs", () => {
+    const l = emptyLayout();
+    expect(l.tabs).toEqual([]);
+    expect(l.activeTabId).toBe("");
+    expect(l.focusedPaneId).toBe("");
+  });
+  it("newTab WITH a cwd opens the first tab from empty", () => {
+    const l = reduce(emptyLayout(), { type: "newTab", cwd: "/Users/x/Work/proj" });
+    expect(l.tabs.length).toBe(1);
+    expect(l.tabs[0].rows[0].panes[0].cwd).toBe("/Users/x/Work/proj");
+    expect(l.activeTabId).toBe(l.tabs[0].id);
+    expect(l.focusedPaneId).toBe(l.tabs[0].rows[0].panes[0].id);
+  });
+  it("newTab WITHOUT a cwd is a no-op on empty (nothing to inherit — must pick a folder)", () => {
+    const l = reduce(emptyLayout(), { type: "newTab" });
+    expect(l.tabs).toEqual([]);
+  });
+  it("split / splitDown / close are no-ops on empty", () => {
+    expect(reduce(emptyLayout(), { type: "split" }).tabs).toEqual([]);
+    expect(reduce(emptyLayout(), { type: "splitDown" }).tabs).toEqual([]);
+    expect(reduce(emptyLayout(), { type: "close" }).tabs).toEqual([]);
   });
 });
