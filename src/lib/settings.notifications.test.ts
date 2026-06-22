@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { loadSettings, DEFAULT_NOTIFICATIONS } from "./settings";
 
 // Mock localStorage since it's not available in all test environments
@@ -14,11 +14,7 @@ const mockLocalStorage = {
 };
 
 // Replace global localStorage with our mock
-if (typeof window !== "undefined") {
-  Object.defineProperty(window, "localStorage", { value: mockLocalStorage, writable: true });
-} else {
-  (global as any).localStorage = mockLocalStorage;
-}
+Object.defineProperty(window, "localStorage", { value: mockLocalStorage, writable: true });
 
 beforeEach(() => mockLocalStorage.clear());
 
