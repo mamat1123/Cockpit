@@ -113,7 +113,7 @@ pub fn run() {
         ])
         .setup(|app| {
             use tauri::{WebviewWindowBuilder, WebviewUrl, WindowEvent};
-            let mut b = WebviewWindowBuilder::new(app, "beacon", WebviewUrl::App("beacon.html".into()))
+            let b = WebviewWindowBuilder::new(app, "beacon", WebviewUrl::App("beacon.html".into()))
                 .title("")
                 .inner_size(230.0, 64.0)
                 .decorations(false)
@@ -123,19 +123,22 @@ pub fn run() {
                 .resizable(false)
                 .shadow(false)
                 .visible(false);
-            // Make the beacon a child of the main window so it closes with it (lifecycle B).
-            if let Some(main) = app.get_webview_window("main") {
-                b = b.parent(&main)?;
-            }
+            // Standalone window (NOT a child of main): a child follows its parent's moves on
+            // macOS, so it could never be dragged independently. App lifecycle is handled by the
+            // CloseRequested -> exit(0) hook below, which also tears the beacon down with main.
             let beacon = b.build()?;
             let _ = beacon.set_visible_on_all_workspaces(true);
-            // Position top-right of the primary monitor with a margin.
+            // Center on the primary monitor on first run. The user can drag it anywhere;
+            // the dragged position is remembered across launches (saved by the webview).
             if let Ok(Some(mon)) = beacon.primary_monitor() {
                 let sz = mon.size();
                 let pos = mon.position();
+                let scale = mon.scale_factor();
+                let bw = (230.0 * scale) as i32;
+                let bh = (64.0 * scale) as i32;
                 let _ = beacon.set_position(tauri::PhysicalPosition::new(
-                    pos.x + sz.width as i32 - 250,
-                    pos.y + 40,
+                    pos.x + (sz.width as i32 - bw) / 2,
+                    pos.y + (sz.height as i32 - bh) / 2,
                 ));
             }
             // Lifecycle B: closing the main Cockpit window quits the whole app (beacon

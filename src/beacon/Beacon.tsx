@@ -25,7 +25,7 @@ export function Beacon() {
   }, [open, st.sessions.length]);
 
   // Draggable + persisted position (localStorage is shared across same-origin windows).
-  // Rust positions it top-right on first run; a saved position overrides on next launch.
+  // Rust centers it on first run; a saved position overrides on next launch.
   useEffect(() => {
     const w = getCurrentWindow();
     const saved = localStorage.getItem("cockpit.beacon.pos");
@@ -43,9 +43,8 @@ export function Beacon() {
         {mode === "done" && <span className="beacon__ping"><i /><b /></span>}
         {mode === "work" && <span className="beacon__eq"><i /><i /><i /></span>}
         {mode === "idle" && <span className="beacon__dot" />}
-        {st.totalUnseen > 0 && <span className="beacon__num">{st.totalUnseen}</span>}
-        {st.totalUnseen > 0 ? <span className="beacon__lbl">done</span>
-          : st.working > 0 ? <span className="beacon__lbl">{st.working} working</span> : null}
+        {mode !== "idle" && <span className="beacon__num">{mode === "done" ? st.totalUnseen : st.working}</span>}
+        <span className="beacon__lbl">{mode === "done" ? "done" : mode === "work" ? "working" : "idle"}</span>
       </button>
       {open && (
         <div className="beacon-list">
