@@ -22,6 +22,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { useCompletionNotifier } from "../hooks/useCompletionNotifier";
 import { ToastHost } from "./ToastHost";
 import { useNotifications, unseenByTab, notifications } from "../lib/notifications";
+import { invoke } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
 import { buildBeaconState } from "../lib/beaconState";
 import { paneLastLineAt } from "../lib/terminalRegistry";
@@ -135,9 +136,15 @@ export function CockpitView() {
     }
   }, [layout]);
 
+  // Drive beacon window visibility from settings.
+  useEffect(() => {
+    const visible = settings.notifications.enabled && settings.notifications.beacon;
+    void invoke("set_beacon_visible", { visible });
+  }, [settings.notifications.enabled, settings.notifications.beacon]);
+
   // Emit beacon snapshots on a light interval (covers working-state changes too)
   useEffect(() => {
-    if (!settings.notifications.beacon) return;
+    if (!(settings.notifications.enabled && settings.notifications.beacon)) return;
     const tick = () => {
       const now = Date.now();
       const working = new Set<string>();
@@ -148,7 +155,7 @@ export function CockpitView() {
     tick();
     const id = setInterval(tick, 500);
     return () => clearInterval(id);
-  }, [layout, entries, settings.notifications.beacon]);
+  }, [layout, entries, settings.notifications.enabled, settings.notifications.beacon]);
 
   // Jump requests coming from the beacon window
   useEffect(() => {

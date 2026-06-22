@@ -22,6 +22,14 @@ fn beacon_jump(app: tauri::AppHandle, session_id: String) -> Result<(), String> 
     app.emit("cockpit://jump", session_id).map_err(|e| e.to_string())
 }
 
+/// Show or hide the floating beacon window.
+#[tauri::command]
+fn set_beacon_visible(app: tauri::AppHandle, visible: bool) {
+    if let Some(w) = app.get_webview_window("beacon") {
+        let _ = if visible { w.show() } else { w.hide() };
+    }
+}
+
 /// Continuous Ghostty-style background blur via the private CoreGraphics
 /// `CGSSetWindowBackgroundBlurRadius` API. `radius = 0` clears the blur so the
 /// transparent window shows the desktop through unmodified.
@@ -89,6 +97,7 @@ pub fn run() {
             greet,
             set_window_blur,
             beacon_jump,
+            set_beacon_visible,
             pty::pty_spawn,
             pty::pty_write,
             pty::pty_resize,
@@ -112,7 +121,8 @@ pub fn run() {
                 .always_on_top(true)
                 .skip_taskbar(true)
                 .resizable(false)
-                .shadow(false);
+                .shadow(false)
+                .visible(false);
             // Make the beacon a child of the main window so it closes with it (lifecycle B).
             if let Some(main) = app.get_webview_window("main") {
                 b = b.parent(&main)?;
