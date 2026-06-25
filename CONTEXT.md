@@ -68,3 +68,25 @@ _Avoid_: cost, quota, tokens-left, rate (be specific)
 The two rolling rate-limit windows Usage is reported for: the short rolling 5-hour window
 and the 7-day weekly window, each with its own utilization % and reset time.
 _Avoid_: 5h limit / weekly limit (it's a rolling window, not a fixed limit)
+
+**Daily budget** (a.k.a. today's allowance):
+The suggested share of the remaining weekly Headroom to spend today so the Weekly window
+runs down to empty at its reset instead of being exhausted early. A self-set pacing target,
+NOT one of Anthropic's limits — you can exceed it (it just borrows from later days). Paced in
+% of the Weekly window; a USD figure shown alongside is an estimate (self-calibrated).
+_Avoid_: limit, cap, quota (it's a target, not a wall — say budget / allowance)
+
+**Headroom**:
+The weekly utilization still unspent — 100% minus what's burned. What the Daily budget spreads
+across the days left until reset.
+_Avoid_: remaining limit, tokens-left
+
+**Burn-down**:
+Recomputing the Daily budget each day as Headroom ÷ days-left, so under-using one day raises the
+next day's budget and over-using lowers it — self-correcting toward landing exactly at reset.
+_Avoid_: rollover, carry-over
+
+**Overspend**:
+Spending past today's Daily budget — the day gauge passes 100% and reads red. Allowed; it draws
+from the rest of the week's share. Distinct from hitting a Usage window, which actually blocks.
+_Avoid_: over limit, blocked (overspend doesn't block — say overspend / borrowing)

@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { useUsage, type UsageUiStatus } from "../lib/usageStore";
+import { useBudget } from "../lib/budgetStore";
+import type { Budget } from "../lib/budget";
 import type { UsageWindow } from "../lib/usageClient";
 import { clampPct, levelFor, formatReset } from "../lib/usage";
 import "./UsageGauges.css";
@@ -81,12 +83,64 @@ function Mini({ k, win, stale }: { k: string; win: UsageWindow | null; stale: bo
   );
 }
 
+/** Daily-budget mini for the strip: how much of TODAY's pacing budget is spent (can exceed 100% = borrowing from later days). */
+function DayMini({ b, stale }: { b: Budget; stale: boolean }) {
+  const fill = Math.max(0, Math.min(100, b.fillPct));
+  const [w, setW] = useState(0);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setW(fill));
+    return () => cancelAnimationFrame(id);
+  }, [fill]);
+  const cls = b.over ? "is-red is-over" : `is-${b.level}`;
+  const remain = Math.max(0, Math.round(b.remainingPct));
+  const title = `today's budget — ${Math.round(b.fillPct)}% used · ${remain}% (≈$${Math.round(b.remainingUsd)}) left to spend today · ${b.daysLeft}d left this week. A pacing target, not a hard limit.`;
+  return (
+    <span className={`cu-mini ${cls}${stale ? " is-stale" : ""}`} title={title}>
+      <span className="cu-mini__k">day</span>
+      <span className="cu-mini__track"><span className="cu-mini__fill" style={{ width: `${w}%` }} /></span>
+      <span className="cu-mini__v">{Math.round(b.fillPct)}%</span>
+    </span>
+  );
+}
+
+/** Full daily-budget gauge for the popover + Mission Control panel — mirrors the 5h/weekly gauge. */
+function DayGauge({ b, stale }: { b: Budget; stale: boolean }) {
+  const fill = Math.max(0, Math.min(100, b.fillPct));
+  const [w, setW] = useState(0);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setW(fill));
+    return () => cancelAnimationFrame(id);
+  }, [fill]);
+  const cls = b.over ? "is-red is-over" : `is-${b.level}`;
+  const remain = Math.round(b.remainingPct);
+  const foot = b.over
+    ? `${Math.abs(remain)}% over — borrowing from later days`
+    : `${remain}% (≈$${Math.round(b.remainingUsd)}) left today`;
+  return (
+    <div className={`cu-gauge ${cls}${stale ? " is-stale" : ""}`}>
+      <div className="cu-gauge__head">
+        <span className="cu-gauge__name">today’s budget</span>
+        <span className="cu-gauge__pct">{Math.round(b.fillPct)}<i>%</i></span>
+      </div>
+      <div className="cu-gauge__track">
+        <div className="cu-gauge__fill" style={{ width: `${w}%` }} />
+        <div className="cu-gauge__ticks" />
+      </div>
+      <div className="cu-gauge__foot">
+        <span className="cu-gauge__used">spent</span>
+        <span className="cu-gauge__reset">{foot}</span>
+      </div>
+    </div>
+  );
+}
+
 /**
- * Compact always-visible usage strip for the tab bar: two mini gauges (5h / weekly).
+ * Compact always-visible usage strip for the tab bar: 5h / weekly mini gauges + a daily-budget mini.
  * Hover (or focus) opens a popover with full gauges + live reset countdowns.
  */
 export function UsageStrip() {
   const { report, status } = useUsage();
+  const budget = useBudget();
   const [open, setOpen] = useState(false);
   const mode = modeOf(status, !!report);
   const five = report?.fiveHour ?? null;
@@ -119,17 +173,19 @@ export function UsageStrip() {
     >
       <Mini k="5h" win={five} stale={stale} />
       <Mini k="wk" win={week} stale={stale} />
-      {open && <Popover five={five} week={week} stale={stale} />}
+      {budget && <DayMini b={budget} stale={stale} />}
+      {open && <Popover five={five} week={week} budget={budget} stale={stale} />}
     </div>
   );
 }
 
-function Popover({ five, week, stale }: { five: UsageWindow | null; week: UsageWindow | null; stale: boolean }) {
+function Popover({ five, week, budget, stale }: { five: UsageWindow | null; week: UsageWindow | null; budget: Budget | null; stale: boolean }) {
   const now = useNow(1000);
   return (
     <div className="cu-pop" role="tooltip">
       <Gauge label="5-hour window" win={five} now={now} stale={stale} mode="data" />
       <Gauge label="Weekly · 7-day" win={week} now={now} stale={stale} mode="data" />
+      {budget && <DayGauge b={budget} stale={stale} />}
     </div>
   );
 }
@@ -137,6 +193,7 @@ function Popover({ five, week, stale }: { five: UsageWindow | null; week: UsageW
 /** Full usage panel for Mission Control: both windows at full size + a local clock. */
 export function UsagePanel() {
   const { report, status } = useUsage();
+  const budget = useBudget();
   const now = useNow(1000);
   const mode = modeOf(status, !!report);
   const five = report?.fiveHour ?? null;
@@ -155,6 +212,7 @@ export function UsagePanel() {
       <div className="cu-panel__gauges">
         <Gauge label="5-hour window" win={five} now={now} stale={stale} mode={mode} />
         <Gauge label="Weekly · 7-day" win={week} now={now} stale={stale} mode={mode} />
+        {budget && <DayGauge b={budget} stale={stale} />}
       </div>
       <div className="cu-panel__clock"><b>{clock}</b><span>local</span></div>
     </div>

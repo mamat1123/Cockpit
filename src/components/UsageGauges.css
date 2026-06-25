@@ -6,6 +6,9 @@
 .cu-gauge.is-amber, .cu-mini.is-amber { --col: var(--ck-accent); }
 .cu-gauge.is-red, .cu-mini.is-red { --col: var(--ck-red); }
 .cu-gauge.is-na, .cu-gauge.is-loading { --col: var(--ck-dim); }
+/* day-budget overspent (a pacing target exceeded — NOT a hard block): outline the track red */
+.cu-mini.is-over .cu-mini__track,
+.cu-gauge.is-over .cu-gauge__track { box-shadow: 0 0 0 1px var(--ck-red) inset, inset 0 1px 3px rgba(0,0,0,.55); }
 
 /* ── compact strip in the tab bar ───────────────────────────── */
 .cockpit-usage {
@@ -120,7 +123,7 @@
   color: var(--ck-accent); border: 1px solid color-mix(in srgb, var(--ck-accent) 45%, transparent);
   border-radius: 5px; padding: 2px 7px;
 }
-.cu-panel__gauges { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: clamp(18px, 4vw, 40px); min-width: 0; }
+.cu-panel__gauges { flex: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: clamp(18px, 4vw, 40px); min-width: 0; }
 .cu-panel__clock {
   flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 3px;
   border: 1px solid var(--ck-border); border-radius: 9px; padding: 8px 14px; background: var(--ck-surface);
