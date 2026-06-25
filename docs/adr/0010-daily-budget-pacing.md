@@ -9,9 +9,15 @@ Anthropic adjusts limits (the 5-hour cap doubled May 2026). The one authoritativ
 number we already read ([ADR 0009]) is the weekly `utilization` %.
 
 Decision: pace the **Daily budget in % of the weekly window**, not tokens or dollars.
-- `allowance% = (100 − uStart) ÷ daysLeft`, where `uStart` is the start-of-local-day
-  utilization baseline (persisted in localStorage) and `daysLeft` is whole local days through
-  `resets_at` inclusive. Recomputed daily → **burn-down**, so under/over-use self-corrects.
+- `allowance% = (100 − uStart) ÷ daysLeft`, where `daysLeft` is whole local days through
+  `resets_at` inclusive, recomputed daily → **burn-down** so under/over-use self-corrects.
+- **"Spent today" comes from the fine-grained cost log, NOT the coarse weekly %.** Weekly
+  utilization is integer-stepped over a large budget (~$6.6k cost-weighted at 100%), so a
+  day's spend barely moves it — a naive `util − startOfDayUtil` reads ~0 and looks frozen
+  (the bug that shipped in the first cut). Instead: `usedToday% = utilization × (today's $ ÷
+  this week's $)` — today's share of the week's spend scaled onto the authoritative %-axis.
+  `uStart` is then *derived* (`util − usedToday%`), so **no persisted baseline is needed** —
+  which also removes the cold-start problem and a class of localStorage bugs.
 - The day gauge mirrors the 5h/weekly gauges (fill = spent ÷ allowance) but **may exceed 100%**:
   it's a self-set pacing target, not a hard limit. Past 100% it reads red = *overspend*
   (borrowing from later days), which is the signal that prevents hitting the weekly wall early.
