@@ -108,6 +108,16 @@ export function acquireTerminal(paneId: string, cwd: string, sessionId: string, 
     if (e.metaKey && !e.ctrlKey && !e.altKey && ["t", "d", "w"].includes(e.key.toLowerCase())) {
       return false;
     }
+    // Shift+Enter → newline, not submit. Send ESC+CR — the same sequence Option+Enter
+    // and `/terminal-setup` produce — which claude interprets as "insert newline".
+    // preventDefault() is REQUIRED: xterm's _keyDown bails on a false custom-handler
+    // return WITHOUT calling preventDefault, so the keystroke still reaches the hidden
+    // textarea and leaks a second \r via the input event → claude submits anyway.
+    if (e.type === "keydown" && e.key === "Enter" && e.shiftKey) {
+      e.preventDefault();
+      void writePty(paneId, "\x1b\r");
+      return false; // suppress xterm's own \r; preventDefault suppresses the textarea leak
+    }
     return true;
   });
 
