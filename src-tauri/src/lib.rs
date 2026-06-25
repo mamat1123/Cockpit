@@ -2,6 +2,7 @@ mod pty;
 mod logtail;
 mod cost;
 mod usage;
+mod dropfile;
 
 use tauri::{Emitter, Manager};
 
@@ -110,6 +111,7 @@ pub fn run() {
             cost::cost_report,
             cost::list_projects,
             usage::usage_report,
+            dropfile::save_dropped_file,
         ])
         .setup(|app| {
             use tauri::{WebviewWindowBuilder, WebviewUrl, WindowEvent};

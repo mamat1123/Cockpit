@@ -2,7 +2,9 @@ import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { debounce } from "../lib/debounce";
 import { deriveState, type PaneState } from "../lib/paneState";
 import { paneTopic } from "../lib/logClient";
-import { acquireTerminal, attachTerminal, parkTerminalNode, refit } from "../lib/terminalRegistry";
+import { acquireTerminal, attachTerminal, parkTerminalNode, refit, focusTerminal } from "../lib/terminalRegistry";
+import { writePty } from "../lib/ptyClient";
+import { saveDroppedFile, dragHasFiles, imageFiles } from "../lib/dropClient";
 import { PaneHeader } from "./PaneHeader";
 import "./TerminalPane.css";
 
@@ -27,6 +29,8 @@ export function TerminalPane({ paneId, cwd, sessionId, resume, title, focused, i
   const [state, setState] = useState<PaneState>("idle");
   const onAutoTitleRef = useRef(onAutoTitle);
   onAutoTitleRef.current = onAutoTitle;
+  const onFocusRef = useRef(onFocus);
+  onFocusRef.current = onFocus;
 
   // The xterm + PTY live in the registry (persistent across tab moves). A pop-out or
   // drag remounts THIS wrapper (a portal-container change remounts — verified), so if
@@ -60,6 +64,54 @@ export function TerminalPane({ paneId, cwd, sessionId, resume, title, focused, i
       parkTerminalNode(paneId);
     };
   }, [paneId, cwd, sessionId]);
+
+  // Drop an image (e.g. a Snapzy screenshot) onto the terminal → type its path
+  // into claude, like a native terminal does. We can't keep Tauri's native
+  // drag-drop bridge (it would give the real path but breaks HTML5 pane
+  // reordering — that's why tauri.conf has dragDropEnabled:false), and a
+  // WKWebView never exposes File.path. So we read the dropped bytes, have Rust
+  // write a temp file, and write that path to this pane's PTY. We listen only
+  // for FILE drags (types includes "Files") and stopPropagation so the pane's
+  // root-level reorder drop zone never sees them; non-file drags fall through.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const onDragOver = (e: DragEvent) => {
+      if (!dragHasFiles(e.dataTransfer)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+    };
+    const onDrop = (e: DragEvent) => {
+      if (!dragHasFiles(e.dataTransfer)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const files = imageFiles(e.dataTransfer!.files);
+      if (!files.length) return;
+      void (async () => {
+        const paths: string[] = [];
+        for (const f of files) {
+          try { paths.push(await saveDroppedFile(f)); }
+          catch (err) { console.error("[cockpit] drop save failed", err); }
+        }
+        if (!paths.length) return;
+        // Wrap the path in bracketed-paste markers (ESC[200~ … ESC[201~). claude runs
+        // its image-path → [Image #N] detection ONLY on pasted content, not on typed
+        // text — a raw write leaves the literal path in the prompt. A native terminal
+        // inserts a drag AS a paste, which is why Ghostty shows the [Image] chip; this
+        // makes our drop behave the same.
+        await writePty(paneId, `\x1b[200~${paths.join(" ")}\x1b[201~`);
+        onFocusRef.current();
+        focusTerminal(paneId);
+      })();
+    };
+    container.addEventListener("dragover", onDragOver);
+    container.addEventListener("drop", onDrop);
+    return () => {
+      container.removeEventListener("dragover", onDragOver);
+      container.removeEventListener("drop", onDrop);
+    };
+  }, [paneId]);
 
   // Auto-name: poll this pane's OWN session log for its topic.
   useEffect(() => {
