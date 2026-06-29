@@ -8,11 +8,12 @@ import { saveDroppedFile, dragHasFiles, imageFiles } from "../lib/dropClient";
 import { PaneHeader } from "./PaneHeader";
 import "./TerminalPane.css";
 
-export function TerminalPane({ paneId, cwd, sessionId, resume, title, focused, isDragging, isDropTarget, onFocus, onRename, onAutoTitle, onPopOut, onClose, dragHandleProps, dropZoneProps }: {
+export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, title, focused, isDragging, isDropTarget, onFocus, onRename, onAutoTitle, onPopOut, onClose, onToggleHeadroom, dragHandleProps, dropZoneProps }: {
   paneId: string;
   cwd: string;
   sessionId: string;
   resume?: boolean;
+  headroom?: boolean;
   title: string;
   focused: boolean;
   isDragging?: boolean;
@@ -22,6 +23,7 @@ export function TerminalPane({ paneId, cwd, sessionId, resume, title, focused, i
   onAutoTitle: (title: string) => void;
   onPopOut: () => void;
   onClose: () => void;
+  onToggleHeadroom: () => void;
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement> & { draggable?: boolean };
   dropZoneProps?: React.HTMLAttributes<HTMLDivElement>;
 }) {
@@ -38,7 +40,7 @@ export function TerminalPane({ paneId, cwd, sessionId, resume, title, focused, i
   // "pop-out = black screen" bug). Instead we just move the persistent host node into
   // this pane's container; on unmount we park it (never dispose) so the session survives.
   useLayoutEffect(() => {
-    const entry = acquireTerminal(paneId, cwd, sessionId, !!resume);
+    const entry = acquireTerminal(paneId, cwd, sessionId, !!resume, !!headroom);
     const container = containerRef.current!;
     attachTerminal(paneId, container);
 
@@ -147,9 +149,11 @@ export function TerminalPane({ paneId, cwd, sessionId, resume, title, focused, i
         title={title}
         repo={cwd.split("/").filter(Boolean).slice(-2).join("/")}
         working={state === "working"}
+        headroom={!!headroom}
         onRename={onRename}
         onPopOut={onPopOut}
         onClose={onClose}
+        onToggleHeadroom={onToggleHeadroom}
         dragHandleProps={dragHandleProps}
       />
       <div ref={containerRef} className="cockpit-pane__host" />

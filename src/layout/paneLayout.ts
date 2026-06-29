@@ -1,9 +1,9 @@
-export interface Pane { id: string; cwd: string; size: number; title: string; autoTitle: boolean; sessionId: string; resume?: boolean }
+export interface Pane { id: string; cwd: string; size: number; title: string; autoTitle: boolean; sessionId: string; resume?: boolean; headroom?: boolean }
 export interface Row { id: string; panes: Pane[]; size: number }
 export interface Tab { id: string; rows: Row[] }
 export interface Layout { tabs: Tab[]; activeTabId: string; focusedPaneId: string }
 
-export interface SavedPane { cwd: string; title: string; autoTitle: boolean; size: number; sessionId?: string }
+export interface SavedPane { cwd: string; title: string; autoTitle: boolean; size: number; sessionId?: string; headroom?: boolean }
 export interface SavedRow { size: number; panes: SavedPane[] }
 export interface SavedTab { rows: SavedRow[] }
 export interface SavedLayout { tabs: SavedTab[]; activeTabIndex: number }
@@ -24,7 +24,8 @@ export type Action =
   | { type: "popOut"; paneId: string }
   | { type: "movePaneAfter"; paneId: string; targetPaneId: string }
   | { type: "openSession"; cwd: string; sessionId: string }
-  | { type: "loadLayout"; saved: SavedLayout };
+  | { type: "loadLayout"; saved: SavedLayout }
+  | { type: "setHeadroom"; paneId: string; on: boolean };
 
 let counter = 0;
 const nextId = (p: string) => `${p}-${++counter}`;
@@ -59,6 +60,7 @@ export function serializeLayout(l: Layout, keepSessions: boolean): SavedLayout {
         size: r.size,
         panes: r.panes.map((p) => ({
           cwd: p.cwd, title: p.title, autoTitle: p.autoTitle, size: p.size,
+          ...(p.headroom ? { headroom: true } : {}),
           ...(keepSessions ? { sessionId: p.sessionId } : {}),
         })),
       })),
@@ -80,6 +82,7 @@ export function deserializeLayout(s: SavedLayout): Layout {
       panes: r.panes.map((p) => ({
         id: nextId("pane"), cwd: p.cwd, size: p.size, title: p.title, autoTitle: p.autoTitle,
         sessionId: p.sessionId ?? crypto.randomUUID(), resume: !!p.sessionId,
+        headroom: !!p.headroom,
       })),
     })),
   }));
@@ -269,6 +272,16 @@ export function reduce(l: Layout, a: Action): Layout {
       }));
       if (!out.some((t) => t.rows.some((r) => r.panes.some((p) => p.id === a.paneId)))) return l;
       return { ...l, tabs: out, activeTabId: destTabId, focusedPaneId: pane.id };
+    }
+    case "setHeadroom": {
+      const tabs = l.tabs.map((t) => ({
+        ...t,
+        rows: t.rows.map((r) => ({
+          ...r,
+          panes: r.panes.map((p) => (p.id === a.paneId ? { ...p, headroom: a.on } : p)),
+        })),
+      }));
+      return { ...l, tabs };
     }
   }
 }

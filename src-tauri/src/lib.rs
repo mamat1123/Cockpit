@@ -3,6 +3,7 @@ mod logtail;
 mod cost;
 mod usage;
 mod dropfile;
+mod headroom;
 
 use tauri::{Emitter, Manager};
 
@@ -84,7 +85,7 @@ fn set_window_blur(window: tauri::WebviewWindow, radius: u32) -> Result<(), Stri
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
@@ -94,6 +95,7 @@ pub fn run() {
         .manage(logtail::LogtailManager::default())
         .manage(cost::CostManager::default())
         .manage(cost::CostReportManager::default())
+        .manage(headroom::HeadroomManager::default())
         .invoke_handler(tauri::generate_handler![
             greet,
             set_window_blur,
@@ -112,6 +114,8 @@ pub fn run() {
             cost::list_projects,
             usage::usage_report,
             dropfile::save_dropped_file,
+            headroom::headroom_ensure,
+            headroom::headroom_status,
         ])
         .setup(|app| {
             use tauri::{WebviewWindowBuilder, WebviewUrl, WindowEvent};
@@ -155,6 +159,11 @@ pub fn run() {
             }
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+    app.run(|app_handle, event| {
+        if let tauri::RunEvent::Exit = event {
+            headroom::shutdown(app_handle);
+        }
+    });
 }

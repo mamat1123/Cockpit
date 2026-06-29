@@ -90,3 +90,23 @@ _Avoid_: rollover, carry-over
 Spending past today's Daily budget — the day gauge passes 100% and reads red. Allowed; it draws
 from the rest of the week's share. Distinct from hitting a Usage window, which actually blocks.
 _Avoid_: over limit, blocked (overspend doesn't block — say overspend / borrowing)
+
+**Headroom proxy** (the tool) — NB: distinct from **Headroom** (the budget term above):
+A local optimization proxy (the `headroom` CLI) that sits between a [[Session]] and the API
+and compresses prompts to cut tokens. The word "Headroom" is overloaded: alone it means the
+unspent weekly utilization (above); for the tool, say **Headroom proxy**.
+
+**Headroom routing**:
+Whether a [[Session]] talks to the model through the [[Headroom proxy]] or straight to the
+API. Set per-Session and toggled in the [[Pane]] header; flipping it relaunches that
+Session's Claude (via resume) since the choice is fixed at process start. Default off.
+_Avoid_: headroom mode, compression toggle, proxy on/off (say Headroom routing)
+
+**Savings**:
+The tokens (and their USD value) that the [[Headroom proxy]]'s compression removed from a
+Session's requests — the difference between what would have been sent and what actually was.
+A third money/usage axis distinct from **Cost** (USD actually spent) and **Usage** (% of
+rate limit). Attributed to whichever Session was in its [[Working state|working]] state
+when a request passed the proxy; requests that can't be pinned to one Session land in a
+separate **Unattributed** bucket rather than being guessed.
+_Avoid_: discount, reduction, compression (be specific: Savings); never conflate with Cost

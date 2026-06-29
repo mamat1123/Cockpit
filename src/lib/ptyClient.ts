@@ -1,8 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
-export function spawnPty(paneId: string, cwd: string, cols: number, rows: number, launch: string | null) {
-  return invoke("pty_spawn", { paneId, cwd, cols, rows, launch });
+export function spawnPty(paneId: string, cwd: string, cols: number, rows: number, launch: string | null, env?: Record<string, string> | null) {
+  return invoke("pty_spawn", { paneId, cwd, cols, rows, launch, env: env ?? null });
 }
 
 export function killPty(paneId: string) {
