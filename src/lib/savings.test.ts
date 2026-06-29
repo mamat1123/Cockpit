@@ -23,6 +23,9 @@ describe("parseRecord", () => {
   it("returns null for malformed JSON", () => {
     expect(parseRecord("not json")).toBeNull();
   });
+  it("returns null when tokens_saved is a string, not a number", () => {
+    expect(parseRecord(JSON.stringify({ timestamp: "2026-06-29T04:01:13Z", model: "claude-opus-4-8", tokens_saved: "400" }))).toBeNull();
+  });
 });
 
 describe("savedUsd", () => {
@@ -30,7 +33,7 @@ describe("savedUsd", () => {
     expect(savedUsd(400_000, "claude-opus-4-8", PRICES)).toBeCloseTo(2.0, 6); // 400k * $5/1M
   });
   it("falls back to opus pricing for an unknown model", () => {
-    expect(savedUsd(1_000_000, "mystery-model", PRICES)).toBeGreaterThan(0);
+    expect(savedUsd(1_000_000, "mystery-model", PRICES)).toBeCloseTo(5.0, 6);
   });
 });
 
