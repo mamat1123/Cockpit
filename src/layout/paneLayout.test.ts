@@ -200,6 +200,28 @@ describe("serialize/deserialize", () => {
   });
 });
 
+describe("headroom flag", () => {
+  it("setHeadroom toggles the flag on the target pane only", () => {
+    let l = initLayout("/tmp/a");
+    l = reduce(l, { type: "split" });
+    const [p0, p1] = l.tabs[0].rows[0].panes;
+    l = reduce(l, { type: "setHeadroom", paneId: p0.id, on: true });
+    const panes = l.tabs[0].rows[0].panes;
+    expect(panes.find((p) => p.id === p0.id)!.headroom).toBe(true);
+    expect(panes.find((p) => p.id === p1.id)!.headroom).toBeFalsy();
+  });
+
+  it("round-trips headroom through serialize/deserialize", () => {
+    let l = initLayout("/tmp/a");
+    const pid = l.tabs[0].rows[0].panes[0].id;
+    l = reduce(l, { type: "setHeadroom", paneId: pid, on: true });
+    const saved = serializeLayout(l, true);
+    expect(saved.tabs[0].rows[0].panes[0].headroom).toBe(true);
+    const back = deserializeLayout(saved);
+    expect(back.tabs[0].rows[0].panes[0].headroom).toBe(true);
+  });
+});
+
 describe("empty layout (no project open yet)", () => {
   it("emptyLayout has zero tabs", () => {
     const l = emptyLayout();
