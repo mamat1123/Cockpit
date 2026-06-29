@@ -110,3 +110,12 @@ rate limit). Attributed to whichever Session was in its [[Working state|working]
 when a request passed the proxy; requests that can't be pinned to one Session land in a
 separate **Unattributed** bucket rather than being guessed.
 _Avoid_: discount, reduction, compression (be specific: Savings); never conflate with Cost
+
+**Ponytail level**:
+A per-[[Pane]] setting (`off`/`lite`/`full`/`ultra`) controlling how aggressively the Session's
+Claude minimizes code, via the **ponytail** Claude Code plugin's injected ruleset. A distinct axis
+from **Headroom routing** (where requests go) and **Savings** (tokens the proxy removed). Fixed at
+Session start (the plugin reads `PONYTAIL_DEFAULT_MODE` once); switched by relaunch, like Headroom
+routing. Shown as the **PT** chip in the [[Pane]] header. Default `off`; Cockpit's per-Pane level
+overrides any global ponytail config.
+_Avoid_: lazy mode, ponytail mode (say Ponytail level); never conflate with Headroom routing.
