@@ -255,3 +255,35 @@ describe("empty layout (no project open yet)", () => {
     expect(reduce(emptyLayout(), { type: "close" }).tabs).toEqual([]);
   });
 });
+
+describe("ponytail level", () => {
+  it("setPonytail sets the level on the target pane only", () => {
+    let l = initLayout("/tmp/a");
+    l = reduce(l, { type: "split" });
+    const [p0, p1] = l.tabs[0].rows[0].panes;
+    l = reduce(l, { type: "setPonytail", paneId: p0.id, level: "ultra" });
+    const panes = l.tabs[0].rows[0].panes;
+    expect(panes.find((p) => p.id === p0.id)!.ponytail).toBe("ultra");
+    expect(panes.find((p) => p.id === p1.id)!.ponytail).toBeUndefined();
+  });
+  it("serialize omits ponytail when unset; deserialize defaults to off", () => {
+    const l = initLayout("/tmp/a");
+    const saved = serializeLayout(l, true);
+    expect(saved.tabs[0].rows[0].panes[0].ponytail).toBeUndefined();
+    expect(deserializeLayout(saved).tabs[0].rows[0].panes[0].ponytail).toBe("off");
+  });
+  it("serialize keeps a real level and round-trips it", () => {
+    let l = initLayout("/tmp/a");
+    const pid = l.tabs[0].rows[0].panes[0].id;
+    l = reduce(l, { type: "setPonytail", paneId: pid, level: "full" });
+    const saved = serializeLayout(l, true);
+    expect(saved.tabs[0].rows[0].panes[0].ponytail).toBe("full");
+    expect(deserializeLayout(saved).tabs[0].rows[0].panes[0].ponytail).toBe("full");
+  });
+  it("serialize omits ponytail when explicitly off", () => {
+    let l = initLayout("/tmp/a");
+    const pid = l.tabs[0].rows[0].panes[0].id;
+    l = reduce(l, { type: "setPonytail", paneId: pid, level: "off" });
+    expect(serializeLayout(l, true).tabs[0].rows[0].panes[0].ponytail).toBeUndefined();
+  });
+});
