@@ -85,6 +85,11 @@ function parkingNode(): HTMLDivElement {
 
 const registry = new Map<string, TermEntry>();
 
+/** Pane ids currently routed through the Headroom proxy (HR on). Maintained here so
+ *  savings attribution knows which working panes are even candidates (only routed panes
+ *  hit the proxy). Updated by acquireTerminal (initial flag) and setPaneHeadroom (toggle). */
+const routed = new Set<string>();
+
 /** Build + run the launch command for a pane, ensuring the Headroom proxy is up
  *  first when routing is on. Resumes if the session log already exists. */
 async function launchClaude(paneId: string, cwd: string, sessionId: string, resume: boolean, headroom: boolean, cols: number, rows: number): Promise<void> {
@@ -106,6 +111,7 @@ async function launchClaude(paneId: string, cwd: string, sessionId: string, resu
 /** Create (once) or return the persistent terminal for a pane. Spawns the PTY +
  *  `claude --session-id` and starts the logtail exactly once. */
 export function acquireTerminal(paneId: string, cwd: string, sessionId: string, resume: boolean, headroom: boolean): TermEntry {
+  if (headroom) routed.add(paneId); else routed.delete(paneId);
   const existing = registry.get(paneId);
   if (existing) return existing;
 
@@ -206,6 +212,7 @@ export function releaseTerminal(paneId: string) {
   e.term.dispose();
   e.hostEl.remove();
   registry.delete(paneId);
+  routed.delete(paneId);
 }
 
 /** Live activity timestamp for a pane (last meaningful PTY output), or null. */
@@ -223,6 +230,17 @@ export function anyPaneWorking(now: number, graceMs = 1000): boolean {
   return false;
 }
 
+/** Headroom-routed panes that emitted output within `graceMs` (i.e. working now).
+ *  The candidate set for attributing a proxy savings record to a Session. */
+export function routedWorkingPaneIds(now: number, graceMs = 2000): string[] {
+  const out: string[] = [];
+  for (const id of routed) {
+    const t = registry.get(id)?.lastLineAt.current;
+    if (t != null && now - t < graceMs) out.push(id);
+  }
+  return out;
+}
+
 /** Focus a pane's terminal so keystrokes go straight to it (e.g. after a dashboard
  *  jump or programmatic tab switch, where no click lands inside the xterm). */
 export function focusTerminal(paneId: string) {
@@ -236,6 +254,7 @@ export async function setPaneHeadroom(paneId: string, cwd: string, sessionId: st
   const e = registry.get(paneId);
   if (!e) return;
   await killPty(paneId);
+  if (on) routed.add(paneId); else routed.delete(paneId);
   e.term.write("\r\n[switching Headroom routing…]\r\n");
   await launchClaude(paneId, cwd, sessionId, true, on, e.term.cols, e.term.rows);
 }

@@ -4,6 +4,7 @@ mod cost;
 mod usage;
 mod dropfile;
 mod headroom;
+mod headroomlog;
 
 use tauri::{Emitter, Manager};
 
@@ -96,6 +97,7 @@ pub fn run() {
         .manage(cost::CostManager::default())
         .manage(cost::CostReportManager::default())
         .manage(headroom::HeadroomManager::default())
+        .manage(headroomlog::HeadroomLogManager::default())
         .invoke_handler(tauri::generate_handler![
             greet,
             set_window_blur,
@@ -116,6 +118,8 @@ pub fn run() {
             dropfile::save_dropped_file,
             headroom::headroom_ensure,
             headroom::headroom_status,
+            headroomlog::headroom_log_start,
+            headroomlog::headroom_log_stop,
         ])
         .setup(|app| {
             use tauri::{WebviewWindowBuilder, WebviewUrl, WindowEvent};

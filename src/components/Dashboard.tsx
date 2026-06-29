@@ -79,7 +79,7 @@ export function Dashboard({ layout, onJump, onJumpSession, onClose }: {
           )}
         </div>
         <UsagePanel />
-        {view === "sessions" ? (
+        {view === "sessions" && (
         <div className="cockpit-dash__grid">
           {items.map((it) => (
             <button
@@ -108,9 +108,8 @@ export function Dashboard({ layout, onJump, onJumpSession, onClose }: {
             </button>
           ))}
         </div>
-        ) : (
-          <CostView onJump={onJumpSession} />
         )}
+        {view === "cost" && <CostView onJump={onJumpSession} />}
       </div>
     </div>
   );

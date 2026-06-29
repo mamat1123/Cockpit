@@ -25,11 +25,18 @@ Decision:
   `headroom proxy` as a managed child (lazy start, health-poll `/livez`, auto-restart;
   surface a clear status + a "switch to direct" fallback if it can't recover). A per-Session
   proxy fleet would give exact numbers but cost an extra ~150–600 MB Python process each.
-- **`cache` mode, not `token` mode.** We run the proxy in `cache` mode (freeze prior turns
-  for prefix-cache hits) even though `token` mode would show larger Savings. Aggressive
-  rewriting wins on Savings but evicts Anthropic's prompt cache, which can push **Cost up**
-  — and Cockpit shows Cost right next to Savings (see 0005). `cache` keeps the two numbers
-  moving the same direction.
+- **`token` mode (REVISED 2026-06-29; originally `cache`).** We now run the proxy in `token`
+  mode (compress/rewrite prior turns to cut tokens). The original decision was `cache` mode
+  — reasoning that aggressive rewriting evicts Anthropic's prompt cache and pushes **USD Cost**
+  up, so `cache` kept Cost and Savings moving together. **That reasoning assumed pay-per-token
+  billing.** The owner is on a Claude *subscription*: there is no per-token USD bill, so the
+  binding constraint is the **token-based rate-limit window** (the 5-hour / weekly Usage), not
+  Cost. `token` mode cuts tokens → consumes less of that window (and fits more into context) —
+  the saving that actually matters here; `cache` mode's cheaper-input benefit simply doesn't
+  apply. Accepted trade-off: token-mode rewrites prior context so Claude sees a compressed
+  view (a fidelity risk for precision/coding work), mitigated by CCR (`headroom_retrieve` pulls
+  full detail back on demand). Per-Session `off/cache/token` selection was considered and
+  deferred — a single `token` default is simpler and fits the subscription case.
 - **Savings attributed by [[Working state]].** Cockpit reads the proxy's `--log-file`
   (per-request `tokens_before`/`tokens_after`) and pins each request to the one ON Session
   that was `working` at that timestamp. When zero or two-plus ON Sessions were working, the
@@ -41,17 +48,18 @@ Decision:
 
 Why it matters: it turns a fragile, all-or-nothing, silently-breaking wrap into a
 controllable per-Session feature whose failure mode is a visible status, not a cryptic
-retry loop. The two surprising calls — a *shared* proxy (accepting ~80–90% attribution
-accuracy to save RAM) and `cache` over `token` (accepting smaller Savings to protect Cost)
-— are deliberate trade-offs, not oversights, and both are expensive to reverse: they reach
-into PTY spawn, proxy supervision, and how the [[Savings]] number is computed and trusted.
+retry loop. The surprising call — a *shared* proxy (accepting ~80–90% attribution accuracy
+to save RAM) — is a deliberate trade-off, not an oversight, and is expensive to reverse: it
+reaches into PTY spawn, proxy supervision, and how the [[Savings]] number is computed and
+trusted. (The proxy *mode* — `token` vs `cache` — was revised post-Plan-1; see the mode
+bullet above and the Status note.)
 
 ## Status
 
 Plan 1 (Routing Foundation) shipped: per-Pane toggle, env injection, a single
-Cockpit-owned `cache`-mode proxy with lazy start + TCP health-check + kill-on-exit, and
-relaunch-via-resume. **Deferred from this ADR's full promise, tracked here so the gap is
-explicit, not lost:**
+Cockpit-owned proxy (now `token` mode — see the revised mode bullet above) with lazy start +
+TCP health-check + kill-on-exit, and relaunch-via-resume. **Deferred from this ADR's full
+promise, tracked here so the gap is explicit, not lost:**
 - **Mid-session auto-restart + status readout.** Plan 1 ensures the proxy on launch/toggle
   only. If the proxy dies *while* a routed Session is live, that Session sees the
   ConnectionRefused this feature exists to prevent until it is toggled/relaunched.
@@ -72,3 +80,29 @@ Cockpit is launched from inside a Claude Code session (`npm run tauri dev`). `pt
 now strips `CLAUDE*`/`AI_AGENT` from the spawned shell. Keep that strip. (Also: `pty_kill`
 must `.kill()` the child explicitly — portable-pty does not kill on drop on macOS — or
 orphaned claudes collide on the same `--session-id` and fork to new ids.)
+
+### Why a bare proxy saved 0 tokens — the agent-90 profile is the compression lever
+
+Token mode showed `tokens_saved=0` on every request (`router:excluded:tool`,
+`router:protected:user_message`, `router:noop`). Investigated with subagents (one reading
+0.27.0 source, one running a live proxy + real `claude` read). **A bare `headroom proxy`
+runs on conservative defaults that protect/skip exactly the traffic we want compressed**;
+the high-savings behaviour is entirely driven by the `agent-90` *savings profile* that
+`headroom wrap claude` seeds into the **proxy** process env (not onto `claude`). No profile →
+`read_protection_window` is 30%-of-excluded (floor 4), `skip_user_messages=True`,
+`target_ratio=None`, `force_kompress=False`. We now spawn the proxy after
+`eval "$(headroom agent-savings --profile agent-90 --format shell)"` — sourced live so the 13
+vars always match the installed version (there is **no config file**; env is the only channel
+and is read once at startup). Set them on the proxy, never on `claude`.
+
+**Upstream ceiling (headroom 0.27.0) the profile cannot reach — empirically confirmed, not a
+Cockpit bug:** (1) Claude Code stamps `cache_control:{ephemeral}` on its most-recent
+`tool_result` blocks; `content_router.py:2923` hard-skips any `cache_control` block *before*
+the tool_result check, so the latest large Read never compresses. (2) `--intercept-tool-results`
+is dead-wired — `server.py:645` builds an explicit `[CacheAligner, ContentRouter]` transforms
+list, so `ToolResultInterceptorTransform` (the ast-grep Read outliner, proven to cut
+`mcp/types.py` 21k→5.8k tokens when invoked directly) is never added. The flag was dropped.
+What the profile DOES unlock and why this is still worth shipping: Bash output, aged-out
+(non-`cache_control`'d) reads, and user/system history all become compressible — strictly
+better than the bare proxy's 0. The 2026-06-24 history showing 57% reduction was such traffic
+(a large non-`cache_control`'d message), not a recent Read.

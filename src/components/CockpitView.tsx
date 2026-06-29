@@ -27,6 +27,7 @@ import { emit, listen } from "@tauri-apps/api/event";
 import { buildBeaconState } from "../lib/beaconState";
 import { paneLastLineAt } from "../lib/terminalRegistry";
 import { deriveState } from "../lib/paneState";
+import { startSavings } from "../lib/savingsStore";
 
 function livePaneIds(l: Layout): Set<string> {
   return new Set(l.tabs.flatMap((t) => t.rows.flatMap((r) => r.panes.map((p) => p.id))));
@@ -79,6 +80,7 @@ export function CockpitView() {
   // Live font change — mutates every open terminal in place; sessions are untouched (only a grid reflow).
   useEffect(() => { setTerminalFont(settings.fontFamily, settings.fontSize); }, [settings.fontFamily, settings.fontSize]);
   useEffect(() => {
+    startSavings();
     getVersion().then(setAppVersion).catch(() => {});
     checkForUpdate().then((u) => { if (u) setUpdate(u); });
   }, []);
