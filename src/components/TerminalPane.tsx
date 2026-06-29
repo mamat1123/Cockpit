@@ -6,14 +6,16 @@ import { acquireTerminal, attachTerminal, parkTerminalNode, refit, focusTerminal
 import { writePty } from "../lib/ptyClient";
 import { saveDroppedFile, dragHasFiles, imageFiles } from "../lib/dropClient";
 import { PaneHeader } from "./PaneHeader";
+import { ponytailInstalled, type PonytailLevel } from "../lib/ponytailClient";
 import "./TerminalPane.css";
 
-export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, title, focused, isDragging, isDropTarget, onFocus, onRename, onAutoTitle, onPopOut, onClose, onToggleHeadroom, dragHandleProps, dropZoneProps }: {
+export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, ponytail, title, focused, isDragging, isDropTarget, onFocus, onRename, onAutoTitle, onPopOut, onClose, onToggleHeadroom, onSetPonytail, dragHandleProps, dropZoneProps }: {
   paneId: string;
   cwd: string;
   sessionId: string;
   resume?: boolean;
   headroom?: boolean;
+  ponytail?: PonytailLevel;
   title: string;
   focused: boolean;
   isDragging?: boolean;
@@ -24,11 +26,14 @@ export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, title, 
   onPopOut: () => void;
   onClose: () => void;
   onToggleHeadroom: () => void;
+  onSetPonytail: (level: PonytailLevel) => void;
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement> & { draggable?: boolean };
   dropZoneProps?: React.HTMLAttributes<HTMLDivElement>;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<PaneState>("idle");
+  const [ptInstalled, setPtInstalled] = useState(false);
+  useEffect(() => { ponytailInstalled().then(setPtInstalled).catch(() => {}); }, []);
   const onAutoTitleRef = useRef(onAutoTitle);
   onAutoTitleRef.current = onAutoTitle;
   const onFocusRef = useRef(onFocus);
@@ -40,7 +45,7 @@ export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, title, 
   // "pop-out = black screen" bug). Instead we just move the persistent host node into
   // this pane's container; on unmount we park it (never dispose) so the session survives.
   useLayoutEffect(() => {
-    const entry = acquireTerminal(paneId, cwd, sessionId, !!resume, !!headroom);
+    const entry = acquireTerminal(paneId, cwd, sessionId, !!resume, !!headroom, ponytail ?? "off");
     const container = containerRef.current!;
     attachTerminal(paneId, container);
 
@@ -151,10 +156,13 @@ export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, title, 
         repo={cwd.split("/").filter(Boolean).slice(-2).join("/")}
         working={state === "working"}
         headroom={!!headroom}
+        ponytail={ponytail ?? "off"}
+        ponytailInstalled={ptInstalled}
         onRename={onRename}
         onPopOut={onPopOut}
         onClose={onClose}
         onToggleHeadroom={onToggleHeadroom}
+        onSetPonytail={onSetPonytail}
         dragHandleProps={dragHandleProps}
       />
       <div ref={containerRef} className="cockpit-pane__host" />

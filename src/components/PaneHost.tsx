@@ -3,7 +3,8 @@ import { createPortal } from "react-dom";
 import type { Action, Layout } from "../layout/paneLayout";
 import { flattenPanes } from "./paneFlatten";
 import { TerminalPane } from "./TerminalPane";
-import { setPaneHeadroom } from "../lib/terminalRegistry";
+import { setPaneHeadroom, setPanePonytail } from "../lib/terminalRegistry";
+import type { PonytailLevel } from "../lib/ponytailClient";
 
 /** Mounts every pane's TerminalPane ONCE and portals it into the DOM slot for its
  *  current position. Moving a pane between tabs only retargets the portal, so the
@@ -39,6 +40,7 @@ export function PaneHost({ layout, slots, dispatch }: {
               sessionId={pane.sessionId}
               resume={pane.resume}
               headroom={pane.headroom}
+              ponytail={pane.ponytail ?? "off"}
               title={pane.title}
               focused={pane.id === layout.focusedPaneId}
               isDragging={dragId === pane.id}
@@ -54,9 +56,13 @@ export function PaneHost({ layout, slots, dispatch }: {
                 // toggle never shows ON while silently going direct.
                 const next = !pane.headroom;
                 dispatch({ type: "setHeadroom", paneId: pane.id, on: next });
-                void setPaneHeadroom(pane.id, pane.cwd, pane.sessionId, next).then((engaged) => {
+                void setPaneHeadroom(pane.id, pane.cwd, pane.sessionId, next, pane.ponytail ?? "off").then((engaged) => {
                   if (next && !engaged) dispatch({ type: "setHeadroom", paneId: pane.id, on: false });
                 });
+              }}
+              onSetPonytail={(level: PonytailLevel) => {
+                dispatch({ type: "setPonytail", paneId: pane.id, level });
+                void setPanePonytail(pane.id, pane.cwd, pane.sessionId, level, !!pane.headroom);
               }}
               dragHandleProps={{
                 draggable: true,
