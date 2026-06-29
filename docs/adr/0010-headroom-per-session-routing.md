@@ -60,3 +60,15 @@ explicit, not lost:**
   adopts via the port-open check; only clean exit kills the child. → revisit if it bites.
 - **Savings attribution + Dashboard readout** (the `--log-file` ingestion, Working-state
   correlation, Unattributed bucket, per-Session metrics) → Plans 2 and 3.
+
+### Gotcha found in verification (don't regress)
+
+The toggle relaunch (`--resume <pane.sessionId>`) silently degraded to a fresh
+`--session-id` because the pane's transcript jsonl never existed. Root cause: **a pane
+shell that inherits `CLAUDECODE` / `CLAUDE_CODE_*` makes its `claude` think it is a nested
+CHILD session, which does not write a transcript** — so `sessionExists()` is always false
+and resume (and Cost/Working state, which read the same jsonl) break. This bites whenever
+Cockpit is launched from inside a Claude Code session (`npm run tauri dev`). `pty_spawn`
+now strips `CLAUDE*`/`AI_AGENT` from the spawned shell. Keep that strip. (Also: `pty_kill`
+must `.kill()` the child explicitly — portable-pty does not kill on drop on macOS — or
+orphaned claudes collide on the same `--session-id` and fork to new ids.)
