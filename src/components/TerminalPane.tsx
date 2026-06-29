@@ -146,6 +146,7 @@ export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, title, 
       {...dropZoneProps}
     >
       <PaneHeader
+        paneId={paneId}
         title={title}
         repo={cwd.split("/").filter(Boolean).slice(-2).join("/")}
         working={state === "working"}

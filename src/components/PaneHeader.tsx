@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { usePaneSavings } from "../lib/savingsStore";
 import "./PaneHeader.css";
 
 const PopOutIcon = () => (
@@ -14,7 +15,8 @@ const CloseIcon = () => (
   </svg>
 );
 
-export function PaneHeader({ title, repo, working, headroom, onRename, onPopOut, onClose, onToggleHeadroom, dragHandleProps }: {
+export function PaneHeader({ paneId, title, repo, working, headroom, onRename, onPopOut, onClose, onToggleHeadroom, dragHandleProps }: {
+  paneId: string;
   title: string;
   repo: string;
   working: boolean;
@@ -26,6 +28,8 @@ export function PaneHeader({ title, repo, working, headroom, onRename, onPopOut,
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement> & { draggable?: boolean };
 }) {
   const [editing, setEditing] = useState(false);
+  const sv = usePaneSavings(paneId);
+  const rate = sv.requests > 0 ? Math.round((sv.cacheHits / sv.requests) * 100) : 0;
   const [draft, setDraft] = useState(title);
   const commit = () => {
     setEditing(false);
@@ -62,14 +66,29 @@ export function PaneHeader({ title, repo, working, headroom, onRename, onPopOut,
         <span className="pane-head__bars"><i /><i /><i /></span>
         <span className="pane-head__lbl">{working ? "working" : "idle"}</span>
       </span>
-      <button
-        className={`pane-head__hr${headroom ? " is-on" : ""}`}
-        onClick={onToggleHeadroom}
-        title={headroom ? "Headroom: เปิด (กดเพื่อปิด)" : "Headroom: ปิด (กดเพื่อเปิด)"}
-        aria-pressed={headroom}
-      >
-        <span className="pane-head__hr-sw" /><span className="pane-head__hr-lbl">HR</span>
-      </button>
+      <span className="pane-head__hr-wrap">
+        <button
+          className={`pane-head__hr${headroom ? " is-on" : ""}`}
+          onClick={onToggleHeadroom}
+          title={headroom ? "Headroom: เปิด (กดเพื่อปิด)" : "Headroom: ปิด (กดเพื่อเปิด)"}
+          aria-pressed={headroom}
+        >
+          <span className="pane-head__hr-sw" /><span className="pane-head__hr-lbl">HR</span>
+        </button>
+        <span className="pane-head__hr-pop" role="tooltip">
+          <span className="pane-head__hr-pop-h">Headroom · {headroom ? "on" : "off"}</span>
+          {sv.requests === 0 ? (
+            <span className="pane-head__hr-pop-empty">{headroom ? "no activity yet" : "routing off"}</span>
+          ) : (
+            <>
+              <span className="pane-head__hr-pop-row"><b>{sv.cacheHits}/{sv.requests}</b> cache hits <i>({rate}%)</i></span>
+              <span className="pane-head__hr-pop-row"><b>{sv.tokensSaved.toLocaleString()}</b> tokens saved</span>
+              <span className="pane-head__hr-pop-row"><b>${sv.usd.toFixed(2)}</b> est. saved</span>
+            </>
+          )}
+          <span className="pane-head__hr-pop-foot">since app start</span>
+        </span>
+      </span>
       <button className="pane-head__btn" onClick={onPopOut} aria-label="เปิดในแท็บใหม่" title="เปิดในแท็บใหม่"><PopOutIcon /></button>
       <button className="pane-head__btn pane-head__btn--x" onClick={onClose} aria-label="ปิด" title="ปิด"><CloseIcon /></button>
     </div>

@@ -44,14 +44,16 @@ function start(): void {
  *  independent of whether the Dashboard is mounted. Idempotent. */
 export function startSavings(): void { start(); }
 
-/** Subscribe a component to the live per-Session savings totals. */
-export function useSavings(): SavingsState {
-  const [s, setS] = useState<SavingsState>(state);
+/** Live savings totals for ONE pane (the per-chat hover popover). Starts the
+ *  pipeline on mount so the popover works even if no other consumer ran start(). */
+export function usePaneSavings(paneId: string): Totals {
+  const [t, setT] = useState<Totals>(() => state.byPane[paneId] ?? emptyTotals());
   useEffect(() => {
     start();
-    subs.add(setS);
-    setS(state);
-    return () => { subs.delete(setS); };
-  }, []);
-  return s;
+    const fn = (s: SavingsState) => setT(s.byPane[paneId] ?? emptyTotals());
+    subs.add(fn);
+    fn(state);
+    return () => { subs.delete(fn); };
+  }, [paneId]);
+  return t;
 }
