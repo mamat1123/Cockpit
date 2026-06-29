@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePaneSavings } from "../lib/savingsStore";
+import { PONYTAIL_LEVELS, PONYTAIL_META, type PonytailLevel } from "../lib/ponytailClient";
 import "./PaneHeader.css";
 
 const PopOutIcon = () => (
@@ -15,22 +16,38 @@ const CloseIcon = () => (
   </svg>
 );
 
-export function PaneHeader({ paneId, title, repo, working, headroom, onRename, onPopOut, onClose, onToggleHeadroom, dragHandleProps }: {
+export function PaneHeader({ paneId, title, repo, working, headroom, ponytail, ponytailInstalled, onRename, onPopOut, onClose, onToggleHeadroom, onSetPonytail, dragHandleProps }: {
   paneId: string;
   title: string;
   repo: string;
   working: boolean;
   headroom: boolean;
+  ponytail: PonytailLevel;
+  ponytailInstalled: boolean;
   onRename: (title: string) => void;
   onPopOut: () => void;
   onClose: () => void;
   onToggleHeadroom: () => void;
+  onSetPonytail: (level: PonytailLevel) => void;
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement> & { draggable?: boolean };
 }) {
   const [editing, setEditing] = useState(false);
   const sv = usePaneSavings(paneId);
   const rate = sv.requests > 0 ? Math.round((sv.cacheHits / sv.requests) * 100) : 0;
   const [draft, setDraft] = useState(title);
+  const [ptOpen, setPtOpen] = useState(false);
+  const ptWrapRef = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!ptOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (ptWrapRef.current && !ptWrapRef.current.contains(e.target as Node)) setPtOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [ptOpen]);
+  const meter = (fill: number) => (
+    <span className="pane-head__pt-meter">{[0, 1, 2].map((i) => <i key={i} className={i < fill ? "on" : ""} />)}</span>
+  );
   const commit = () => {
     setEditing(false);
     const t = draft.trim();
@@ -88,6 +105,43 @@ export function PaneHeader({ paneId, title, repo, working, headroom, onRename, o
           )}
           <span className="pane-head__hr-pop-foot">since app start</span>
         </span>
+      </span>
+      <span className="pane-head__pt-wrap" ref={ptWrapRef}>
+        <button
+          className={`pane-head__pt lvl-${ponytail}${ponytailInstalled ? "" : " is-disabled"}`}
+          onClick={() => setPtOpen((o) => !o)}
+          title={ponytailInstalled ? `Ponytail level: ${ponytail}` : "ponytail plugin ยังไม่ลง"}
+          aria-haspopup="menu"
+          aria-expanded={ptOpen}
+        >
+          <span className="pane-head__pt-lbl">PT</span>
+          {meter(PONYTAIL_META[ponytail].fill)}
+          <span className="pane-head__pt-car">▾</span>
+        </button>
+        {ptOpen && ponytailInstalled && (
+          <span className="pane-head__pt-menu" role="menu">
+            {PONYTAIL_LEVELS.map((l) => (
+              <button
+                key={l}
+                className={`pane-head__pt-item lvl-${l}${l === ponytail ? " is-sel" : ""}`}
+                role="menuitemradio"
+                aria-checked={l === ponytail}
+                onClick={() => { setPtOpen(false); if (l !== ponytail) onSetPonytail(l); }}
+              >
+                <span className="pane-head__pt-item-top">{meter(PONYTAIL_META[l].fill)}<b>{l}</b></span>
+                <span className="pane-head__pt-item-desc">{PONYTAIL_META[l].desc}</span>
+              </button>
+            ))}
+          </span>
+        )}
+        {ptOpen && !ponytailInstalled && (
+          <span className="pane-head__pt-menu pane-head__pt-nudge" role="dialog">
+            <span className="pane-head__pt-nudge-h">ต้องลง ponytail plugin ก่อน</span>
+            <code className="pane-head__pt-nudge-cmd">/plugin marketplace add DietrichGebert/ponytail</code>
+            <code className="pane-head__pt-nudge-cmd">/plugin install ponytail@ponytail</code>
+            <span className="pane-head__pt-nudge-foot">รันใน Claude Code แล้ว toggle ใหม่</span>
+          </span>
+        )}
       </span>
       <button className="pane-head__btn" onClick={onPopOut} aria-label="เปิดในแท็บใหม่" title="เปิดในแท็บใหม่"><PopOutIcon /></button>
       <button className="pane-head__btn pane-head__btn--x" onClick={onClose} aria-label="ปิด" title="ปิด"><CloseIcon /></button>
