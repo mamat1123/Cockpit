@@ -26,8 +26,8 @@ function start(): void {
     while (history.length && now - history[0].t > HISTORY_MS) history.shift();
   }, SAMPLE_MS);
 
-  void startHeadroomLog();
-  void onHeadroomLog((line) => {
+  startHeadroomLog().catch((e) => console.warn("headroom log start failed", e));
+  onHeadroomLog((line) => {
     const r = parseRecord(line);
     if (!r) return;
     const paneId = attribute(r.ts || Date.now(), history);
@@ -37,8 +37,12 @@ function start(): void {
       state = { ...state, unattributed: addRecord(state.unattributed, r) };
     }
     emit();
-  });
+  }).catch((e) => console.warn("headroom log listen failed", e));
 }
+
+/** Start the savings pipeline at app boot (tailer + working-history sampling),
+ *  independent of whether the Dashboard is mounted. Idempotent. */
+export function startSavings(): void { start(); }
 
 /** Subscribe a component to the live per-Session savings totals. */
 export function useSavings(): SavingsState {

@@ -12,6 +12,10 @@ export function parseRecord(line: string): ProxyRecord | null {
   let v: Record<string, unknown>;
   try { v = JSON.parse(line); } catch { return null; }
   if (typeof v.tokens_saved !== "number") return null;
+  // The proxy emits a NAIVE-LOCAL wall-clock timestamp (no `Z`, microseconds), e.g.
+  // "2026-06-29T14:32:59.295294". Date.parse reads it as local — matching the webview's
+  // Date.now() used for working-history samples (same machine). Do NOT append "Z": that
+  // would reinterpret it as UTC and skew attribution by the local timezone offset.
   const tsRaw = typeof v.timestamp === "string" ? Date.parse(v.timestamp) : NaN;
   return {
     ts: Number.isNaN(tsRaw) ? 0 : tsRaw,

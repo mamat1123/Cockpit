@@ -146,7 +146,7 @@ export function Dashboard({ layout, onJump, onJumpSession, onClose }: {
                       );
                     })}
                     {unattributed.requests > 0 && (
-                      <tr key="unattributed">
+                      <tr>
                         <td className="cockpit-dash__savings-name cockpit-dash__savings-unattributed">Unattributed</td>
                         <td>{unattributed.tokensSaved.toLocaleString()}</td>
                         <td>{unattributed.cacheHits}/{unattributed.requests}</td>

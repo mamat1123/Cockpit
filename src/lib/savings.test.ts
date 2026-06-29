@@ -26,6 +26,16 @@ describe("parseRecord", () => {
   it("returns null when tokens_saved is a string, not a number", () => {
     expect(parseRecord(JSON.stringify({ timestamp: "2026-06-29T04:01:13Z", model: "claude-opus-4-8", tokens_saved: "400" }))).toBeNull();
   });
+  it("parses the real naive-local proxy timestamp (no Z, microseconds) as local time", () => {
+    const line = JSON.stringify({
+      timestamp: "2026-06-29T14:32:59.295294", model: "claude-opus-4-8",
+      tokens_saved: 0, cache_hit: true, savings_percent: 0,
+    });
+    const r = parseRecord(line)!;
+    expect(r.ts).toBe(Date.parse("2026-06-29T14:32:59.295294"));
+    expect(Number.isNaN(r.ts)).toBe(false);
+    expect(r.ts).toBeGreaterThan(0);
+  });
 });
 
 describe("savedUsd", () => {
