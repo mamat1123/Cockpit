@@ -45,3 +45,18 @@ retry loop. The two surprising calls — a *shared* proxy (accepting ~80–90% a
 accuracy to save RAM) and `cache` over `token` (accepting smaller Savings to protect Cost)
 — are deliberate trade-offs, not oversights, and both are expensive to reverse: they reach
 into PTY spawn, proxy supervision, and how the [[Savings]] number is computed and trusted.
+
+## Status
+
+Plan 1 (Routing Foundation) shipped: per-Pane toggle, env injection, a single
+Cockpit-owned `cache`-mode proxy with lazy start + TCP health-check + kill-on-exit, and
+relaunch-via-resume. **Deferred from this ADR's full promise, tracked here so the gap is
+explicit, not lost:**
+- **Mid-session auto-restart + status readout.** Plan 1 ensures the proxy on launch/toggle
+  only. If the proxy dies *while* a routed Session is live, that Session sees the
+  ConnectionRefused this feature exists to prevent until it is toggled/relaunched.
+  `headroom_status` exists but no component polls it yet. → Plan 2/3.
+- **A crashed Cockpit (not a clean exit) can still orphan a proxy** that the next launch
+  adopts via the port-open check; only clean exit kills the child. → revisit if it bites.
+- **Savings attribution + Dashboard readout** (the `--log-file` ingestion, Working-state
+  correlation, Unattributed bucket, per-Session metrics) → Plans 2 and 3.
