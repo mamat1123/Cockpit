@@ -59,29 +59,3 @@ export function addRecord(t: Totals, r: ProxyRecord, prices: Record<string, Mode
   };
 }
 
-export interface SavingsRow { paneId: string; title: string; cwd: string; totals: Totals; cacheRate: number }
-export interface SavingsSummary { rows: SavingsRow[]; totalTokensSaved: number; totalRequests: number; totalCacheHits: number; totalUsd: number }
-
-/** Join per-pane savings totals with a paneId→{title,cwd} map, compute each row's
- *  cache-hit rate, sort by USD saved (then requests) descending, and sum the totals.
- *  A paneId absent from `meta` (a closed pane) is labelled "(closed session)". */
-export function savingsRows(
-  byPane: Record<string, Totals>,
-  meta: Record<string, { title: string; cwd: string }>,
-): SavingsSummary {
-  const rows: SavingsRow[] = Object.entries(byPane).map(([paneId, totals]) => ({
-    paneId,
-    title: meta[paneId]?.title ?? "(closed session)",
-    cwd: meta[paneId]?.cwd ?? "",
-    totals,
-    cacheRate: totals.requests > 0 ? totals.cacheHits / totals.requests : 0,
-  }));
-  rows.sort((a, b) => b.totals.usd - a.totals.usd || b.totals.requests - a.totals.requests);
-  return {
-    rows,
-    totalTokensSaved: rows.reduce((s, r) => s + r.totals.tokensSaved, 0),
-    totalRequests: rows.reduce((s, r) => s + r.totals.requests, 0),
-    totalCacheHits: rows.reduce((s, r) => s + r.totals.cacheHits, 0),
-    totalUsd: rows.reduce((s, r) => s + r.totals.usd, 0),
-  };
-}

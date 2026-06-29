@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseRecord, savedUsd, attribute, emptyTotals, addRecord, savingsRows } from "./savings";
+import { parseRecord, savedUsd, attribute, emptyTotals, addRecord } from "./savings";
 
 const PRICES = { "claude-opus-4-8": { input: 5, output: 25, cacheRead: 0.5, cacheWrite5m: 6.25, cacheWrite1h: 10 } };
 
@@ -82,53 +82,3 @@ describe("addRecord / emptyTotals", () => {
   });
 });
 
-describe("savingsRows", () => {
-  const t = (tokensSaved: number, requests: number, cacheHits: number, usd: number) =>
-    ({ tokensSaved, requests, cacheHits, usd });
-
-  it("joins pane title/cwd from meta and computes cache-hit rate", () => {
-    const out = savingsRows(
-      { "pane-1": t(100, 4, 2, 0.5) },
-      { "pane-1": { title: "akurax-api", cwd: "/Users/x/akurax-api" } },
-    );
-    expect(out.rows[0].title).toBe("akurax-api");
-    expect(out.rows[0].cwd).toBe("/Users/x/akurax-api");
-    expect(out.rows[0].cacheRate).toBeCloseTo(0.5, 6); // 2/4
-  });
-
-  it("labels a pane missing from meta as a closed session, cwd empty", () => {
-    const out = savingsRows({ "pane-9": t(0, 1, 0, 0) }, {});
-    expect(out.rows[0].title).toBe("(closed session)");
-    expect(out.rows[0].cwd).toBe("");
-  });
-
-  it("cacheRate is 0 when there are no requests (no divide-by-zero)", () => {
-    const out = savingsRows({ "pane-1": t(0, 0, 0, 0) }, {});
-    expect(out.rows[0].cacheRate).toBe(0);
-  });
-
-  it("sorts rows by usd desc, then requests desc", () => {
-    const out = savingsRows(
-      { a: t(0, 1, 0, 0.1), b: t(0, 9, 0, 0.1), c: t(0, 1, 0, 5.0) },
-      {},
-    );
-    expect(out.rows.map((r) => r.paneId)).toEqual(["c", "b", "a"]);
-  });
-
-  it("sums summary totals across panes", () => {
-    const out = savingsRows(
-      { a: t(100, 2, 1, 0.5), b: t(50, 3, 2, 0.25) },
-      {},
-    );
-    expect(out.totalTokensSaved).toBe(150);
-    expect(out.totalRequests).toBe(5);
-    expect(out.totalCacheHits).toBe(3);
-    expect(out.totalUsd).toBeCloseTo(0.75, 6);
-  });
-
-  it("empty byPane → empty rows + zero totals", () => {
-    const out = savingsRows({}, {});
-    expect(out.rows).toEqual([]);
-    expect(out.totalUsd).toBe(0);
-  });
-});
