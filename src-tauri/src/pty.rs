@@ -62,6 +62,7 @@ pub fn pty_spawn(
     cols: u16,
     rows: u16,
     launch: Option<String>,
+    env: Option<HashMap<String, String>>,
 ) -> Result<(), String> {
     // Idempotent: a pane that re-mounts must NOT respawn (would kill its session).
     if mgr.0.lock().unwrap().contains_key(&pane_id) {
@@ -87,6 +88,13 @@ pub fn pty_spawn(
     // escapes instead of downsampling to the 256-color palette — matches Ghostty,
     // which sets COLORTERM=truecolor and is why colors look more intense there.
     cmd.env("COLORTERM", "truecolor");
+    // Per-Pane env (e.g. ANTHROPIC_BASE_URL for Headroom routing). Applied on top of
+    // the inherited environment, before the login shell sources the profile.
+    if let Some(env) = env {
+        for (k, v) in env {
+            cmd.env(k, v);
+        }
+    }
 
     let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
     drop(pair.slave);
