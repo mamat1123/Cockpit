@@ -83,3 +83,29 @@
 .cockpit-dash__savings-table tr:last-child td { border-bottom: none; }
 .cockpit-dash__savings-name { color: var(--ck-bright); font-weight: 700; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cockpit-dash__savings-unattributed { color: var(--ck-muted); font-weight: 400; }
+
+/* Savings view — supplementary rules (Task 3) */
+.cockpit-dash__savings-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  padding-bottom: 18px; margin-bottom: 18px; border-bottom: 1px solid var(--ck-border);
+}
+.cockpit-dash__savings-head h3 {
+  margin: 0; font: 700 12px/1 ui-monospace, Menlo, monospace;
+  letter-spacing: 0.22em; text-transform: uppercase; color: var(--ck-text);
+  display: flex; align-items: center; gap: 8px;
+}
+.cockpit-dash__savings-scope {
+  font-size: 10px; font-weight: 400; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--ck-muted); font-family: ui-monospace, Menlo, monospace;
+}
+.cockpit-dash__savings-rate {
+  color: var(--ck-muted); font-variant-numeric: tabular-nums;
+}
+.cockpit-dash__savings-table tbody tr:hover td { background: var(--ck-surface); }
+.cockpit-dash__savings-unattributed-row td { color: var(--ck-dim); }
+.cockpit-dash__savings-unattributed-row .cockpit-dash__savings-name { color: var(--ck-dim); font-weight: 400; }
+.cockpit-dash__savings-hint {
+  margin: 16px 0 0; font: 11px ui-monospace, Menlo, monospace;
+  color: var(--ck-muted); line-height: 1.6;
+}
+.cockpit-dash__savings-hint b { color: var(--ck-text); font-weight: 700; }
