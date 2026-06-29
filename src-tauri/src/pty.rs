@@ -41,8 +41,11 @@ use tauri::{AppHandle, Emitter, State};
 struct PtySession {
     master: Box<dyn MasterPty + Send>,
     writer: Box<dyn Write + Send>,
-    // keep child alive; killing it on drop is handled by portable-pty
-    _child: Box<dyn portable_pty::Child + Send + Sync>,
+    // The child is NOT killed on drop (portable-pty leaves it running on macOS),
+    // so pty_kill must .kill() it explicitly — otherwise a kill+respawn (e.g. the
+    // Headroom toggle) leaves the old claude alive and the new one collides on the
+    // same --session-id, forking to a fresh session instead of resuming.
+    child: Box<dyn portable_pty::Child + Send + Sync>,
 }
 
 #[derive(Default)]
@@ -88,6 +91,19 @@ pub fn pty_spawn(
     // escapes instead of downsampling to the 256-color palette — matches Ghostty,
     // which sets COLORTERM=truecolor and is why colors look more intense there.
     cmd.env("COLORTERM", "truecolor");
+    // Strip Claude Code's own session markers from the inherited environment. Claude
+    // Code sets CLAUDECODE / CLAUDE_CODE_* to tell a nested `claude` it's a child
+    // session — and a child session does NOT write its transcript jsonl (so
+    // `--resume` later finds nothing and a Headroom toggle can't restore the chat).
+    // Cockpit launched from inside a Claude Code session (e.g. `npm run tauri dev`)
+    // would otherwise leak these into every pane and silently break persistence +
+    // resume. The login shell re-sources the profile, so any CLAUDE_* the user
+    // legitimately exports there is restored; only the runtime-injected markers go.
+    for (key, _) in std::env::vars() {
+        if key.starts_with("CLAUDE") || key == "AI_AGENT" {
+            cmd.env_remove(&key);
+        }
+    }
     // Per-Pane env (e.g. ANTHROPIC_BASE_URL for Headroom routing). Applied on top of
     // the inherited environment, before the login shell sources the profile.
     if let Some(env) = env {
@@ -151,7 +167,7 @@ pub fn pty_spawn(
 
     mgr.0.lock().unwrap().insert(
         pane_id,
-        PtySession { master: pair.master, writer, _child: child },
+        PtySession { master: pair.master, writer, child },
     );
     Ok(())
 }
@@ -175,6 +191,13 @@ pub fn pty_resize(mgr: State<PtyManager>, pane_id: String, cols: u16, rows: u16)
 
 #[tauri::command]
 pub fn pty_kill(mgr: State<PtyManager>, pane_id: String) {
-    // Dropping the PtySession drops its child -> portable-pty kills the process.
-    mgr.0.lock().unwrap().remove(&pane_id);
+    // Explicitly kill the child — dropping the session does NOT kill it
+    // (portable-pty leaves it running on macOS), which otherwise orphans claude
+    // and breaks resume-after-respawn via a --session-id collision. kill() returns
+    // immediately; reap in a detached thread so a slow-exiting child can't block
+    // this command (a synchronous wait() here would hang the toggle).
+    if let Some(mut sess) = mgr.0.lock().unwrap().remove(&pane_id) {
+        let _ = sess.child.kill();
+        std::thread::spawn(move || { let _ = sess.child.wait(); });
+    }
 }
