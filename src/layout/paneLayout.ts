@@ -66,6 +66,12 @@ export function serializeLayout(l: Layout, keepSessions: boolean): SavedLayout {
   };
 }
 
+/** True when a saved layout carries live session ids (saved with keepSessions),
+ *  so loading it will resume those terminals rather than start fresh ones. */
+export function layoutHasSessions(s: SavedLayout): boolean {
+  return s.tabs.some((t) => t.rows.some((r) => r.panes.some((p) => !!p.sessionId)));
+}
+
 export function deserializeLayout(s: SavedLayout): Layout {
   const tabs: Tab[] = s.tabs.map((t) => ({
     id: nextId("tab"),

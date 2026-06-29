@@ -240,7 +240,7 @@ export function CockpitView() {
         <WorkspacesMenu
           onClose={() => setWsOpen(false)}
           onLoad={(saved) => { dispatch({ type: "loadLayout", saved }); setWsOpen(false); }}
-          onSaveCurrent={(name) => savePreset(name, serializeLayout(layout, false))}
+          onSaveCurrent={(name, keepSessions) => savePreset(name, serializeLayout(layout, keepSessions))}
         />
       )}
       {settingsOpen && (

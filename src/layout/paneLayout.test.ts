@@ -163,7 +163,7 @@ describe("sessionId", () => {
   });
 });
 
-import { serializeLayout, deserializeLayout } from "./paneLayout";
+import { serializeLayout, deserializeLayout, layoutHasSessions } from "./paneLayout";
 
 describe("serialize/deserialize", () => {
   it("round-trips structure + cwd/size, fresh ids", () => {
@@ -197,6 +197,15 @@ describe("serialize/deserialize", () => {
     const saved = serializeLayout(initLayout("/x"), false);
     const l2 = reduce(initLayout(CWD), { type: "loadLayout", saved });
     expect(l2.tabs[0].rows[0].panes[0].cwd).toBe("/x");
+  });
+});
+
+describe("layoutHasSessions", () => {
+  it("is true for a layout saved with sessions", () => {
+    expect(layoutHasSessions(serializeLayout(initLayout(CWD), true))).toBe(true);
+  });
+  it("is false for a layout saved without sessions", () => {
+    expect(layoutHasSessions(serializeLayout(initLayout(CWD), false))).toBe(false);
   });
 });
 
