@@ -8,6 +8,7 @@ import { costOf } from "../lib/pricing";
 import { CostView } from "./CostView";
 import { UsagePanel } from "./UsageGauges";
 import { useSavings } from "../lib/savingsStore";
+import { savingsRows } from "../lib/savings";
 import "./Dashboard.css";
 
 function ago(last: number | null, now: number): string {
@@ -58,6 +59,11 @@ export function Dashboard({ layout, onJump, onJumpSession, onClose }: {
     return { ...it, working: deriveState({ lastLineAt: last }, now, 800) === "working", when: ago(last, now) };
   });
   const workCount = items.filter((i) => i.working).length;
+
+  const paneMeta = Object.fromEntries(
+    overviewItems(layout).map((it) => [it.paneId, { title: it.title, cwd: it.cwd }]),
+  );
+  const sv = savingsRows(savings.byPane, paneMeta);
 
   return (
     <div className="cockpit-dash" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -113,52 +119,49 @@ export function Dashboard({ layout, onJump, onJumpSession, onClose }: {
         </div>
         )}
         {view === "cost" && <CostView onJump={onJumpSession} />}
-        {view === "savings" && (() => {
-          const byPane = savings.byPane;
-          const unattributed = savings.unattributed;
-          const paneIds = Object.keys(byPane);
-          const hasAny = paneIds.length > 0 || unattributed.requests > 0;
-          return (
-            <div className="cockpit-dash__savings">
-              <h3 className="cockpit-dash__savings-heading">Headroom Savings</h3>
-              {!hasAny ? (
-                <p className="cockpit-dash__savings-empty">No Headroom activity yet</p>
-              ) : (
-                <table className="cockpit-dash__savings-table">
-                  <thead>
-                    <tr>
-                      <th>Session</th>
-                      <th>Tokens saved</th>
-                      <th>Cache hits / requests</th>
-                      <th>Est. saved</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paneIds.map((paneId) => {
-                      const t = byPane[paneId];
-                      return (
-                        <tr key={paneId}>
-                          <td className="cockpit-dash__savings-name">{paneId}</td>
-                          <td>{t.tokensSaved.toLocaleString()}</td>
-                          <td>{t.cacheHits}/{t.requests}</td>
-                          <td>${t.usd.toFixed(2)}</td>
-                        </tr>
-                      );
-                    })}
-                    {unattributed.requests > 0 && (
-                      <tr>
-                        <td className="cockpit-dash__savings-name cockpit-dash__savings-unattributed">Unattributed</td>
-                        <td>{unattributed.tokensSaved.toLocaleString()}</td>
-                        <td>{unattributed.cacheHits}/{unattributed.requests}</td>
-                        <td>${unattributed.usd.toFixed(2)}</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              )}
+        {view === "savings" && (
+          <div className="cockpit-dash__savings">
+            <div className="cockpit-dash__savings-head">
+              <h3>Headroom Savings <span className="cockpit-dash__savings-scope">since app start</span></h3>
+              <div className="cockpit-dash__readout">
+                <div className="cockpit-dash__stat is-cost"><b>{fmt(sv.totalUsd)}</b><span>est. saved</span></div>
+                <div className="cockpit-dash__stat"><b>{sv.totalCacheHits}</b><span>cache hits</span></div>
+                <div className="cockpit-dash__stat"><b>{sv.totalRequests}</b><span>requests</span></div>
+              </div>
             </div>
-          );
-        })()}
+            {sv.rows.length === 0 && savings.unattributed.requests === 0 ? (
+              <p className="cockpit-dash__savings-empty">No Headroom activity yet — toggle HR on a pane and send a prompt.</p>
+            ) : (
+              <table className="cockpit-dash__savings-table">
+                <thead>
+                  <tr><th>Session</th><th>Cache hits</th><th>Tokens saved</th><th>Est. saved</th></tr>
+                </thead>
+                <tbody>
+                  {sv.rows.map((r) => (
+                    <tr key={r.paneId}>
+                      <td className="cockpit-dash__savings-name" title={r.cwd}>{r.title}</td>
+                      <td>{r.totals.cacheHits}/{r.totals.requests} <span className="cockpit-dash__savings-rate">({Math.round(r.cacheRate * 100)}%)</span></td>
+                      <td>{r.totals.tokensSaved.toLocaleString()}</td>
+                      <td>{fmt(r.totals.usd)}</td>
+                    </tr>
+                  ))}
+                  {savings.unattributed.requests > 0 && (
+                    <tr className="cockpit-dash__savings-unattributed-row">
+                      <td className="cockpit-dash__savings-name">Unattributed</td>
+                      <td>{savings.unattributed.cacheHits}/{savings.unattributed.requests}</td>
+                      <td>{savings.unattributed.tokensSaved.toLocaleString()}</td>
+                      <td>{fmt(savings.unattributed.usd)}</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            )}
+            <p className="cockpit-dash__savings-hint">
+              Headroom runs in <b>cache mode</b>: savings show as <b>cache hits</b> (cheaper input), not fewer tokens.
+              Token-level compression needs <b>token mode</b> (heavier savings, but riskier for subscription billing).
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
