@@ -8,6 +8,8 @@ import { emitSend } from "./juiceBus";
 import { type Theme, themeById, DEFAULT_THEME_ID } from "./themes";
 import { headroomEnsure, HEADROOM_BASE_URL } from "./headroomClient";
 import { resolveHeadroomRouting } from "./headroomRouting";
+import { paneLaunchEnv } from "./paneLaunchEnv";
+import type { PonytailLevel } from "./ponytailClient";
 
 let activeTheme: Theme = themeById(DEFAULT_THEME_ID);
 let activeFontFamily = "Menlo, monospace";
@@ -93,25 +95,26 @@ const registry = new Map<string, TermEntry>();
  *  (initial launch) and setPaneHeadroom (toggle). */
 const routed = new Set<string>();
 
-/** Build + run the launch command for a pane, ensuring the Headroom proxy is up first
- *  when routing is on. Resumes if the session log already exists. Returns whether
- *  Headroom routing actually engaged (proxy up + env injected); false means the launch
- *  is direct — either routing is off or the proxy couldn't start (the latter falls back
- *  to direct so the pane is never stuck). */
-async function launchClaude(paneId: string, cwd: string, sessionId: string, resume: boolean, headroom: boolean, cols: number, rows: number): Promise<boolean> {
+/** Build + run the launch command for a pane. Resolves HR routing (when on) and merges
+ *  the HR + ponytail env via paneLaunchEnv (PONYTAIL_DEFAULT_MODE is always set, incl.
+ *  "off", so Cockpit's per-pane level is authoritative). Resumes if the session log
+ *  exists. Returns whether Headroom routing actually engaged (false = direct / proxy down,
+ *  which falls back to direct so the pane is never stuck). */
+async function launchClaude(paneId: string, cwd: string, sessionId: string, resume: boolean, opts: { headroom: boolean; ponytail: PonytailLevel }, cols: number, rows: number): Promise<boolean> {
   const flags = "--dangerously-skip-permissions";
   let launch = `claude ${flags} --session-id ${sessionId}`;
   if (resume) {
     try { if (await sessionExists(cwd, sessionId)) launch = `claude ${flags} --resume ${sessionId}`; } catch { /* not under tauri */ }
   }
-  const { engaged, env } = await resolveHeadroomRouting(headroom, headroomEnsure, HEADROOM_BASE_URL);
+  const { engaged } = await resolveHeadroomRouting(opts.headroom, headroomEnsure, HEADROOM_BASE_URL);
+  const env = paneLaunchEnv({ headroomEngaged: engaged, ponytail: opts.ponytail, headroomBaseUrl: HEADROOM_BASE_URL });
   void spawnPty(paneId, cwd, cols, rows, launch, env);
   return engaged;
 }
 
 /** Create (once) or return the persistent terminal for a pane. Spawns the PTY +
  *  `claude --session-id` and starts the logtail exactly once. */
-export function acquireTerminal(paneId: string, cwd: string, sessionId: string, resume: boolean, headroom: boolean): TermEntry {
+export function acquireTerminal(paneId: string, cwd: string, sessionId: string, resume: boolean, headroom: boolean, ponytail: PonytailLevel): TermEntry {
   const existing = registry.get(paneId);
   if (existing) return existing;
 
@@ -164,7 +167,7 @@ export function acquireTerminal(paneId: string, cwd: string, sessionId: string, 
     void writePty(paneId, data);
   });
 
-  void launchClaude(paneId, cwd, sessionId, resume, headroom, term.cols, term.rows)
+  void launchClaude(paneId, cwd, sessionId, resume, { headroom, ponytail }, term.cols, term.rows)
     .then((engaged) => { if (engaged) routed.add(paneId); else routed.delete(paneId); });
   void startLogtail(paneId, cwd, sessionId);
 
@@ -254,13 +257,26 @@ export function focusTerminal(paneId: string) {
  *  when turning ON but the proxy can't start, the relaunch falls back to direct, this says
  *  so in the pane and returns false — the caller bounces the toggle back to off so the UI
  *  never shows ON while silently going direct. */
-export async function setPaneHeadroom(paneId: string, cwd: string, sessionId: string, on: boolean): Promise<boolean> {
+export async function setPaneHeadroom(paneId: string, cwd: string, sessionId: string, on: boolean, ponytail: PonytailLevel): Promise<boolean> {
   const e = registry.get(paneId);
   if (!e) return false;
   await killPty(paneId);
   e.term.write("\r\n[switching Headroom routing…]\r\n");
-  const engaged = await launchClaude(paneId, cwd, sessionId, true, on, e.term.cols, e.term.rows);
+  const engaged = await launchClaude(paneId, cwd, sessionId, true, { headroom: on, ponytail }, e.term.cols, e.term.rows);
   if (engaged) routed.add(paneId); else routed.delete(paneId);
   if (on && !engaged) e.term.write("[Headroom proxy unavailable — staying on direct]\r\n");
   return engaged;
+}
+
+/** Switch a LIVE pane's Ponytail level: kill its claude and relaunch with --resume so the
+ *  conversation is preserved (PONYTAIL_DEFAULT_MODE is read at session start, so a restart is
+ *  the only way to switch). Passes the pane's current HR state so routing is preserved. No
+ *  failure path: env injection always succeeds; a missing plugin is gated by the UI. */
+export async function setPanePonytail(paneId: string, cwd: string, sessionId: string, level: PonytailLevel, headroom: boolean): Promise<void> {
+  const e = registry.get(paneId);
+  if (!e) return;
+  await killPty(paneId);
+  e.term.write(`\r\n[switching ponytail → ${level}…]\r\n`);
+  const engaged = await launchClaude(paneId, cwd, sessionId, true, { headroom, ponytail: level }, e.term.cols, e.term.rows);
+  if (engaged) routed.add(paneId); else routed.delete(paneId);
 }
