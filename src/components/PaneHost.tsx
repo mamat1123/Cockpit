@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import type { Action, Layout } from "../layout/paneLayout";
 import { flattenPanes } from "./paneFlatten";
 import { TerminalPane } from "./TerminalPane";
+import { setPaneHeadroom } from "../lib/terminalRegistry";
 
 /** Mounts every pane's TerminalPane ONCE and portals it into the DOM slot for its
  *  current position. Moving a pane between tabs only retargets the portal, so the
@@ -37,6 +38,7 @@ export function PaneHost({ layout, slots, dispatch }: {
               cwd={pane.cwd}
               sessionId={pane.sessionId}
               resume={pane.resume}
+              headroom={pane.headroom}
               title={pane.title}
               focused={pane.id === layout.focusedPaneId}
               isDragging={dragId === pane.id}
@@ -46,6 +48,7 @@ export function PaneHost({ layout, slots, dispatch }: {
               onAutoTitle={(t) => dispatch({ type: "autoTitlePane", paneId: pane.id, title: t })}
               onPopOut={() => dispatch({ type: "popOut", paneId: pane.id })}
               onClose={() => { dispatch({ type: "focusPane", paneId: pane.id }); dispatch({ type: "close" }); }}
+              onToggleHeadroom={() => { const next = !pane.headroom; dispatch({ type: "setHeadroom", paneId: pane.id, on: next }); void setPaneHeadroom(pane.id, pane.cwd, pane.sessionId, next); }}
               dragHandleProps={{
                 draggable: true,
                 onDragStart: (e) => {

@@ -14,13 +14,15 @@ const CloseIcon = () => (
   </svg>
 );
 
-export function PaneHeader({ title, repo, working, onRename, onPopOut, onClose, dragHandleProps }: {
+export function PaneHeader({ title, repo, working, headroom, onRename, onPopOut, onClose, onToggleHeadroom, dragHandleProps }: {
   title: string;
   repo: string;
   working: boolean;
+  headroom: boolean;
   onRename: (title: string) => void;
   onPopOut: () => void;
   onClose: () => void;
+  onToggleHeadroom: () => void;
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement> & { draggable?: boolean };
 }) {
   const [editing, setEditing] = useState(false);
@@ -60,6 +62,14 @@ export function PaneHeader({ title, repo, working, onRename, onPopOut, onClose, 
         <span className="pane-head__bars"><i /><i /><i /></span>
         <span className="pane-head__lbl">{working ? "working" : "idle"}</span>
       </span>
+      <button
+        className={`pane-head__hr${headroom ? " is-on" : ""}`}
+        onClick={onToggleHeadroom}
+        title={headroom ? "Headroom: เปิด (กดเพื่อปิด)" : "Headroom: ปิด (กดเพื่อเปิด)"}
+        aria-pressed={headroom}
+      >
+        <span className="pane-head__hr-sw" /><span className="pane-head__hr-lbl">HR</span>
+      </button>
       <button className="pane-head__btn" onClick={onPopOut} aria-label="เปิดในแท็บใหม่" title="เปิดในแท็บใหม่"><PopOutIcon /></button>
       <button className="pane-head__btn pane-head__btn--x" onClick={onClose} aria-label="ปิด" title="ปิด"><CloseIcon /></button>
     </div>
