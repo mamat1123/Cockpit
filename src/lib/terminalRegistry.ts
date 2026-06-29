@@ -2,10 +2,11 @@ import { Terminal } from "@xterm/xterm";
 import type { ITheme } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
-import { spawnPty, writePty, resizePty, onPtyOutput, onPtyExit } from "./ptyClient";
+import { spawnPty, writePty, resizePty, killPty, onPtyOutput, onPtyExit } from "./ptyClient";
 import { startLogtail, sessionExists } from "./logClient";
 import { emitSend } from "./juiceBus";
 import { type Theme, themeById, DEFAULT_THEME_ID } from "./themes";
+import { headroomEnsure, HEADROOM_BASE_URL } from "./headroomClient";
 
 let activeTheme: Theme = themeById(DEFAULT_THEME_ID);
 let activeFontFamily = "Menlo, monospace";
@@ -84,9 +85,27 @@ function parkingNode(): HTMLDivElement {
 
 const registry = new Map<string, TermEntry>();
 
+/** Build + run the launch command for a pane, ensuring the Headroom proxy is up
+ *  first when routing is on. Resumes if the session log already exists. */
+async function launchClaude(paneId: string, cwd: string, sessionId: string, resume: boolean, headroom: boolean, cols: number, rows: number): Promise<void> {
+  const flags = "--dangerously-skip-permissions";
+  let launch = `claude ${flags} --session-id ${sessionId}`;
+  if (resume) {
+    try { if (await sessionExists(cwd, sessionId)) launch = `claude ${flags} --resume ${sessionId}`; } catch { /* not under tauri */ }
+  }
+  let env: Record<string, string> | null = null;
+  if (headroom) {
+    try {
+      await headroomEnsure();
+      env = { ANTHROPIC_BASE_URL: HEADROOM_BASE_URL };
+    } catch { /* proxy down: fall back to direct so the pane is never stuck */ }
+  }
+  void spawnPty(paneId, cwd, cols, rows, launch, env);
+}
+
 /** Create (once) or return the persistent terminal for a pane. Spawns the PTY +
  *  `claude --session-id` and starts the logtail exactly once. */
-export function acquireTerminal(paneId: string, cwd: string, sessionId: string, resume: boolean): TermEntry {
+export function acquireTerminal(paneId: string, cwd: string, sessionId: string, resume: boolean, headroom: boolean): TermEntry {
   const existing = registry.get(paneId);
   if (existing) return existing;
 
@@ -129,17 +148,7 @@ export function acquireTerminal(paneId: string, cwd: string, sessionId: string, 
     void writePty(paneId, data);
   });
 
-  // Resume only if the session log actually exists; otherwise start fresh pinned to
-  // this id (so it's resumable next time). Avoids "No conversation found" dead panes.
-  void (async () => {
-    // Always skip the permission prompts — Cockpit panes run claude unattended.
-    const flags = "--dangerously-skip-permissions";
-    let launch = `claude ${flags} --session-id ${sessionId}`;
-    if (resume) {
-      try { if (await sessionExists(cwd, sessionId)) launch = `claude ${flags} --resume ${sessionId}`; } catch { /* not under tauri */ }
-    }
-    void spawnPty(paneId, cwd, term.cols, term.rows, launch);
-  })();
+  void launchClaude(paneId, cwd, sessionId, resume, headroom, term.cols, term.rows);
   void startLogtail(paneId, cwd, sessionId);
 
   const entry: TermEntry = { term, hostEl, fit, lastLineAt, lastInputAt, lastResizeAt };
@@ -208,4 +217,15 @@ export function anyPaneWorking(now: number, graceMs = 1000): boolean {
  *  jump or programmatic tab switch, where no click lands inside the xterm). */
 export function focusTerminal(paneId: string) {
   registry.get(paneId)?.term.focus();
+}
+
+/** Toggle Headroom routing for a LIVE pane: kill its claude and relaunch with
+ *  --resume so the conversation is preserved (ANTHROPIC_BASE_URL is fixed at
+ *  process start, so a restart is the only way to switch routing). */
+export async function setPaneHeadroom(paneId: string, cwd: string, sessionId: string, on: boolean): Promise<void> {
+  const e = registry.get(paneId);
+  if (!e) return;
+  await killPty(paneId);
+  e.term.write("\r\n[switching Headroom routing…]\r\n");
+  await launchClaude(paneId, cwd, sessionId, true, on, e.term.cols, e.term.rows);
 }
