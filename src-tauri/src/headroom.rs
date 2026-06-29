@@ -1,4 +1,3 @@
-use std::io::ErrorKind;
 use std::net::{TcpStream, ToSocketAddrs};
 use std::process::{Child, Command};
 use std::sync::Mutex;
@@ -48,7 +47,7 @@ pub fn headroom_ensure(mgr: State<HeadroomManager>) -> Result<bool, String> {
         let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
         // cache mode (ADR 0010); log file feeds Plan 2's Savings attribution.
         let cmd = format!(
-            "headroom proxy --port {HEADROOM_PORT} --mode cache --log-file ~/.headroom/logs/cockpit-proxy.jsonl"
+            "exec headroom proxy --port {HEADROOM_PORT} --mode cache --log-file ~/.headroom/logs/cockpit-proxy.jsonl"
         );
         let child = Command::new(&shell)
             .arg("-lc")
@@ -67,9 +66,16 @@ pub fn headroom_ensure(mgr: State<HeadroomManager>) -> Result<bool, String> {
         }
         std::thread::sleep(Duration::from_millis(150));
     }
-    Err("headroom proxy did not become reachable on 127.0.0.1:8787 within 8s".into())
+    Err(format!("headroom proxy did not become reachable on 127.0.0.1:{HEADROOM_PORT} within 8s"))
 }
 
-// Silence unused import on non-test builds.
-#[allow(unused_imports)]
-use ErrorKind as _ErrorKind;
+/// Kill the managed proxy child (called on app exit so we don't orphan it).
+pub fn shutdown(app: &tauri::AppHandle) {
+    use tauri::Manager;
+    let mgr = app.state::<HeadroomManager>();
+    let child = mgr.0.lock().unwrap().take();
+    if let Some(mut child) = child {
+        let _ = child.kill();
+        let _ = child.wait();
+    }
+}

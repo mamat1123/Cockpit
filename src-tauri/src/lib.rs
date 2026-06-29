@@ -84,7 +84,7 @@ fn set_window_blur(window: tauri::WebviewWindow, radius: u32) -> Result<(), Stri
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
@@ -154,6 +154,11 @@ pub fn run() {
             }
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+    app.run(|app_handle, event| {
+        if let tauri::RunEvent::Exit = event {
+            headroom::shutdown(app_handle);
+        }
+    });
 }
