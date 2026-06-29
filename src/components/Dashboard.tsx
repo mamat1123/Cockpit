@@ -7,6 +7,7 @@ import { sessionUsage } from "../lib/costClient";
 import { costOf } from "../lib/pricing";
 import { CostView } from "./CostView";
 import { UsagePanel } from "./UsageGauges";
+import { useSavings } from "../lib/savingsStore";
 import "./Dashboard.css";
 
 function ago(last: number | null, now: number): string {
@@ -24,7 +25,8 @@ export function Dashboard({ layout, onJump, onJumpSession, onClose }: {
   onClose: () => void;
 }) {
   const [now, setNow] = useState(() => Date.now());
-  const [view, setView] = useState<"sessions" | "cost">("sessions");
+  const [view, setView] = useState<"sessions" | "cost" | "savings">("sessions");
+  const savings = useSavings();
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 400);
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { e.preventDefault(); onClose(); } };
@@ -68,6 +70,7 @@ export function Dashboard({ layout, onJump, onJumpSession, onClose }: {
           <div className="cockpit-dash__viewtabs">
             <button className={view === "sessions" ? "on" : ""} onClick={() => setView("sessions")}>Sessions</button>
             <button className={view === "cost" ? "on" : ""} onClick={() => setView("cost")}>Cost</button>
+            <button className={view === "savings" ? "on" : ""} onClick={() => setView("savings")}>Savings</button>
           </div>
           {view === "sessions" && (
           <div className="cockpit-dash__readout">
@@ -79,7 +82,7 @@ export function Dashboard({ layout, onJump, onJumpSession, onClose }: {
           )}
         </div>
         <UsagePanel />
-        {view === "sessions" ? (
+        {view === "sessions" && (
         <div className="cockpit-dash__grid">
           {items.map((it) => (
             <button
@@ -108,9 +111,54 @@ export function Dashboard({ layout, onJump, onJumpSession, onClose }: {
             </button>
           ))}
         </div>
-        ) : (
-          <CostView onJump={onJumpSession} />
         )}
+        {view === "cost" && <CostView onJump={onJumpSession} />}
+        {view === "savings" && (() => {
+          const byPane = savings.byPane;
+          const unattributed = savings.unattributed;
+          const paneIds = Object.keys(byPane);
+          const hasAny = paneIds.length > 0 || unattributed.requests > 0;
+          return (
+            <div className="cockpit-dash__savings">
+              <h3 className="cockpit-dash__savings-heading">Headroom Savings</h3>
+              {!hasAny ? (
+                <p className="cockpit-dash__savings-empty">No Headroom activity yet</p>
+              ) : (
+                <table className="cockpit-dash__savings-table">
+                  <thead>
+                    <tr>
+                      <th>Session</th>
+                      <th>Tokens saved</th>
+                      <th>Cache hits / requests</th>
+                      <th>Est. saved</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paneIds.map((paneId) => {
+                      const t = byPane[paneId];
+                      return (
+                        <tr key={paneId}>
+                          <td className="cockpit-dash__savings-name">{paneId}</td>
+                          <td>{t.tokensSaved.toLocaleString()}</td>
+                          <td>{t.cacheHits}/{t.requests}</td>
+                          <td>${t.usd.toFixed(2)}</td>
+                        </tr>
+                      );
+                    })}
+                    {unattributed.requests > 0 && (
+                      <tr key="unattributed">
+                        <td className="cockpit-dash__savings-name cockpit-dash__savings-unattributed">Unattributed</td>
+                        <td>{unattributed.tokensSaved.toLocaleString()}</td>
+                        <td>{unattributed.cacheHits}/{unattributed.requests}</td>
+                        <td>${unattributed.usd.toFixed(2)}</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

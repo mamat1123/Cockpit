@@ -73,3 +73,13 @@
 .cockpit-dash__viewtabs button { font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: var(--ck-muted); background: transparent; border: 0; border-radius: 6px; padding: 6px 14px; cursor: pointer; }
 .cockpit-dash__viewtabs button.on { background: var(--ck-accent); color: #1a1206; font-weight: 700; }
 .cockpit-dash__viewtabs button:not(.on):hover { color: var(--ck-text); }
+
+.cockpit-dash__savings { padding: 4px 0; }
+.cockpit-dash__savings-heading { margin: 0 0 16px; font: 700 12px/1 ui-monospace, Menlo, monospace; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ck-muted); }
+.cockpit-dash__savings-empty { font: 12px ui-monospace, Menlo, monospace; color: var(--ck-muted); margin: 0; padding: 8px 0; }
+.cockpit-dash__savings-table { width: 100%; border-collapse: collapse; font: 12px ui-monospace, Menlo, monospace; color: var(--ck-text); }
+.cockpit-dash__savings-table th { text-align: left; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ck-muted); padding: 0 12px 10px 0; border-bottom: 1px solid var(--ck-border); }
+.cockpit-dash__savings-table td { padding: 10px 12px 10px 0; border-bottom: 1px solid var(--ck-border); font-variant-numeric: tabular-nums; vertical-align: middle; }
+.cockpit-dash__savings-table tr:last-child td { border-bottom: none; }
+.cockpit-dash__savings-name { color: var(--ck-bright); font-weight: 700; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cockpit-dash__savings-unattributed { color: var(--ck-muted); font-weight: 400; }
