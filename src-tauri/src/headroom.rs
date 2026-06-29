@@ -51,8 +51,27 @@ pub fn headroom_ensure(mgr: State<HeadroomManager>) -> Result<bool, String> {
         // which is the saving that matters here. cache mode's cheaper-input benefit is a
         // pay-per-token concern that doesn't apply. CCR (headroom_retrieve) lets Claude pull
         // back full detail when the compressed view isn't enough. log file feeds Savings.
+        //
+        // agent-90 savings profile (the actual compression lever): a bare `headroom proxy`
+        // runs on conservative defaults that protect/skip exactly the traffic we want cut —
+        // recent reads (30%-of-excluded window), user/system messages (skip_user_messages),
+        // and no target ratio / force-kompress. `headroom wrap claude` only compresses because
+        // it seeds the agent-90 env vars into the *proxy* process; we must do the same. We get
+        // them from `agent-savings --format shell` so they always match the installed version
+        // (no config file exists; env is the only channel, read once at proxy startup). They
+        // go on the proxy, NOT on claude — claude needs only ANTHROPIC_BASE_URL.
+        //
+        // Known ceiling (headroom 0.27.0, two upstream bugs the profile can't reach): Claude
+        // Code stamps `cache_control` on its most-recent tool_result blocks, and ContentRouter
+        // hard-skips any cache_control'd block before the tool_result check — so the *latest*
+        // big Read won't compress. The ToolResultInterceptor that could outline it is built but
+        // never wired into the proxy's explicit transforms list. What the profile DOES unlock:
+        // Bash output, aged-out (non-cache_control'd) reads, and user/system history. Dropped
+        // the earlier `--intercept-tool-results` flag — it's dead-wired in this build, not the
+        // lever. If the eval yields nothing (e.g. profile renamed upstream) the proxy still
+        // starts, just on defaults — same as before, no regression.
         let cmd = format!(
-            "exec headroom proxy --port {HEADROOM_PORT} --mode token --log-file ~/.headroom/logs/cockpit-proxy.jsonl"
+            "eval \"$(headroom agent-savings --profile agent-90 --format shell)\"; exec headroom proxy --port {HEADROOM_PORT} --mode token --log-file ~/.headroom/logs/cockpit-proxy.jsonl"
         );
         let child = Command::new(&shell)
             .arg("-lc")

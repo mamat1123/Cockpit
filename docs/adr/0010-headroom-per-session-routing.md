@@ -80,3 +80,29 @@ Cockpit is launched from inside a Claude Code session (`npm run tauri dev`). `pt
 now strips `CLAUDE*`/`AI_AGENT` from the spawned shell. Keep that strip. (Also: `pty_kill`
 must `.kill()` the child explicitly — portable-pty does not kill on drop on macOS — or
 orphaned claudes collide on the same `--session-id` and fork to new ids.)
+
+### Why a bare proxy saved 0 tokens — the agent-90 profile is the compression lever
+
+Token mode showed `tokens_saved=0` on every request (`router:excluded:tool`,
+`router:protected:user_message`, `router:noop`). Investigated with subagents (one reading
+0.27.0 source, one running a live proxy + real `claude` read). **A bare `headroom proxy`
+runs on conservative defaults that protect/skip exactly the traffic we want compressed**;
+the high-savings behaviour is entirely driven by the `agent-90` *savings profile* that
+`headroom wrap claude` seeds into the **proxy** process env (not onto `claude`). No profile →
+`read_protection_window` is 30%-of-excluded (floor 4), `skip_user_messages=True`,
+`target_ratio=None`, `force_kompress=False`. We now spawn the proxy after
+`eval "$(headroom agent-savings --profile agent-90 --format shell)"` — sourced live so the 13
+vars always match the installed version (there is **no config file**; env is the only channel
+and is read once at startup). Set them on the proxy, never on `claude`.
+
+**Upstream ceiling (headroom 0.27.0) the profile cannot reach — empirically confirmed, not a
+Cockpit bug:** (1) Claude Code stamps `cache_control:{ephemeral}` on its most-recent
+`tool_result` blocks; `content_router.py:2923` hard-skips any `cache_control` block *before*
+the tool_result check, so the latest large Read never compresses. (2) `--intercept-tool-results`
+is dead-wired — `server.py:645` builds an explicit `[CacheAligner, ContentRouter]` transforms
+list, so `ToolResultInterceptorTransform` (the ast-grep Read outliner, proven to cut
+`mcp/types.py` 21k→5.8k tokens when invoked directly) is never added. The flag was dropped.
+What the profile DOES unlock and why this is still worth shipping: Bash output, aged-out
+(non-`cache_control`'d) reads, and user/system history all become compressible — strictly
+better than the bare proxy's 0. The 2026-06-24 history showing 57% reduction was such traffic
+(a large non-`cache_control`'d message), not a recent Read.
