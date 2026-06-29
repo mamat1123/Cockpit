@@ -45,9 +45,14 @@ pub fn headroom_ensure(mgr: State<HeadroomManager>) -> Result<bool, String> {
     }
     if guard.is_none() {
         let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
-        // cache mode (ADR 0010); log file feeds Plan 2's Savings attribution.
+        // token mode (ADR 0010, revised): the owner is on a Claude *subscription*, so the
+        // binding constraint is the token-based rate-limit window, not per-token USD — token
+        // mode compresses prompts to cut tokens (extends rate-limit headroom + context),
+        // which is the saving that matters here. cache mode's cheaper-input benefit is a
+        // pay-per-token concern that doesn't apply. CCR (headroom_retrieve) lets Claude pull
+        // back full detail when the compressed view isn't enough. log file feeds Savings.
         let cmd = format!(
-            "exec headroom proxy --port {HEADROOM_PORT} --mode cache --log-file ~/.headroom/logs/cockpit-proxy.jsonl"
+            "exec headroom proxy --port {HEADROOM_PORT} --mode token --log-file ~/.headroom/logs/cockpit-proxy.jsonl"
         );
         let child = Command::new(&shell)
             .arg("-lc")
