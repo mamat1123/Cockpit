@@ -7,6 +7,7 @@ import { startLogtail, sessionExists } from "./logClient";
 import { emitSend } from "./juiceBus";
 import { type Theme, themeById, DEFAULT_THEME_ID } from "./themes";
 import { headroomEnsure, HEADROOM_BASE_URL } from "./headroomClient";
+import { resolveHeadroomRouting } from "./headroomRouting";
 
 let activeTheme: Theme = themeById(DEFAULT_THEME_ID);
 let activeFontFamily = "Menlo, monospace";
@@ -85,33 +86,32 @@ function parkingNode(): HTMLDivElement {
 
 const registry = new Map<string, TermEntry>();
 
-/** Pane ids currently routed through the Headroom proxy (HR on). Maintained here so
- *  savings attribution knows which working panes are even candidates (only routed panes
- *  hit the proxy). Updated by acquireTerminal (initial flag) and setPaneHeadroom (toggle). */
+/** Pane ids ACTUALLY routed through the Headroom proxy (HR on AND the proxy came up).
+ *  Maintained here so savings attribution knows which working panes are even candidates
+ *  (only routed panes hit the proxy). Set from the real launch outcome — a pane whose
+ *  proxy bring-up failed falls back to direct and is NOT added — by acquireTerminal
+ *  (initial launch) and setPaneHeadroom (toggle). */
 const routed = new Set<string>();
 
-/** Build + run the launch command for a pane, ensuring the Headroom proxy is up
- *  first when routing is on. Resumes if the session log already exists. */
-async function launchClaude(paneId: string, cwd: string, sessionId: string, resume: boolean, headroom: boolean, cols: number, rows: number): Promise<void> {
+/** Build + run the launch command for a pane, ensuring the Headroom proxy is up first
+ *  when routing is on. Resumes if the session log already exists. Returns whether
+ *  Headroom routing actually engaged (proxy up + env injected); false means the launch
+ *  is direct — either routing is off or the proxy couldn't start (the latter falls back
+ *  to direct so the pane is never stuck). */
+async function launchClaude(paneId: string, cwd: string, sessionId: string, resume: boolean, headroom: boolean, cols: number, rows: number): Promise<boolean> {
   const flags = "--dangerously-skip-permissions";
   let launch = `claude ${flags} --session-id ${sessionId}`;
   if (resume) {
     try { if (await sessionExists(cwd, sessionId)) launch = `claude ${flags} --resume ${sessionId}`; } catch { /* not under tauri */ }
   }
-  let env: Record<string, string> | null = null;
-  if (headroom) {
-    try {
-      await headroomEnsure();
-      env = { ANTHROPIC_BASE_URL: HEADROOM_BASE_URL };
-    } catch { /* proxy down: fall back to direct so the pane is never stuck */ }
-  }
+  const { engaged, env } = await resolveHeadroomRouting(headroom, headroomEnsure, HEADROOM_BASE_URL);
   void spawnPty(paneId, cwd, cols, rows, launch, env);
+  return engaged;
 }
 
 /** Create (once) or return the persistent terminal for a pane. Spawns the PTY +
  *  `claude --session-id` and starts the logtail exactly once. */
 export function acquireTerminal(paneId: string, cwd: string, sessionId: string, resume: boolean, headroom: boolean): TermEntry {
-  if (headroom) routed.add(paneId); else routed.delete(paneId);
   const existing = registry.get(paneId);
   if (existing) return existing;
 
@@ -164,7 +164,8 @@ export function acquireTerminal(paneId: string, cwd: string, sessionId: string, 
     void writePty(paneId, data);
   });
 
-  void launchClaude(paneId, cwd, sessionId, resume, headroom, term.cols, term.rows);
+  void launchClaude(paneId, cwd, sessionId, resume, headroom, term.cols, term.rows)
+    .then((engaged) => { if (engaged) routed.add(paneId); else routed.delete(paneId); });
   void startLogtail(paneId, cwd, sessionId);
 
   const entry: TermEntry = { term, hostEl, fit, lastLineAt, lastInputAt, lastResizeAt };
@@ -247,14 +248,19 @@ export function focusTerminal(paneId: string) {
   registry.get(paneId)?.term.focus();
 }
 
-/** Toggle Headroom routing for a LIVE pane: kill its claude and relaunch with
- *  --resume so the conversation is preserved (ANTHROPIC_BASE_URL is fixed at
- *  process start, so a restart is the only way to switch routing). */
-export async function setPaneHeadroom(paneId: string, cwd: string, sessionId: string, on: boolean): Promise<void> {
+/** Toggle Headroom routing for a LIVE pane: kill its claude and relaunch with --resume
+ *  so the conversation is preserved (ANTHROPIC_BASE_URL is fixed at process start, so a
+ *  restart is the only way to switch routing). Returns whether routing actually engaged:
+ *  when turning ON but the proxy can't start, the relaunch falls back to direct, this says
+ *  so in the pane and returns false — the caller bounces the toggle back to off so the UI
+ *  never shows ON while silently going direct. */
+export async function setPaneHeadroom(paneId: string, cwd: string, sessionId: string, on: boolean): Promise<boolean> {
   const e = registry.get(paneId);
-  if (!e) return;
+  if (!e) return false;
   await killPty(paneId);
-  if (on) routed.add(paneId); else routed.delete(paneId);
   e.term.write("\r\n[switching Headroom routing…]\r\n");
-  await launchClaude(paneId, cwd, sessionId, true, on, e.term.cols, e.term.rows);
+  const engaged = await launchClaude(paneId, cwd, sessionId, true, on, e.term.cols, e.term.rows);
+  if (engaged) routed.add(paneId); else routed.delete(paneId);
+  if (on && !engaged) e.term.write("[Headroom proxy unavailable — staying on direct]\r\n");
+  return engaged;
 }

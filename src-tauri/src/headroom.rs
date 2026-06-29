@@ -82,11 +82,25 @@ pub fn headroom_ensure(mgr: State<HeadroomManager>) -> Result<bool, String> {
     }
     drop(guard);
 
-    // Poll up to 8s for the port to come up.
+    // Poll up to 8s for the port to come up — but bail the moment the proxy child we
+    // spawned has already exited (e.g. `headroom` isn't installed, so the login shell's
+    // `exec headroom proxy` dies with "command not found"). Without this, a missing or
+    // broken proxy stalls the full 8s and the HR toggle sits on ON before bouncing back;
+    // with it the caller falls back to direct in ~one poll.
     let deadline = Instant::now() + Duration::from_secs(8);
     while Instant::now() < deadline {
         if port_open(Duration::from_millis(250)) {
             return Ok(true);
+        }
+        if let Ok(mut guard) = mgr.0.lock() {
+            if let Some(child) = guard.as_mut() {
+                if let Ok(Some(status)) = child.try_wait() {
+                    *guard = None;
+                    return Err(format!(
+                        "headroom proxy exited immediately ({status}); is the `headroom` CLI installed and on PATH?"
+                    ));
+                }
+            }
         }
         std::thread::sleep(Duration::from_millis(150));
     }

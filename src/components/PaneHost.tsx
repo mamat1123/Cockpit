@@ -48,7 +48,16 @@ export function PaneHost({ layout, slots, dispatch }: {
               onAutoTitle={(t) => dispatch({ type: "autoTitlePane", paneId: pane.id, title: t })}
               onPopOut={() => dispatch({ type: "popOut", paneId: pane.id })}
               onClose={() => { dispatch({ type: "focusPane", paneId: pane.id }); dispatch({ type: "close" }); }}
-              onToggleHeadroom={() => { const next = !pane.headroom; dispatch({ type: "setHeadroom", paneId: pane.id, on: next }); void setPaneHeadroom(pane.id, pane.cwd, pane.sessionId, next); }}
+              onToggleHeadroom={() => {
+                // Optimistic flip for instant feedback, then bounce back to off if turning
+                // ON couldn't actually engage the proxy (it fell back to direct) — so the
+                // toggle never shows ON while silently going direct.
+                const next = !pane.headroom;
+                dispatch({ type: "setHeadroom", paneId: pane.id, on: next });
+                void setPaneHeadroom(pane.id, pane.cwd, pane.sessionId, next).then((engaged) => {
+                  if (next && !engaged) dispatch({ type: "setHeadroom", paneId: pane.id, on: false });
+                });
+              }}
               dragHandleProps={{
                 draggable: true,
                 onDragStart: (e) => {
