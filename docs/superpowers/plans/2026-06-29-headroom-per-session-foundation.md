@@ -603,5 +603,30 @@ If `headroom doctor` still shows `claude … routed`, run `headroom unwrap claud
 
 ## Follow-on plans (write after Plan 1 lands)
 
-- **Plan 2 — Savings attribution:** run the proxy with `--log-file`, tail `~/.headroom/logs/cockpit-proxy.jsonl`, sum `tokens_before − tokens_after` per request, attribute to the one `working` Session at that timestamp, else the **Unattributed** bucket. Empirically confirm the real JSONL field names first.
-- **Plan 3 — Dashboard readout:** per-Session Savings table (tokens · %lost · ≈$ via `pricing.ts` · #requests) + Unattributed row, alongside Cost in the Dashboard (UI variant B).
+### Empirical findings from the Plan-1 smoke test (2026-06-29) — READ before Plan 2/3
+
+Verified live: Cockpit's `headroom_ensure` spawns `headroom proxy --port 8787 --mode cache
+--log-file ~/.headroom/logs/cockpit-proxy.jsonl`, traffic flows through it (23 records logged).
+
+- **Real JSONL field names (NOT `tokens_before`/`tokens_after` as Task assumed):** each line has
+  `input_tokens_original`, `input_tokens_optimized`, `tokens_saved`, `savings_percent`,
+  `cache_hit` (bool), `transforms_applied` (list), `output_tokens`, `model`, `provider`,
+  `request_id`, `turn_id`, `timestamp`, `tags`, `optimization_latency_ms`, `total_latency_ms`.
+  Plan 2 must use these.
+- **`cache` mode does ZERO token compression by design.** Measured: `input_tokens_original ==
+  input_tokens_optimized` (119,720 == 119,720), `tokens_saved = 0`, `transforms_applied = []`,
+  but `cache_hit = 5/23`. So in cache mode "tokens saved" is *always ~0* — the benefit is
+  provider cache hits (lower **Cost**), not token reduction. A token-delta "Savings" readout
+  would show $0 and look broken. This is the Q9 trade-off made concrete.
+- **Decision (user, 2026-06-29):** the Dashboard shows BOTH metrics transparently — `cache_hit`
+  rate + cost-from-cache AND `tokens_saved`/`savings_percent` (≈0 in cache mode) — rather than a
+  single token-delta number. Consider surfacing a one-time hint that token-level savings need
+  `token` mode (which is subscription-billing-risky per the user's own notes).
+
+- **Plan 2 — Savings attribution:** tail `~/.headroom/logs/cockpit-proxy.jsonl`, use the REAL
+  fields above (sum `tokens_saved`, count `cache_hit`, derive cost-from-cache via `pricing.ts`),
+  attribute each record to the one `working` Session at its `timestamp`, else the **Unattributed**
+  bucket. (`turn_id` may help correlate a burst of requests to one turn.)
+- **Plan 3 — Dashboard readout:** per-Session row with cache_hit rate + cost-from-cache +
+  tokens_saved + savings_percent + #requests, plus an Unattributed row, alongside Cost (UI
+  variant B).
