@@ -5,6 +5,7 @@ mod usage;
 mod dropfile;
 mod headroom;
 mod headroomlog;
+mod ponytail;
 
 use tauri::{Emitter, Manager};
 
@@ -120,6 +121,7 @@ pub fn run() {
             headroom::headroom_status,
             headroomlog::headroom_log_start,
             headroomlog::headroom_log_stop,
+            ponytail::ponytail_installed,
         ])
         .setup(|app| {
             use tauri::{WebviewWindowBuilder, WebviewUrl, WindowEvent};
