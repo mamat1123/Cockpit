@@ -68,3 +68,19 @@ _Avoid_: cost, quota, tokens-left, rate (be specific)
 The two rolling rate-limit windows Usage is reported for: the short rolling 5-hour window
 and the 7-day weekly window, each with its own utilization % and reset time.
 _Avoid_: 5h limit / weekly limit (it's a rolling window, not a fixed limit)
+
+**Headroom routing**:
+Whether a [[Session]] talks to the model through the Headroom optimization proxy (which
+compresses prompts to cut tokens) or straight to the API. Set per-Session and toggled in
+the [[Pane]] header; flipping it relaunches that Session's Claude (via resume) since the
+choice is fixed at process start. Default off.
+_Avoid_: headroom mode, compression toggle, proxy on/off (say Headroom routing)
+
+**Savings**:
+The tokens (and their USD value) that Headroom's compression removed from a Session's
+requests — the difference between what would have been sent and what actually was. A
+third money/usage axis distinct from **Cost** (USD actually spent) and **Usage** (% of
+rate limit). Attributed to whichever Session was in its [[Working state|working]] state
+when a request passed the proxy; requests that can't be pinned to one Session land in a
+separate **Unattributed** bucket rather than being guessed.
+_Avoid_: discount, reduction, compression (be specific: Savings); never conflate with Cost
