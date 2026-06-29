@@ -2,6 +2,7 @@ mod pty;
 mod logtail;
 mod cost;
 mod usage;
+mod headroom;
 
 use tauri::{Emitter, Manager};
 
@@ -93,6 +94,7 @@ pub fn run() {
         .manage(logtail::LogtailManager::default())
         .manage(cost::CostManager::default())
         .manage(cost::CostReportManager::default())
+        .manage(headroom::HeadroomManager::default())
         .invoke_handler(tauri::generate_handler![
             greet,
             set_window_blur,
@@ -110,6 +112,8 @@ pub fn run() {
             cost::cost_report,
             cost::list_projects,
             usage::usage_report,
+            headroom::headroom_ensure,
+            headroom::headroom_status,
         ])
         .setup(|app| {
             use tauri::{WebviewWindowBuilder, WebviewUrl, WindowEvent};
