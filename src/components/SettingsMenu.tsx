@@ -19,6 +19,7 @@ export function SettingsMenu({ settings, onPatch, onClose, onUpdateFound }: {
   const [zaiToken, setZaiToken] = useState("");
   const [zaiConfigured, setZaiConfigured] = useState<boolean | null>(null);
   const [zaiSaving, setZaiSaving] = useState(false);
+  const [zaiError, setZaiError] = useState("");
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { e.preventDefault(); onClose(); } };
@@ -37,10 +38,13 @@ export function SettingsMenu({ settings, onPatch, onClose, onUpdateFound }: {
 
   async function saveZai() {
     setZaiSaving(true);
+    setZaiError("");
     try {
       await saveZaiToken(zaiToken);
       setZaiToken("");
       setZaiConfigured(await zaiTokenConfigured());
+    } catch (e) {
+      setZaiError(e instanceof Error ? e.message : String(e));
     } finally {
       setZaiSaving(false);
     }
@@ -199,12 +203,17 @@ export function SettingsMenu({ settings, onPatch, onClose, onUpdateFound }: {
                 onChange={(e) => setZaiToken(e.target.value)}
                 aria-label="z.ai monitor token"
               />
-              <button type="button" className="settings__btn" onClick={saveZai} disabled={zaiSaving}>
-                {zaiSaving ? "saving…" : "save"}
+              <button
+                type="button"
+                className="settings__btn"
+                onClick={saveZai}
+                disabled={zaiSaving || (zaiToken.trim() === "" && !zaiConfigured)}
+              >
+                {zaiSaving ? "saving…" : zaiToken.trim() === "" && zaiConfigured ? "clear" : "save"}
               </button>
             </div>
-            <span className={`settings__zai-status${zaiConfigured ? " is-on" : ""}`}>
-              {zaiConfigured === null ? "…" : zaiConfigured ? "✓ configured" : "not configured"}
+            <span className={`settings__zai-status${zaiConfigured ? " is-on" : ""}`} aria-live="polite">
+              {zaiError ? `⚠ ${zaiError}` : zaiConfigured === null ? "…" : zaiConfigured ? "✓ configured" : "not configured"}
             </span>
           </div>
         </div>
