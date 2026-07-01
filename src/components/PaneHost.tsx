@@ -68,9 +68,10 @@ export function PaneHost({ layout, slots, dispatch }: {
                 dispatch({ type: "setPonytail", paneId: pane.id, level });
                 void setPanePonytail(pane.id, pane.cwd, pane.sessionId, level, !!pane.headroom);
               }}
-              onSwitchProvider={(provider: AgentProvider) => {
+              onSelectProvider={(provider: AgentProvider) => {
                 const current = pane.provider ?? "claude";
                 if (current === provider || handoffBusy === pane.id) return;
+                if (provider === "zai") return;
                 if (current === "claude" && provider === "codex") {
                   setHandoffBusy(pane.id);
                   void createCodexHandoff(pane.cwd, pane.sessionId)

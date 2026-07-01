@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePaneSavings } from "../lib/savingsStore";
 import { PONYTAIL_LEVELS, PONYTAIL_META, type PonytailLevel } from "../lib/ponytailClient";
 import type { AgentProvider } from "../layout/paneLayout";
+import { PROVIDERS, providerMeta } from "../lib/providers";
 import "./PaneHeader.css";
 
 const PopOutIcon = () => (
@@ -17,7 +18,7 @@ const CloseIcon = () => (
   </svg>
 );
 
-export function PaneHeader({ paneId, title, repo, working, headroom, ponytail, provider, ponytailInstalled, onRename, onPopOut, onClose, onToggleHeadroom, onSetPonytail, onSwitchProvider, dragHandleProps }: {
+export function PaneHeader({ paneId, title, repo, working, headroom, ponytail, provider, ponytailInstalled, onRename, onPopOut, onClose, onToggleHeadroom, onSetPonytail, onSelectProvider, dragHandleProps }: {
   paneId: string;
   title: string;
   repo: string;
@@ -31,7 +32,7 @@ export function PaneHeader({ paneId, title, repo, working, headroom, ponytail, p
   onClose: () => void;
   onToggleHeadroom: () => void;
   onSetPonytail: (level: PonytailLevel) => void;
-  onSwitchProvider: (provider: AgentProvider) => void;
+  onSelectProvider: (provider: AgentProvider) => void;
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement> & { draggable?: boolean };
 }) {
   const [editing, setEditing] = useState(false);
@@ -39,15 +40,19 @@ export function PaneHeader({ paneId, title, repo, working, headroom, ponytail, p
   const rate = sv.requests > 0 ? Math.round((sv.cacheHits / sv.requests) * 100) : 0;
   const [draft, setDraft] = useState(title);
   const [ptOpen, setPtOpen] = useState(false);
+  const [providerOpen, setProviderOpen] = useState(false);
   const ptWrapRef = useRef<HTMLSpanElement>(null);
+  const providerWrapRef = useRef<HTMLSpanElement>(null);
   useEffect(() => {
-    if (!ptOpen) return;
+    if (!ptOpen && !providerOpen) return;
     const onDown = (e: MouseEvent) => {
       if (ptWrapRef.current && !ptWrapRef.current.contains(e.target as Node)) setPtOpen(false);
+      if (providerWrapRef.current && !providerWrapRef.current.contains(e.target as Node)) setProviderOpen(false);
     };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
-  }, [ptOpen]);
+  }, [ptOpen, providerOpen]);
+  const activeProvider = providerMeta(provider);
   const meter = (fill: number) => (
     <span className="pane-head__pt-meter">{[0, 1, 2].map((i) => <i key={i} className={i < fill ? "on" : ""} />)}</span>
   );
@@ -86,18 +91,41 @@ export function PaneHeader({ paneId, title, repo, working, headroom, ponytail, p
         <span className="pane-head__bars"><i /><i /><i /></span>
         <span className="pane-head__lbl">{working ? "working" : "idle"}</span>
       </span>
-      <span className="pane-head__agent" role="group" aria-label="Agent provider">
-        {(["claude", "codex"] as const).map((p) => (
-          <button
-            key={p}
-            className={`pane-head__agent-btn${provider === p ? " is-on" : ""}`}
-            onClick={() => { if (provider !== p) onSwitchProvider(p); }}
-            aria-pressed={provider === p}
-            title={p === "codex" && provider === "claude" ? "Create a Codex handoff from this Claude session" : `Switch to ${p}`}
-          >
-            {p === "claude" ? "Claude" : "Codex"}
-          </button>
-        ))}
+      <span className="pane-head__provider-wrap" ref={providerWrapRef}>
+        <button
+          className={`pane-head__provider provider-${provider}`}
+          onClick={() => setProviderOpen((o) => !o)}
+          aria-haspopup="menu"
+          aria-expanded={providerOpen}
+          title={`Provider: ${activeProvider.label}`}
+        >
+          <span className="pane-head__provider-mark">{activeProvider.mark}</span>
+          <span className="pane-head__provider-car">▾</span>
+        </button>
+        {providerOpen && (
+          <span className="pane-head__provider-menu" role="menu">
+            {PROVIDERS.map((p) => (
+              <button
+                key={p.id}
+                className={`pane-head__provider-item provider-${p.id}${p.id === provider ? " is-sel" : ""}`}
+                role="menuitemradio"
+                aria-checked={p.id === provider}
+                disabled={!p.enabled}
+                onClick={() => {
+                  if (!p.enabled) return;
+                  setProviderOpen(false);
+                  if (p.id !== provider) onSelectProvider(p.id);
+                }}
+              >
+                <span className="pane-head__provider-item-mark">{p.mark}</span>
+                <span className="pane-head__provider-item-copy">
+                  <b>{p.label}</b>
+                  <small>{p.enabled ? p.description : "coming soon"}</small>
+                </span>
+              </button>
+            ))}
+          </span>
+        )}
       </span>
       {provider === "claude" && <span className="pane-head__hr-wrap">
         <button

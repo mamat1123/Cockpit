@@ -10,7 +10,7 @@ import { ponytailInstalled, type PonytailLevel } from "../lib/ponytailClient";
 import type { AgentProvider } from "../layout/paneLayout";
 import "./TerminalPane.css";
 
-export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, ponytail, provider, codexPromptPath, title, focused, isDragging, isDropTarget, onFocus, onRename, onAutoTitle, onPopOut, onClose, onToggleHeadroom, onSetPonytail, onSwitchProvider, dragHandleProps, dropZoneProps }: {
+export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, ponytail, provider, codexPromptPath, title, focused, isDragging, isDropTarget, onFocus, onRename, onAutoTitle, onPopOut, onClose, onToggleHeadroom, onSetPonytail, onSelectProvider, dragHandleProps, dropZoneProps }: {
   paneId: string;
   cwd: string;
   sessionId: string;
@@ -30,7 +30,7 @@ export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, ponytai
   onClose: () => void;
   onToggleHeadroom: () => void;
   onSetPonytail: (level: PonytailLevel) => void;
-  onSwitchProvider: (provider: AgentProvider) => void;
+  onSelectProvider: (provider: AgentProvider) => void;
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement> & { draggable?: boolean };
   dropZoneProps?: React.HTMLAttributes<HTMLDivElement>;
 }) {
@@ -174,7 +174,7 @@ export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, ponytai
         onClose={onClose}
         onToggleHeadroom={onToggleHeadroom}
         onSetPonytail={onSetPonytail}
-        onSwitchProvider={onSwitchProvider}
+        onSelectProvider={onSelectProvider}
         dragHandleProps={dragHandleProps}
       />
       <div ref={containerRef} className="cockpit-pane__host" />

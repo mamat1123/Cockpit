@@ -136,7 +136,9 @@ async function launchAgent(
   rows: number,
 ): Promise<boolean> {
   if (opts.provider === "codex") return launchCodex(paneId, cwd, opts.codexPromptPath, cols, rows);
-  return launchClaude(paneId, cwd, sessionId, resume, { headroom: opts.headroom, ponytail: opts.ponytail }, cols, rows);
+  if (opts.provider === "claude") return launchClaude(paneId, cwd, sessionId, resume, { headroom: opts.headroom, ponytail: opts.ponytail }, cols, rows);
+  await spawnPty(paneId, cwd, cols, rows, "printf 'z.ai provider is not wired yet\\n'", null);
+  return false;
 }
 
 /** Create (once) or return the persistent terminal for a pane. Spawns the PTY +

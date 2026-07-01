@@ -1,6 +1,6 @@
 import type { PonytailLevel } from "../lib/ponytailClient";
 
-export type AgentProvider = "claude" | "codex";
+export type AgentProvider = "claude" | "codex" | "zai";
 
 export interface Pane {
   id: string;
