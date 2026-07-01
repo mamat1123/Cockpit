@@ -1,7 +1,9 @@
 name: release
 
 # Auto-release on push to main — but only when the version in tauri.conf.json
-# has no matching tag yet. Bump the version => the next push ships a release.
+# has no matching GitHub Release yet. Bump the version => the next push ships a
+# release. Checking the release instead of the tag lets us recover if a tag was
+# pushed before the updater artifacts were built.
 on:
   push:
     branches: [main]
@@ -19,10 +21,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null 2>&1; then
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
             echo "go=false" >> "$GITHUB_OUTPUT"
             echo "::notice::v$VERSION already released — skipping."
           else
