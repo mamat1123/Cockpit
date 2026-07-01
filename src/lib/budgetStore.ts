@@ -6,7 +6,7 @@ import { computeBudget, weekWindowStartDate, type Budget } from "./budget";
 
 /**
  * Daily-budget pacing, composed entirely on the frontend from data we already have:
- *  - weekly utilization % + reset time  ← useUsage()  (authoritative account-API read)
+ *  - weekly utilization % + reset time  ← useMultiUsage().claude  (authoritative account-API read)
  *  - real $ spent (this week / today)   ← cost_report (fine-grained session-log cost)
  *
  * "Spent today" is derived from the cost log (not the coarse weekly %), so it moves per-turn

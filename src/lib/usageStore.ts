@@ -75,11 +75,14 @@ async function fetchUsage(force = false): Promise<void> {
   if (!force && now - lastFetchAt < MIN_GAP_MS) return;
   inFlight = true;
   lastFetchAt = now;
-  const [claude, codex, zai] = await Promise.allSettled([usageReport(), usageReportCodex(), usageReportZai()]);
-  applyResult("claude", claude);
-  applyResult("codex", codex);
-  applyResult("zai", zai);
-  inFlight = false;
+  try {
+    const [claude, codex, zai] = await Promise.allSettled([usageReport(), usageReportCodex(), usageReportZai()]);
+    applyResult("claude", claude);
+    applyResult("codex", codex);
+    applyResult("zai", zai);
+  } finally {
+    inFlight = false;
+  }
 }
 
 let started = false;
