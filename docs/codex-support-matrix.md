@@ -13,7 +13,7 @@ This document tracks whether each Cockpit feature can support Codex, what is alr
 | Codex launch flags | Yes | Implemented in v0.7.0 | Every Codex launch uses `--dangerously-bypass-approvals-and-sandbox`. |
 | Codex pane launch from handoff prompt | Yes | Implemented in v0.7.0 | Cockpit writes the handoff prompt to a temp file and launches `codex --cd <cwd> "$(cat <prompt-file>)"`. |
 | Codex back to Claude jump | Yes | Implemented in v0.7.0 | Codex panes remember the source Claude `sessionId`; switching back focuses or resumes that Claude session. |
-| Token used display | Yes | Implemented after v0.7.0 | Claude panes sum Claude usage from session logs. Codex panes read local Codex `token_count` events and show total tokens in the pane header and Mission Control. |
+| Token used display | Partial | Claude only | Claude panes sum Claude usage from session logs and show it in the pane header/Mission Control. Codex has no equivalent cumulative per-session token count yet — a different metric from the 5h/weekly rate-limit % below, which Codex now has. |
 | Direct Claude session id import UI | Yes | Not yet | Technically straightforward: add an input for Claude `sessionId`, resolve `~/.claude/projects/*/<sessionId>.jsonl`, then reuse the existing handoff command. |
 | Switch-in-place Claude to Codex | Yes | Not yet | Possible, but side-by-side is safer. Switch-in-place would need to kill/park the Claude PTY, launch Codex in the same pane, and preserve a way back. |
 | Native shared session between Claude and Codex | No | Not supported | Claude and Codex have different session stores, transcript schemas, and resume protocols. Cockpit can bridge context, but cannot make one native shared session. |
@@ -26,7 +26,7 @@ This document tracks whether each Cockpit feature can support Codex, what is alr
 | Mission Control listing | Yes | Mostly works | Codex panes appear as panes, but labels/cost/session metadata are still Claude-biased in places. |
 | Cost by session | Partial | Claude only for dollars; token totals visible | Codex can expose token usage, but cost semantics differ. API-key Codex can map tokens to OpenAI pricing; ChatGPT-plan Codex does not expose the same billable cost model as Claude logs. |
 | Cost analytics charts | Partial | Claude only | Chart infrastructure is reusable, but the data source must be split by provider and normalize different usage fields. |
-| Usage / rate-limit gauges | Partial | Claude only | Existing gauges are Claude-account-specific. Codex has different account/rate-limit surfaces, so it needs separate provider-specific usage collectors. |
+| Usage / rate-limit gauges | Yes | Implemented | Codex reads local `~/.codex/sessions` rollout files (`usage_report_codex`, no network); z.ai reads its official monitor API with a Keychain-saved token (`usage_report_zai`). Both show 5h/weekly % + reset time in the tab-bar strip and Mission Control, same as Claude. |
 | Headroom `HR` routing | No | Claude only | Headroom works by routing Anthropic traffic via Claude/Anthropic environment variables. Codex does not use `ANTHROPIC_BASE_URL`. |
 | Headroom savings attribution | No | Claude only | Savings are computed from Headroom proxy logs, which only see Claude/Anthropic traffic. |
 | Ponytail `PT` level | No native support | Claude only | Ponytail is a Claude Code plugin using Claude hooks/session-start behavior. Codex could approximate this with a prompt/profile, but not the actual plugin. |

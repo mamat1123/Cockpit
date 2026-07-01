@@ -59,9 +59,12 @@ a control surface.
 _Avoid_: widget, tray, popup, HUD (be specific: the Beacon)
 
 **Usage**:
-How much of your Claude account's rate limit you've consumed in a rolling window, as a
-percentage (0–100% utilization) plus a reset time. Read live from your account, NOT derived
-from session logs. Distinct from **Cost** — Cost is USD spent, Usage is % of limit left.
+How much of an account's rate limit you've consumed in a rolling window, as a percentage
+(0–100% utilization) plus a reset time. Read live from the account/local session data, NOT
+derived from cost logs. Tracked independently for all three providers Cockpit shows usage
+for — Claude, Codex, z.ai — each provider's own Usage, never combined into one number.
+Distinct from **Cost** — Cost is USD spent, Usage is % of limit left; Cost stays Claude-only
+(Codex/z.ai have no comparable per-turn cost log).
 _Avoid_: cost, quota, tokens-left, rate (be specific)
 
 **5-hour window** / **Weekly window**:
