@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { Action, Layout } from "../layout/paneLayout";
+import { findPaneBySession, type Action, type AgentProvider, type Layout } from "../layout/paneLayout";
 import { flattenPanes } from "./paneFlatten";
 import { TerminalPane } from "./TerminalPane";
 import { setPaneHeadroom, setPanePonytail } from "../lib/terminalRegistry";
 import type { PonytailLevel } from "../lib/ponytailClient";
+import { createCodexHandoff } from "../lib/handoffClient";
 
 /** Mounts every pane's TerminalPane ONCE and portals it into the DOM slot for its
  *  current position. Moving a pane between tabs only retargets the portal, so the
@@ -25,6 +26,7 @@ export function PaneHost({ layout, slots, dispatch }: {
 
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
+  const [handoffBusy, setHandoffBusy] = useState<string | null>(null);
   const endDrag = () => { setDragId(null); setOverId(null); };
 
   const park = parkRef.current;
@@ -41,6 +43,8 @@ export function PaneHost({ layout, slots, dispatch }: {
               resume={pane.resume}
               headroom={pane.headroom}
               ponytail={pane.ponytail ?? "off"}
+              provider={pane.provider ?? "claude"}
+              codexPromptPath={pane.codexPromptPath}
               title={pane.title}
               focused={pane.id === layout.focusedPaneId}
               isDragging={dragId === pane.id}
@@ -63,6 +67,39 @@ export function PaneHost({ layout, slots, dispatch }: {
               onSetPonytail={(level: PonytailLevel) => {
                 dispatch({ type: "setPonytail", paneId: pane.id, level });
                 void setPanePonytail(pane.id, pane.cwd, pane.sessionId, level, !!pane.headroom);
+              }}
+              onSwitchProvider={(provider: AgentProvider) => {
+                const current = pane.provider ?? "claude";
+                if (current === provider || handoffBusy === pane.id) return;
+                if (current === "claude" && provider === "codex") {
+                  setHandoffBusy(pane.id);
+                  void createCodexHandoff(pane.cwd, pane.sessionId)
+                    .then((handoff) => {
+                      dispatch({
+                        type: "openCodexHandoff",
+                        sourcePaneId: pane.id,
+                        cwd: pane.cwd,
+                        promptPath: handoff.promptPath,
+                        fromSessionId: pane.sessionId,
+                        title: handoff.title ?? pane.title,
+                      });
+                    })
+                    .catch((err) => {
+                      console.error("[cockpit] codex handoff failed", err);
+                      window.alert(`Codex handoff failed: ${String(err)}`);
+                    })
+                    .finally(() => setHandoffBusy((id) => (id === pane.id ? null : id)));
+                  return;
+                }
+                if (current === "codex" && provider === "claude" && pane.handoffFromSessionId) {
+                  const hit = findPaneBySession(layout, pane.handoffFromSessionId);
+                  if (hit) {
+                    dispatch({ type: "focusTab", tabId: hit.tabId });
+                    dispatch({ type: "focusPane", paneId: hit.paneId });
+                  } else {
+                    dispatch({ type: "openSession", cwd: pane.cwd, sessionId: pane.handoffFromSessionId });
+                  }
+                }
               }}
               dragHandleProps={{
                 draggable: true,

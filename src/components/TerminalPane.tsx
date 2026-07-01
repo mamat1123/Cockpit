@@ -7,15 +7,18 @@ import { writePty } from "../lib/ptyClient";
 import { saveDroppedFile, dragHasFiles, imageFiles } from "../lib/dropClient";
 import { PaneHeader } from "./PaneHeader";
 import { ponytailInstalled, type PonytailLevel } from "../lib/ponytailClient";
+import type { AgentProvider } from "../layout/paneLayout";
 import "./TerminalPane.css";
 
-export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, ponytail, title, focused, isDragging, isDropTarget, onFocus, onRename, onAutoTitle, onPopOut, onClose, onToggleHeadroom, onSetPonytail, dragHandleProps, dropZoneProps }: {
+export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, ponytail, provider, codexPromptPath, title, focused, isDragging, isDropTarget, onFocus, onRename, onAutoTitle, onPopOut, onClose, onToggleHeadroom, onSetPonytail, onSwitchProvider, dragHandleProps, dropZoneProps }: {
   paneId: string;
   cwd: string;
   sessionId: string;
   resume?: boolean;
   headroom?: boolean;
   ponytail?: PonytailLevel;
+  provider: AgentProvider;
+  codexPromptPath?: string;
   title: string;
   focused: boolean;
   isDragging?: boolean;
@@ -27,6 +30,7 @@ export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, ponytai
   onClose: () => void;
   onToggleHeadroom: () => void;
   onSetPonytail: (level: PonytailLevel) => void;
+  onSwitchProvider: (provider: AgentProvider) => void;
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement> & { draggable?: boolean };
   dropZoneProps?: React.HTMLAttributes<HTMLDivElement>;
 }) {
@@ -45,7 +49,12 @@ export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, ponytai
   // "pop-out = black screen" bug). Instead we just move the persistent host node into
   // this pane's container; on unmount we park it (never dispose) so the session survives.
   useLayoutEffect(() => {
-    const entry = acquireTerminal(paneId, cwd, sessionId, !!resume, !!headroom, ponytail ?? "off");
+    const entry = acquireTerminal(paneId, cwd, sessionId, !!resume, {
+      provider,
+      headroom: !!headroom,
+      ponytail: ponytail ?? "off",
+      codexPromptPath,
+    });
     const container = containerRef.current!;
     attachTerminal(paneId, container);
 
@@ -70,7 +79,7 @@ export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, ponytai
       clearInterval(tick);
       parkTerminalNode(paneId);
     };
-  }, [paneId, cwd, sessionId]);
+  }, [paneId, cwd, sessionId, provider, codexPromptPath]);
 
   // Drop an image (e.g. a Snapzy screenshot) onto the terminal → type its path
   // into claude, like a native terminal does. We can't keep Tauri's native
@@ -122,6 +131,7 @@ export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, ponytai
 
   // Auto-name: poll this pane's OWN session log for its topic.
   useEffect(() => {
+    if (provider !== "claude") return;
     let alive = true;
     let last = "";
     const poll = async () => {
@@ -142,7 +152,7 @@ export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, ponytai
       clearTimeout(first);
       clearInterval(id);
     };
-  }, [cwd, sessionId]);
+  }, [cwd, sessionId, provider]);
 
   return (
     <div
@@ -157,12 +167,14 @@ export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, ponytai
         working={state === "working"}
         headroom={!!headroom}
         ponytail={ponytail ?? "off"}
+        provider={provider}
         ponytailInstalled={ptInstalled}
         onRename={onRename}
         onPopOut={onPopOut}
         onClose={onClose}
         onToggleHeadroom={onToggleHeadroom}
         onSetPonytail={onSetPonytail}
+        onSwitchProvider={onSwitchProvider}
         dragHandleProps={dragHandleProps}
       />
       <div ref={containerRef} className="cockpit-pane__host" />

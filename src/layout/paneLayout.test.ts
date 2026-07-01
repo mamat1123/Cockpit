@@ -150,6 +150,25 @@ describe("paneLayout (rows model)", () => {
     expect(pane.sessionId).toBe("sess-123");
     expect(pane.resume).toBe(true);
   });
+  it("openCodexHandoff inserts a codex pane next to the source pane", () => {
+    let l = initLayout(CWD);
+    const source = l.focusedPaneId;
+    const fromSessionId = l.tabs[0].rows[0].panes[0].sessionId;
+    l = reduce(l, {
+      type: "openCodexHandoff",
+      sourcePaneId: source,
+      cwd: CWD,
+      promptPath: "/tmp/handoff.md",
+      fromSessionId,
+      title: "fix crypto bug",
+    });
+    const panes = l.tabs[0].rows[0].panes;
+    expect(panes.length).toBe(2);
+    expect(panes[1].provider).toBe("codex");
+    expect(panes[1].codexPromptPath).toBe("/tmp/handoff.md");
+    expect(panes[1].handoffFromSessionId).toBe(fromSessionId);
+    expect(l.focusedPaneId).toBe(panes[1].id);
+  });
 });
 
 describe("sessionId", () => {
@@ -192,6 +211,21 @@ describe("serialize/deserialize", () => {
     const p = back.tabs[0].rows[0].panes[0];
     expect(p.sessionId).toBe(orig);
     expect(p.resume).toBe(true);
+  });
+  it("round-trips codex provider metadata but not the transient prompt path", () => {
+    let l = initLayout(CWD);
+    const source = l.focusedPaneId;
+    const fromSessionId = l.tabs[0].rows[0].panes[0].sessionId;
+    l = reduce(l, { type: "openCodexHandoff", sourcePaneId: source, cwd: CWD, promptPath: "/tmp/handoff.md", fromSessionId });
+    const codex = l.tabs[0].rows[0].panes[1];
+    const saved = serializeLayout(l, true);
+    expect(saved.tabs[0].rows[0].panes[1].provider).toBe("codex");
+    const back = deserializeLayout(saved);
+    const p = back.tabs[0].rows[0].panes[1];
+    expect(p.provider).toBe("codex");
+    expect(p.handoffFromSessionId).toBe(fromSessionId);
+    expect(p.codexPromptPath).toBeUndefined();
+    expect(p.sessionId).toBe(codex.sessionId);
   });
   it("loadLayout action replaces the whole layout", () => {
     const saved = serializeLayout(initLayout("/x"), false);

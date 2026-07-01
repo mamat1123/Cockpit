@@ -6,6 +6,7 @@ mod dropfile;
 mod headroom;
 mod headroomlog;
 mod ponytail;
+mod handoff;
 
 use tauri::{Emitter, Manager};
 
@@ -122,6 +123,7 @@ pub fn run() {
             headroomlog::headroom_log_start,
             headroomlog::headroom_log_stop,
             ponytail::ponytail_installed,
+            handoff::create_codex_handoff,
         ])
         .setup(|app| {
             use tauri::{WebviewWindowBuilder, WebviewUrl, WindowEvent};

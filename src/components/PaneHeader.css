@@ -21,6 +21,13 @@
 @keyframes pane-eq { 0%,100% { height: 3px; } 50% { height: 9px; } }
 .pane-head__chip.is-working .pane-head__dot { display: none; }
 .pane-head__chip.is-working .pane-head__bars { display: flex; }
+.pane-head__agent { display: inline-flex; align-items: center; gap: 1px; padding: 2px; border: 1px solid var(--ck-border);
+  border-radius: 999px; background: color-mix(in srgb, var(--ck-bg) 72%, transparent); flex: none; }
+.pane-head__agent-btn { border: 0; background: transparent; color: var(--ck-muted); height: 18px; padding: 0 7px;
+  border-radius: 999px; cursor: pointer; font: 700 9.5px var(--ck-mono, ui-monospace, monospace); letter-spacing: .04em; }
+.pane-head__agent-btn:hover { color: var(--ck-text); }
+.pane-head__agent-btn.is-on { color: var(--ck-bright); background: color-mix(in srgb, var(--ck-accent) 18%, var(--ck-surface-2));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ck-accent) 35%, transparent); }
 .pane-head__btn { display: grid; place-items: center; color: var(--ck-muted); background: transparent; border: 0;
   width: 26px; height: 26px; border-radius: 7px; cursor: pointer; flex: none; }
 .pane-head__btn svg { display: block; }

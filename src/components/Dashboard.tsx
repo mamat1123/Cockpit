@@ -63,7 +63,7 @@ export function Dashboard({ layout, onJump, onJumpSession, onClose }: {
         <div className="cockpit-dash__ribbon">
           <div className="cockpit-dash__brand">
             <h2>Mission Control</h2>
-            <span>every Claude session, one glance · Esc to close</span>
+            <span>every agent session, one glance · Esc to close</span>
           </div>
           <div className="cockpit-dash__viewtabs">
             <button className={view === "sessions" ? "on" : ""} onClick={() => setView("sessions")}>Sessions</button>

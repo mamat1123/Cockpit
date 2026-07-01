@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePaneSavings } from "../lib/savingsStore";
 import { PONYTAIL_LEVELS, PONYTAIL_META, type PonytailLevel } from "../lib/ponytailClient";
+import type { AgentProvider } from "../layout/paneLayout";
 import "./PaneHeader.css";
 
 const PopOutIcon = () => (
@@ -16,19 +17,21 @@ const CloseIcon = () => (
   </svg>
 );
 
-export function PaneHeader({ paneId, title, repo, working, headroom, ponytail, ponytailInstalled, onRename, onPopOut, onClose, onToggleHeadroom, onSetPonytail, dragHandleProps }: {
+export function PaneHeader({ paneId, title, repo, working, headroom, ponytail, provider, ponytailInstalled, onRename, onPopOut, onClose, onToggleHeadroom, onSetPonytail, onSwitchProvider, dragHandleProps }: {
   paneId: string;
   title: string;
   repo: string;
   working: boolean;
   headroom: boolean;
   ponytail: PonytailLevel;
+  provider: AgentProvider;
   ponytailInstalled: boolean;
   onRename: (title: string) => void;
   onPopOut: () => void;
   onClose: () => void;
   onToggleHeadroom: () => void;
   onSetPonytail: (level: PonytailLevel) => void;
+  onSwitchProvider: (provider: AgentProvider) => void;
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement> & { draggable?: boolean };
 }) {
   const [editing, setEditing] = useState(false);
@@ -83,7 +86,20 @@ export function PaneHeader({ paneId, title, repo, working, headroom, ponytail, p
         <span className="pane-head__bars"><i /><i /><i /></span>
         <span className="pane-head__lbl">{working ? "working" : "idle"}</span>
       </span>
-      <span className="pane-head__hr-wrap">
+      <span className="pane-head__agent" role="group" aria-label="Agent provider">
+        {(["claude", "codex"] as const).map((p) => (
+          <button
+            key={p}
+            className={`pane-head__agent-btn${provider === p ? " is-on" : ""}`}
+            onClick={() => { if (provider !== p) onSwitchProvider(p); }}
+            aria-pressed={provider === p}
+            title={p === "codex" && provider === "claude" ? "Create a Codex handoff from this Claude session" : `Switch to ${p}`}
+          >
+            {p === "claude" ? "Claude" : "Codex"}
+          </button>
+        ))}
+      </span>
+      {provider === "claude" && <span className="pane-head__hr-wrap">
         <button
           className={`pane-head__hr${headroom ? " is-on" : ""}`}
           onClick={onToggleHeadroom}
@@ -105,8 +121,8 @@ export function PaneHeader({ paneId, title, repo, working, headroom, ponytail, p
           )}
           <span className="pane-head__hr-pop-foot">since app start</span>
         </span>
-      </span>
-      <span className="pane-head__pt-wrap" ref={ptWrapRef}>
+      </span>}
+      {provider === "claude" && <span className="pane-head__pt-wrap" ref={ptWrapRef}>
         <button
           className={`pane-head__pt lvl-${ponytail}${ponytailInstalled ? "" : " is-disabled"}`}
           onClick={() => setPtOpen((o) => !o)}
@@ -142,7 +158,7 @@ export function PaneHeader({ paneId, title, repo, working, headroom, ponytail, p
             <span className="pane-head__pt-nudge-foot">รันใน Claude Code แล้ว toggle ใหม่</span>
           </span>
         )}
-      </span>
+      </span>}
       <button className="pane-head__btn" onClick={onPopOut} aria-label="เปิดในแท็บใหม่" title="เปิดในแท็บใหม่"><PopOutIcon /></button>
       <button className="pane-head__btn pane-head__btn--x" onClick={onClose} aria-label="ปิด" title="ปิด"><CloseIcon /></button>
     </div>

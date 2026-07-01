@@ -10,6 +10,7 @@ import { headroomEnsure, HEADROOM_BASE_URL } from "./headroomClient";
 import { resolveHeadroomRouting } from "./headroomRouting";
 import { paneLaunchEnv } from "./paneLaunchEnv";
 import type { PonytailLevel } from "./ponytailClient";
+import type { AgentProvider } from "../layout/paneLayout";
 
 let activeTheme: Theme = themeById(DEFAULT_THEME_ID);
 let activeFontFamily = "Menlo, monospace";
@@ -95,7 +96,11 @@ const registry = new Map<string, TermEntry>();
  *  (initial launch) and setPaneHeadroom (toggle). */
 const routed = new Set<string>();
 
-/** Build + run the launch command for a pane. Resolves HR routing (when on) and merges
+function shellQuote(s: string): string {
+  return `'${s.replace(/'/g, `'\\''`)}'`;
+}
+
+/** Build + run the launch command for a Claude pane. Resolves HR routing (when on) and merges
  *  the HR + ponytail env via paneLaunchEnv (PONYTAIL_DEFAULT_MODE is always set, incl.
  *  "off", so Cockpit's per-pane level is authoritative). Resumes if the session log
  *  exists. Returns whether Headroom routing actually engaged (false = direct / proxy down,
@@ -112,9 +117,31 @@ async function launchClaude(paneId: string, cwd: string, sessionId: string, resu
   return engaged;
 }
 
+async function launchCodex(paneId: string, cwd: string, promptPath: string | undefined, cols: number, rows: number): Promise<boolean> {
+  const flags = "--dangerously-bypass-approvals-and-sandbox";
+  const launch = promptPath
+    ? `codex ${flags} --cd ${shellQuote(cwd)} "$(cat ${shellQuote(promptPath)})"`
+    : `codex ${flags} --cd ${shellQuote(cwd)}`;
+  await spawnPty(paneId, cwd, cols, rows, launch, null);
+  return false;
+}
+
+async function launchAgent(
+  paneId: string,
+  cwd: string,
+  sessionId: string,
+  resume: boolean,
+  opts: { provider: AgentProvider; headroom: boolean; ponytail: PonytailLevel; codexPromptPath?: string },
+  cols: number,
+  rows: number,
+): Promise<boolean> {
+  if (opts.provider === "codex") return launchCodex(paneId, cwd, opts.codexPromptPath, cols, rows);
+  return launchClaude(paneId, cwd, sessionId, resume, { headroom: opts.headroom, ponytail: opts.ponytail }, cols, rows);
+}
+
 /** Create (once) or return the persistent terminal for a pane. Spawns the PTY +
- *  `claude --session-id` and starts the logtail exactly once. */
-export function acquireTerminal(paneId: string, cwd: string, sessionId: string, resume: boolean, headroom: boolean, ponytail: PonytailLevel): TermEntry {
+ *  selected agent and starts Claude logtail when applicable. */
+export function acquireTerminal(paneId: string, cwd: string, sessionId: string, resume: boolean, opts: { provider: AgentProvider; headroom: boolean; ponytail: PonytailLevel; codexPromptPath?: string }): TermEntry {
   const existing = registry.get(paneId);
   if (existing) return existing;
 
@@ -160,16 +187,16 @@ export function acquireTerminal(paneId: string, cwd: string, sessionId: string, 
       lastLineAt.current = now;
     }
   });
-  onPtyExit(paneId, () => term.write("\r\n[claude exited]\r\n"));
+  onPtyExit(paneId, () => term.write(`\r\n[${opts.provider} exited]\r\n`));
   term.onData((data) => {
     lastInputAt.current = Date.now();
     if (data.includes("\r")) emitSend();
     void writePty(paneId, data);
   });
 
-  void launchClaude(paneId, cwd, sessionId, resume, { headroom, ponytail }, term.cols, term.rows)
+  void launchAgent(paneId, cwd, sessionId, resume, opts, term.cols, term.rows)
     .then((engaged) => { if (engaged) routed.add(paneId); else routed.delete(paneId); });
-  void startLogtail(paneId, cwd, sessionId);
+  if (opts.provider === "claude") void startLogtail(paneId, cwd, sessionId);
 
   const entry: TermEntry = { term, hostEl, fit, lastLineAt, lastInputAt, lastResizeAt };
   registry.set(paneId, entry);
