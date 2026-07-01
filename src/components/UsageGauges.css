@@ -65,7 +65,7 @@
 
 @keyframes cu-pop-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 .cu-provider-row__pop {
-  position: absolute; top: calc(100% + 6px); left: 0; z-index: 60; width: 210px;
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 60; width: 270px;
   padding: 15px 16px; background: var(--ck-surface);
   border: 1px solid var(--ck-border); border-radius: 12px;
   box-shadow: 0 22px 54px -22px #000, inset 0 1px 0 rgba(255,255,255,.03);
