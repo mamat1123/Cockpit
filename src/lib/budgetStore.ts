@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useUsage } from "./usageStore";
+import { useMultiUsage } from "./usageStore";
 import { costReport, type Bucket } from "./costClient";
 import { totalCost, filterByPeriod } from "./costAggregate";
 import { computeBudget, weekWindowStartDate, type Budget } from "./budget";
@@ -13,7 +13,7 @@ import { computeBudget, weekWindowStartDate, type Budget } from "./budget";
  * and needs no persisted baseline. Pure pacing math lives in ./budget; this hook only wires data.
  */
 export function useBudget(): Budget | null {
-  const usage = useUsage();
+  const usage = useMultiUsage().claude;
   const [buckets, setBuckets] = useState<Bucket[] | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
