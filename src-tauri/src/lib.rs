@@ -2,6 +2,7 @@ mod pty;
 mod logtail;
 mod cost;
 mod usage;
+mod usage_time;
 mod dropfile;
 mod headroom;
 mod headroomlog;

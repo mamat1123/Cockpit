@@ -485,6 +485,7 @@ name = "cockpit"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
+ "chrono",
  "objc2",
  "portable-pty",
  "serde",
