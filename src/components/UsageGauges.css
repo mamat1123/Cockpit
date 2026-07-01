@@ -101,6 +101,7 @@
 .cu-gauge__used { font-size: 9.5px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ck-dim); }
 .cu-gauge__reset { font-size: 11px; color: var(--ck-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .cu-gauge__reset .r { margin-right: 5px; color: var(--col); display: inline-block; }
+.cu-gauge__reset-clock { color: var(--ck-dim); }
 .cu-gauge.is-hot .cu-gauge__reset .r { animation: cu-spin 3.4s linear infinite; }
 .cu-gauge.is-hot .cu-gauge__pct { animation: cu-pulse 1.5s ease-in-out infinite; }
 @keyframes cu-spin { to { transform: rotate(360deg); } }

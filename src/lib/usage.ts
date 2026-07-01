@@ -34,3 +34,12 @@ export function formatReset(resetsAt: string | null | undefined, now: number = D
   if (h > 0) return `${h}h ${String(m).padStart(2, "0")}m`;
   return `${m}m`;
 }
+
+/** Local wall-clock "HH:MM" a reset ISO timestamp lands at. "—" when missing/invalid. */
+export function formatResetClock(resetsAt: string | null | undefined): string {
+  if (!resetsAt) return "—";
+  const t = Date.parse(resetsAt);
+  if (Number.isNaN(t)) return "—";
+  const d = new Date(t);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}

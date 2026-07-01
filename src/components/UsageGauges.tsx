@@ -3,7 +3,7 @@ import { useUsage, type UsageUiStatus } from "../lib/usageStore";
 import { useBudget } from "../lib/budgetStore";
 import type { Budget } from "../lib/budget";
 import type { UsageWindow } from "../lib/usageClient";
-import { clampPct, levelFor, formatReset } from "../lib/usage";
+import { clampPct, levelFor, formatReset, formatResetClock } from "../lib/usage";
 import "./UsageGauges.css";
 
 type Mode = "data" | "loading" | "na";
@@ -46,6 +46,7 @@ function Gauge({ label, win, now, stale, mode }: {
   const reset = mode === "data"
     ? (win?.resetsAt ? `resets in ${formatReset(win.resetsAt, now)}` : "—")
     : mode === "na" ? "sign in to Claude" : "loading…";
+  const resetClock = mode === "data" && win?.resetsAt ? formatResetClock(win.resetsAt) : null;
 
   return (
     <div className={`cu-gauge ${cls}${stale ? " is-stale" : ""}${hot ? " is-hot" : ""}`}>
@@ -59,7 +60,10 @@ function Gauge({ label, win, now, stale, mode }: {
       </div>
       <div className="cu-gauge__foot">
         <span className="cu-gauge__used">used</span>
-        <span className="cu-gauge__reset"><span className="r">⟳</span>{reset}</span>
+        <span className="cu-gauge__reset">
+          <span className="r">⟳</span>{reset}
+          {resetClock && <span className="cu-gauge__reset-clock"> ({resetClock})</span>}
+        </span>
       </div>
     </div>
   );

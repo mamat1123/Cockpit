@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { levelFor, clampPct, formatReset } from "./usage";
+import { levelFor, clampPct, formatReset, formatResetClock } from "./usage";
 
 describe("levelFor", () => {
   it("bands at 55 and 80", () => {
@@ -39,5 +39,20 @@ describe("formatReset", () => {
   it("returns dash for missing/invalid", () => {
     expect(formatReset(null, now)).toBe("—");
     expect(formatReset("nope", now)).toBe("—");
+  });
+});
+
+describe("formatResetClock", () => {
+  it("formats local HH:MM, padded", () => {
+    const at = new Date(2026, 5, 22, 16, 5, 0).toISOString(); // local 22 Jun 16:05
+    expect(formatResetClock(at)).toBe("16:05");
+  });
+  it("pads midnight hour and minute", () => {
+    const at = new Date(2026, 5, 22, 0, 0, 0).toISOString();
+    expect(formatResetClock(at)).toBe("00:00");
+  });
+  it("returns dash for missing/invalid", () => {
+    expect(formatResetClock(null)).toBe("—");
+    expect(formatResetClock("nope")).toBe("—");
   });
 });
