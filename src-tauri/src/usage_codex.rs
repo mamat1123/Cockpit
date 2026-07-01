@@ -25,7 +25,7 @@ struct CodexWindow {
 
 /// Pull `payload.rate_limits.{primary,secondary}` out of one rollout JSONL line, if
 /// it's an `event_msg` with `payload.type == "token_count"`.
-fn parse_token_count_line(line: &str) -> Option<(CodexWindow, CodexWindow)> {
+fn parse_token_count_line(line: &str) -> Option<(CodexWindow, Option<CodexWindow>)> {
     let v: Value = serde_json::from_str(line).ok()?;
     if v.get("type").and_then(|t| t.as_str()) != Some("event_msg") {
         return None;
@@ -42,14 +42,16 @@ fn parse_token_count_line(line: &str) -> Option<(CodexWindow, CodexWindow)> {
             resets_at: w.get("resets_at").and_then(|x| x.as_i64())?,
         })
     };
-    Some((window("primary")?, window("secondary")?))
+    let primary = window("primary")?;
+    let secondary = window("secondary");
+    Some((primary, secondary))
 }
 
 /// Given rollout file contents already ordered newest-first, return the first
 /// `token_count` snapshot found (scanning each file's own lines newest-first too,
 /// since a file can carry more than one snapshot over its life). Pure — no
 /// filesystem, so it's testable without real files or mtime ordering.
-fn pick_newest_snapshot(files_newest_first: &[String]) -> Option<(CodexWindow, CodexWindow)> {
+fn pick_newest_snapshot(files_newest_first: &[String]) -> Option<(CodexWindow, Option<CodexWindow>)> {
     files_newest_first
         .iter()
         .find_map(|content| content.lines().rev().find_map(parse_token_count_line))
@@ -63,8 +65,12 @@ fn collect_rollout_files(dir: &Path, out: &mut Vec<(SystemTime, PathBuf)>) {
         Err(_) => return,
     };
     for entry in entries.flatten() {
+        let file_type = match entry.file_type() {
+            Ok(ft) => ft,
+            Err(_) => continue,
+        };
         let path = entry.path();
-        if path.is_dir() {
+        if file_type.is_dir() {
             collect_rollout_files(&path, out);
         } else if path
             .file_name()
@@ -83,7 +89,7 @@ fn collect_rollout_files(dir: &Path, out: &mut Vec<(SystemTime, PathBuf)>) {
 /// Read up to `MAX_SCAN_FILES` of the most recently modified rollout files (newest
 /// first) and return the first snapshot found. I/O glue around the pure
 /// `pick_newest_snapshot` — not unit tested (mirrors `cost.rs`'s directory scan).
-fn newest_snapshot(root: &Path) -> Option<(CodexWindow, CodexWindow)> {
+fn newest_snapshot(root: &Path) -> Option<(CodexWindow, Option<CodexWindow>)> {
     let mut files: Vec<(SystemTime, PathBuf)> = Vec::new();
     collect_rollout_files(root, &mut files);
     files.sort_by(|a, b| b.0.cmp(&a.0));
@@ -95,16 +101,16 @@ fn newest_snapshot(root: &Path) -> Option<(CodexWindow, CodexWindow)> {
     pick_newest_snapshot(&contents)
 }
 
-fn windows_to_report(primary: CodexWindow, secondary: CodexWindow) -> UsageReport {
+fn windows_to_report(primary: CodexWindow, secondary: Option<CodexWindow>) -> UsageReport {
     UsageReport {
         status: "ok".into(),
         five_hour: Some(UsageWindow {
             utilization: primary.used_percent,
             resets_at: unix_ms_to_iso(primary.resets_at * 1000),
         }),
-        seven_day: Some(UsageWindow {
-            utilization: secondary.used_percent,
-            resets_at: unix_ms_to_iso(secondary.resets_at * 1000),
+        seven_day: secondary.map(|s| UsageWindow {
+            utilization: s.used_percent,
+            resets_at: unix_ms_to_iso(s.resets_at * 1000),
         }),
     }
 }
@@ -148,6 +154,7 @@ mod tests {
         let (primary, secondary) = parse_token_count_line(&sample_token_count_line()).unwrap();
         assert_eq!(primary.used_percent, 24.0);
         assert_eq!(primary.resets_at, 1782907200);
+        let secondary = secondary.unwrap();
         assert_eq!(secondary.used_percent, 41.0);
         assert_eq!(secondary.resets_at, 1783080000);
     }
@@ -165,7 +172,7 @@ mod tests {
         let files = vec![no_snapshot, sample_token_count_line()];
         let (primary, secondary) = pick_newest_snapshot(&files).unwrap();
         assert_eq!(primary.used_percent, 24.0);
-        assert_eq!(secondary.used_percent, 41.0);
+        assert_eq!(secondary.unwrap().used_percent, 41.0);
     }
 
     #[test]
@@ -178,11 +185,26 @@ mod tests {
     fn windows_to_report_converts_seconds_to_iso() {
         let r = windows_to_report(
             CodexWindow { used_percent: 24.0, resets_at: 1782907200 },
-            CodexWindow { used_percent: 41.0, resets_at: 1783080000 },
+            Some(CodexWindow { used_percent: 41.0, resets_at: 1783080000 }),
         );
         assert_eq!(r.status, "ok");
         assert_eq!(r.five_hour.as_ref().unwrap().utilization, 24.0);
         assert_eq!(r.five_hour.as_ref().unwrap().resets_at.as_deref(), Some("2026-07-01T12:00:00+00:00"));
         assert_eq!(r.seven_day.as_ref().unwrap().utilization, 41.0);
+    }
+
+    #[test]
+    fn secondary_window_is_optional() {
+        let line = r#"{"type":"event_msg","payload":{"type":"token_count","rate_limits":{"primary":{"used_percent":24.0,"resets_at":1782907200}}}}"#;
+        let (primary, secondary) = parse_token_count_line(line).unwrap();
+        assert_eq!(primary.used_percent, 24.0);
+        assert!(secondary.is_none());
+    }
+
+    #[test]
+    fn windows_to_report_handles_missing_secondary() {
+        let r = windows_to_report(CodexWindow { used_percent: 24.0, resets_at: 1782907200 }, None);
+        assert_eq!(r.status, "ok");
+        assert!(r.seven_day.is_none());
     }
 }
