@@ -3,6 +3,7 @@ mod logtail;
 mod cost;
 mod usage;
 mod usage_time;
+mod usage_codex;
 mod dropfile;
 mod headroom;
 mod headroomlog;
@@ -118,6 +119,7 @@ pub fn run() {
             cost::cost_report,
             cost::list_projects,
             usage::usage_report,
+            usage_codex::usage_report_codex,
             dropfile::save_dropped_file,
             headroom::headroom_ensure,
             headroom::headroom_status,
