@@ -4,6 +4,7 @@ mod cost;
 mod usage;
 mod usage_time;
 mod usage_codex;
+mod usage_zai;
 mod dropfile;
 mod headroom;
 mod headroomlog;
@@ -120,6 +121,9 @@ pub fn run() {
             cost::list_projects,
             usage::usage_report,
             usage_codex::usage_report_codex,
+            usage_zai::usage_report_zai,
+            usage_zai::save_zai_token,
+            usage_zai::zai_token_configured,
             dropfile::save_dropped_file,
             headroom::headroom_ensure,
             headroom::headroom_status,
