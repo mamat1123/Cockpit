@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { useUsage, type UsageUiStatus } from "../lib/usageStore";
+import { useMultiUsage, type UsageUiStatus, type UsageState, type ProviderId } from "../lib/usageStore";
 import { useBudget } from "../lib/budgetStore";
 import type { Budget } from "../lib/budget";
 import type { UsageWindow } from "../lib/usageClient";
 import { clampPct, levelFor, formatReset, formatResetClock } from "../lib/usage";
+import { providerMeta } from "../lib/providers";
 import "./UsageGauges.css";
 
 type Mode = "data" | "loading" | "na";
@@ -24,13 +25,14 @@ function useNow(ms: number): number {
   return now;
 }
 
-/** Full instrument gauge for one window — used in the popover and the Mission Control panel. */
-function Gauge({ label, win, now, stale, mode }: {
+/** Full instrument gauge for one window — used in per-provider popovers and Mission Control. */
+function Gauge({ label, win, now, stale, mode, naLabel = "sign in to Claude" }: {
   label: string;
   win: UsageWindow | null;
   now: number;
   stale: boolean;
   mode: Mode;
+  naLabel?: string;
 }) {
   const pct = clampPct(win?.utilization ?? 0);
   const level = levelFor(pct);
@@ -45,7 +47,7 @@ function Gauge({ label, win, now, stale, mode }: {
   const hot = mode === "data" && pct > 80;
   const reset = mode === "data"
     ? (win?.resetsAt ? `resets in ${formatReset(win.resetsAt, now)}` : "—")
-    : mode === "na" ? "sign in to Claude" : "loading…";
+    : mode === "na" ? naLabel : "loading…";
   const resetClock = mode === "data" && win?.resetsAt ? formatResetClock(win.resetsAt) : null;
 
   return (
@@ -69,8 +71,8 @@ function Gauge({ label, win, now, stale, mode }: {
   );
 }
 
-/** One compact bar in the tab-bar strip. */
-function Mini({ k, win, stale }: { k: string; win: UsageWindow | null; stale: boolean }) {
+/** One compact bar with a trailing reset-time chip — the tab-bar strip's per-window row. */
+function MiniWithReset({ win, now, stale }: { win: UsageWindow | null; now: number; stale: boolean }) {
   const pct = clampPct(win?.utilization ?? 0);
   const level = levelFor(pct);
   const [w, setW] = useState(0);
@@ -80,14 +82,14 @@ function Mini({ k, win, stale }: { k: string; win: UsageWindow | null; stale: bo
   }, [pct]);
   return (
     <span className={`cu-mini is-${level}${stale ? " is-stale" : ""}`}>
-      <span className="cu-mini__k">{k}</span>
       <span className="cu-mini__track"><span className="cu-mini__fill" style={{ width: `${w}%` }} /></span>
       <span className="cu-mini__v">{pct}%</span>
+      {win?.resetsAt && <span className="cu-mini__t">{formatReset(win.resetsAt, now)}</span>}
     </span>
   );
 }
 
-/** Daily-budget mini for the strip: how much of TODAY's pacing budget is spent (can exceed 100% = borrowing from later days). */
+/** Daily-budget mini for the strip: how much of TODAY's pacing budget is spent (can exceed 100% = borrowing from later days). Claude-only. */
 function DayMini({ b, stale }: { b: Budget; stale: boolean }) {
   const fill = Math.max(0, Math.min(100, b.fillPct));
   const [w, setW] = useState(0);
@@ -107,7 +109,7 @@ function DayMini({ b, stale }: { b: Budget; stale: boolean }) {
   );
 }
 
-/** Full daily-budget gauge for the popover + Mission Control panel — mirrors the 5h/weekly gauge. */
+/** Full daily-budget gauge — mirrors the 5h/weekly gauge. Claude-only. */
 function DayGauge({ b, stale }: { b: Budget; stale: boolean }) {
   const fill = Math.max(0, Math.min(100, b.fillPct));
   const [w, setW] = useState(0);
@@ -138,71 +140,125 @@ function DayGauge({ b, stale }: { b: Budget; stale: boolean }) {
   );
 }
 
+/** No-data copy per provider, shown by `Gauge`/`MiniProviderRow` when there's nothing to show. */
+const NA_LABEL: Record<ProviderId, string> = {
+  claude: "sign in to Claude",
+  codex: "no Codex sessions yet",
+  zai: "set token in Settings",
+};
+
 /**
- * Compact always-visible usage strip for the tab bar: 5h / weekly mini gauges + a daily-budget mini.
- * Hover (or focus) opens a popover with full gauges + live reset countdowns.
+ * Badge + label + full 5h/weekly gauges for one provider, with an optional Claude-only
+ * daily-budget row. The one shared visual unit used by both the tab-bar popover
+ * (`MiniProviderRow`, below) and Mission Control (`UsagePanel`).
  */
-export function UsageStrip() {
-  const { report, status } = useUsage();
-  const budget = useBudget();
-  const [open, setOpen] = useState(false);
-  const mode = modeOf(status, !!report);
-  const five = report?.fiveHour ?? null;
-  const week = report?.sevenDay ?? null;
-  const stale = status === "stale";
-
-  if (mode === "loading") {
-    return (
-      <div className="cockpit-usage is-loading" aria-label="Loading account usage">
-        <span className="cu-mini-sk" /><span className="cu-mini-sk" />
-      </div>
-    );
-  }
-  if (mode === "na") {
-    return (
-      <div className="cockpit-usage is-na" title="Sign in to Claude Code to see usage" aria-label="Usage unavailable — sign in to Claude Code">
-        <span className="cu-na">—</span><span className="cu-na__k">usage</span>
-      </div>
-    );
-  }
+function ProviderGaugeGroup({ id, state, now, budget }: {
+  id: ProviderId;
+  state: UsageState;
+  now: number;
+  budget?: Budget | null;
+}) {
+  const meta = providerMeta(id);
+  const mode = modeOf(state.status, !!state.report);
+  const five = state.report?.fiveHour ?? null;
+  const week = state.report?.sevenDay ?? null;
+  const stale = state.status === "stale";
   return (
-    <div
-      className={`cockpit-usage${stale ? " is-stale" : ""}`}
-      tabIndex={0}
-      aria-label="Account usage — 5-hour and weekly"
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-      onFocus={() => setOpen(true)}
-      onBlur={() => setOpen(false)}
-    >
-      <Mini k="5h" win={five} stale={stale} />
-      <Mini k="wk" win={week} stale={stale} />
-      {budget && <DayMini b={budget} stale={stale} />}
-      {open && <Popover five={five} week={week} budget={budget} stale={stale} />}
-    </div>
-  );
-}
-
-function Popover({ five, week, budget, stale }: { five: UsageWindow | null; week: UsageWindow | null; budget: Budget | null; stale: boolean }) {
-  const now = useNow(1000);
-  return (
-    <div className="cu-pop" role="tooltip">
-      <Gauge label="5-hour window" win={five} now={now} stale={stale} mode="data" />
-      <Gauge label="Weekly · 7-day" win={week} now={now} stale={stale} mode="data" />
+    <div className="cu-provider-group">
+      <div className="cu-provider-group__head">
+        <span className={`cu-badge provider-${id}`}>{meta.mark}</span>
+        <span className="cu-provider-group__name">{meta.label}</span>
+      </div>
+      <Gauge label="5-hour window" win={five} now={now} stale={stale} mode={mode} naLabel={NA_LABEL[id]} />
+      <Gauge label="Weekly · 7-day" win={week} now={now} stale={stale} mode={mode} naLabel={NA_LABEL[id]} />
       {budget && <DayGauge b={budget} stale={stale} />}
     </div>
   );
 }
 
-/** Full usage panel for Mission Control: both windows at full size + a local clock. */
+/**
+ * One provider's tab-bar strip row: badge + 2 mini bars (5h/weekly, each with a
+ * trailing reset-time chip). Its own independent hover/focus target — opens ONLY its
+ * own popover, anchored under itself. A provider with no data shows its own na/loading
+ * state and is never focusable, so it can never block or blank the other providers.
+ */
+function MiniProviderRow({ id, state, budget }: {
+  id: ProviderId;
+  state: UsageState;
+  budget?: Budget | null;
+}) {
+  const meta = providerMeta(id);
+  const now = useNow(1000);
+  const [open, setOpen] = useState(false);
+  const mode = modeOf(state.status, !!state.report);
+  const stale = state.status === "stale";
+
+  if (mode === "loading") {
+    return (
+      <span className="cu-provider-row is-loading" aria-label={`Loading ${meta.label} usage`}>
+        <span className={`cu-badge provider-${id}`}>{meta.mark}</span>
+        <span className="cu-provider-row__bars"><span className="cu-mini-sk" /><span className="cu-mini-sk" /></span>
+      </span>
+    );
+  }
+  if (mode === "na") {
+    return (
+      <span className="cu-provider-row is-na" title={NA_LABEL[id]} aria-label={`${meta.label} usage unavailable — ${NA_LABEL[id]}`}>
+        <span className={`cu-badge provider-${id}`}>{meta.mark}</span>
+        <span className="cu-na">—</span>
+      </span>
+    );
+  }
+
+  const five = state.report?.fiveHour ?? null;
+  const week = state.report?.sevenDay ?? null;
+  return (
+    <span
+      className={`cu-provider-row${stale ? " is-stale" : ""}`}
+      tabIndex={0}
+      aria-label={`${meta.label} usage`}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onFocus={() => setOpen(true)}
+      onBlur={() => setOpen(false)}
+    >
+      <span className={`cu-badge provider-${id}`}>{meta.mark}</span>
+      <span className="cu-provider-row__bars">
+        <MiniWithReset win={five} now={now} stale={stale} />
+        <MiniWithReset win={week} now={now} stale={stale} />
+      </span>
+      {open && (
+        <span className="cu-provider-row__pop" role="tooltip">
+          <ProviderGaugeGroup id={id} state={state} now={now} budget={budget} />
+        </span>
+      )}
+    </span>
+  );
+}
+
+/**
+ * Compact always-visible usage strip for the tab bar: one row per provider (Claude,
+ * Codex, z.ai), each its own hover/focus target with its own popover, plus a
+ * daily-budget mini (Claude-only, unchanged from before).
+ */
+export function UsageStrip() {
+  const multi = useMultiUsage();
+  const budget = useBudget();
+  return (
+    <div className="cockpit-usage" aria-label="Account usage — Claude, Codex, z.ai">
+      <MiniProviderRow id="claude" state={multi.claude} budget={budget} />
+      <MiniProviderRow id="codex" state={multi.codex} />
+      <MiniProviderRow id="zai" state={multi.zai} />
+      {budget && <DayMini b={budget} stale={multi.claude.status === "stale"} />}
+    </div>
+  );
+}
+
+/** Full usage panel for Mission Control: one stacked block per provider + a local clock. */
 export function UsagePanel() {
-  const { report, status } = useUsage();
+  const multi = useMultiUsage();
   const budget = useBudget();
   const now = useNow(1000);
-  const mode = modeOf(status, !!report);
-  const five = report?.fiveHour ?? null;
-  const week = report?.sevenDay ?? null;
-  const stale = status === "stale";
   const d = new Date(now);
   const clock = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 
@@ -210,13 +266,11 @@ export function UsagePanel() {
     <div className="cu-panel">
       <div className="cu-panel__label">
         <span>account usage</span>
-        {stale && <span className="cu-panel__flag">stale</span>}
-        {mode === "na" && <span className="cu-panel__flag">sign in</span>}
       </div>
-      <div className="cu-panel__gauges">
-        <Gauge label="5-hour window" win={five} now={now} stale={stale} mode={mode} />
-        <Gauge label="Weekly · 7-day" win={week} now={now} stale={stale} mode={mode} />
-        {budget && <DayGauge b={budget} stale={stale} />}
+      <div className="cu-panel__providers">
+        <ProviderGaugeGroup id="claude" state={multi.claude} now={now} budget={budget} />
+        <ProviderGaugeGroup id="codex" state={multi.codex} now={now} />
+        <ProviderGaugeGroup id="zai" state={multi.zai} now={now} />
       </div>
       <div className="cu-panel__clock"><b>{clock}</b><span>local</span></div>
     </div>
