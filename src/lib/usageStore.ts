@@ -1,22 +1,28 @@
 import { useEffect, useState } from "react";
-import { usageReport, type UsageReport } from "./usageClient";
+import { usageReport, usageReportCodex, usageReportZai, type UsageReport } from "./usageClient";
 import { anyPaneWorking } from "./terminalRegistry";
+import type { AgentProvider } from "../layout/paneLayout";
 
 /**
  * One shared usage poller behind a tiny pub/sub store, so the tab-bar strip and the
- * Mission Control panel read the SAME cached data and trigger ONE network call.
+ * Mission Control panel read the SAME cached state and trigger ONE set of network/file
+ * calls — now fanned out across all three providers per tick.
  *
- * Refresh policy (decided in design): event-driven + baseline floor.
+ * Refresh policy (unchanged from the single-provider version):
  *  - a turn finishing (working→idle edge) → refresh after an 8s settle
  *  - window regains focus → refresh now
  *  - baseline poll every 60s as a floor
- *  - never below MIN_GAP between actual network calls, so bursts of idle events coalesce
+ *  - never below MIN_GAP between actual fetch ticks, so bursts of idle events coalesce
  *
- * Graceful states: keep the last good report on a failed refresh (marked `stale`); only
- * show "no token" / loading when we've never had data.
+ * Failure isolation: each tick fetches all three providers via `Promise.allSettled`,
+ * so one provider's rejection (e.g. z.ai's curl timing out) only staleness's *that*
+ * provider's slice of state — the other two update normally. This shares the refresh
+ * triggers/timers above (a UI-level concern) rather than running three independent
+ * pollers, which would just duplicate timers for no extra isolation benefit.
  */
 
 export type UsageUiStatus = "loading" | "ok" | "stale" | "noToken";
+export type ProviderId = AgentProvider;
 
 export interface UsageState {
   report: UsageReport | null; // last GOOD report (status === "ok"), or null until first success
@@ -24,17 +30,40 @@ export interface UsageState {
   lastOkAt: number | null;
 }
 
+export type MultiUsageState = Record<ProviderId, UsageState>;
+
 const MIN_GAP_MS = 8_000;
 const BASELINE_MS = 60_000;
 const IDLE_SETTLE_MS = 8_000;
 const EDGE_TICK_MS = 1_000;
 
-let state: UsageState = { report: null, status: "loading", lastOkAt: null };
-const subs = new Set<(s: UsageState) => void>();
+const EMPTY_STATE: UsageState = { report: null, status: "loading", lastOkAt: null };
 
-function emit(patch: Partial<UsageState>) {
-  state = { ...state, ...patch };
+let state: MultiUsageState = { claude: EMPTY_STATE, codex: EMPTY_STATE, zai: EMPTY_STATE };
+const subs = new Set<(s: MultiUsageState) => void>();
+
+function emit(provider: ProviderId, patch: Partial<UsageState>) {
+  state = { ...state, [provider]: { ...state[provider], ...patch } };
   for (const fn of subs) fn(state);
+}
+
+/** Apply one provider's fetch outcome to its own slice — never touches the others. */
+function applyResult(provider: ProviderId, settled: PromiseSettledResult<UsageReport>) {
+  const hadReport = !!state[provider].report;
+  if (settled.status === "fulfilled") {
+    const r = settled.value;
+    if (r.status === "ok") {
+      emit(provider, { report: r, status: "ok", lastOkAt: Date.now() });
+    } else if (r.status === "no_token") {
+      emit(provider, { status: hadReport ? "stale" : "noToken" });
+    } else {
+      emit(provider, { status: hadReport ? "stale" : "loading" });
+    }
+  } else {
+    // Rejected promise (network/invoke failure): same graceful degrade as a
+    // non-"ok" status — keep the last good report if we have one.
+    emit(provider, { status: hadReport ? "stale" : "loading" });
+  }
 }
 
 let inFlight = false;
@@ -46,21 +75,11 @@ async function fetchUsage(force = false): Promise<void> {
   if (!force && now - lastFetchAt < MIN_GAP_MS) return;
   inFlight = true;
   lastFetchAt = now;
-  try {
-    const r = await usageReport();
-    if (r.status === "ok") {
-      emit({ report: r, status: "ok", lastOkAt: Date.now() });
-    } else if (r.status === "no_token") {
-      emit({ status: state.report ? "stale" : "noToken" });
-    } else {
-      // transient error: keep showing last value if we have one, else stay in loading
-      emit({ status: state.report ? "stale" : "loading" });
-    }
-  } catch {
-    emit({ status: state.report ? "stale" : "loading" });
-  } finally {
-    inFlight = false;
-  }
+  const [claude, codex, zai] = await Promise.allSettled([usageReport(), usageReportCodex(), usageReportZai()]);
+  applyResult("claude", claude);
+  applyResult("codex", codex);
+  applyResult("zai", zai);
+  inFlight = false;
 }
 
 let started = false;
@@ -91,9 +110,9 @@ function start(): void {
   }, EDGE_TICK_MS);
 }
 
-/** Subscribe a React component to the shared usage state. */
-export function useUsage(): UsageState {
-  const [s, setS] = useState<UsageState>(state);
+/** Subscribe a React component to the shared multi-provider usage state. */
+export function useMultiUsage(): MultiUsageState {
+  const [s, setS] = useState<MultiUsageState>(state);
   useEffect(() => {
     start();
     subs.add(setS);
