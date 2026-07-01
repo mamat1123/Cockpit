@@ -5,6 +5,7 @@ import { MONO_FONTS, FONT_SIZE_MIN, FONT_SIZE_MAX } from "../lib/fonts";
 import { DEFAULT_SETTINGS, type Settings } from "../lib/settings";
 import { checkForUpdate, type Update } from "../lib/updateClient";
 import { ensureNotifyPermission } from "../lib/osNotify";
+import { saveZaiToken, zaiTokenConfigured } from "../lib/usageClient";
 import "./SettingsMenu.css";
 
 export function SettingsMenu({ settings, onPatch, onClose, onUpdateFound }: {
@@ -15,6 +16,9 @@ export function SettingsMenu({ settings, onPatch, onClose, onUpdateFound }: {
 }) {
   const [version, setVersion] = useState("");
   const [checkState, setCheckState] = useState<"idle" | "checking" | "uptodate">("idle");
+  const [zaiToken, setZaiToken] = useState("");
+  const [zaiConfigured, setZaiConfigured] = useState<boolean | null>(null);
+  const [zaiSaving, setZaiSaving] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { e.preventDefault(); onClose(); } };
@@ -23,11 +27,23 @@ export function SettingsMenu({ settings, onPatch, onClose, onUpdateFound }: {
   }, [onClose]);
 
   useEffect(() => { getVersion().then(setVersion).catch(() => setVersion("")); }, []);
+  useEffect(() => { zaiTokenConfigured().then(setZaiConfigured).catch(() => setZaiConfigured(false)); }, []);
 
   async function check() {
     setCheckState("checking");
     const u = await checkForUpdate();
     if (u) { onUpdateFound(u); } else { setCheckState("uptodate"); }
+  }
+
+  async function saveZai() {
+    setZaiSaving(true);
+    try {
+      await saveZaiToken(zaiToken);
+      setZaiToken("");
+      setZaiConfigured(await zaiTokenConfigured());
+    } finally {
+      setZaiSaving(false);
+    }
   }
 
   const accentValue = settings.accent ?? themeById(settings.themeId).accent;
@@ -165,6 +181,31 @@ export function SettingsMenu({ settings, onPatch, onClose, onUpdateFound }: {
               aria-label="Window blur radius"
             />
             <span className="settings__val">{settings.blurRadius === 0 ? "Off" : `${settings.blurRadius}px`}</span>
+          </div>
+        </div>
+
+        <div className="settings__row">
+          <div className="settings__label">
+            <span className="settings__name">z.ai monitor token</span>
+            <span className="settings__desc">shows the z.ai (GLM Coding Plan) usage gauge — token from your own z.ai account, saved in macOS Keychain</span>
+          </div>
+          <div className="settings__control settings__control--column">
+            <div className="settings__zai-row">
+              <input
+                className="settings__zai-input"
+                type="password"
+                placeholder={zaiConfigured ? "•••••••• (configured)" : "paste monitor token"}
+                value={zaiToken}
+                onChange={(e) => setZaiToken(e.target.value)}
+                aria-label="z.ai monitor token"
+              />
+              <button type="button" className="settings__btn" onClick={saveZai} disabled={zaiSaving}>
+                {zaiSaving ? "saving…" : "save"}
+              </button>
+            </div>
+            <span className={`settings__zai-status${zaiConfigured ? " is-on" : ""}`}>
+              {zaiConfigured === null ? "…" : zaiConfigured ? "✓ configured" : "not configured"}
+            </span>
           </div>
         </div>
 
