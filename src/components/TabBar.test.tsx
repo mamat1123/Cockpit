@@ -3,7 +3,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { TabBar } from "./TabBar";
-import { initLayout, type Layout } from "../layout/paneLayout";
+import { initLayout, reduce, type Layout } from "../layout/paneLayout";
 
 function typeInto(input: HTMLInputElement, value: string) {
   const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")!.set!;
@@ -84,5 +84,39 @@ describe("TabBar — rename", () => {
     expect(onRenameTab).not.toHaveBeenCalled();
     expect(container.querySelector(".cockpit-tab__input")).toBeNull();
     expect(container.querySelector(".cockpit-tab__title")!.textContent).toBe("proj");
+  });
+
+  it("seeds the draft from the raw title, not the truncated 24-char display string", () => {
+    const longTitle = "This Is A Really Long Tab Title"; // > 24 chars, would otherwise be truncated with "…"
+    let layout = initLayout("/tmp/proj");
+    layout = reduce(layout, { type: "renameTab", tabId: layout.tabs[0].id, title: longTitle });
+    const { container } = mount(layout);
+    const title = container.querySelector(".cockpit-tab__title")!;
+    act(() => title.dispatchEvent(new MouseEvent("dblclick", { bubbles: true })));
+    const input = container.querySelector(".cockpit-tab__input") as HTMLInputElement;
+    expect(input.value).toBe(longTitle);
+  });
+
+  it("does not swallow a Space keystroke typed inside the rename input", () => {
+    const layout = initLayout("/tmp/proj");
+    const { container } = mount(layout);
+    const title = container.querySelector(".cockpit-tab__title")!;
+    act(() => title.dispatchEvent(new MouseEvent("dblclick", { bubbles: true })));
+    const input = container.querySelector(".cockpit-tab__input") as HTMLInputElement;
+    const evt = new KeyboardEvent("keydown", { key: " ", bubbles: true, cancelable: true });
+    act(() => input.dispatchEvent(evt));
+    expect(evt.defaultPrevented).toBe(false);
+  });
+
+  it("Enter inside the rename input does not redundantly re-fire onSelect via the outer div", () => {
+    const layout = initLayout("/tmp/proj");
+    const onSelect = vi.fn();
+    const { container } = mount(layout, { onSelect });
+    const title = container.querySelector(".cockpit-tab__title")!;
+    act(() => title.dispatchEvent(new MouseEvent("dblclick", { bubbles: true })));
+    const input = container.querySelector(".cockpit-tab__input") as HTMLInputElement;
+    const callsBefore = onSelect.mock.calls.length;
+    act(() => input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })));
+    expect(onSelect.mock.calls.length).toBe(callsBefore);
   });
 });

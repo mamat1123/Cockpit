@@ -33,8 +33,11 @@ const FolderPlusIcon = () => (
   </svg>
 );
 
+function rawTabName(t: Tab): string {
+  return t.title || t.rows.flatMap((r) => r.panes)[0]?.title || "shell";
+}
 function tabName(t: Tab): string {
-  const base = t.title || t.rows.flatMap((r) => r.panes)[0]?.title || "shell";
+  const base = rawTabName(t);
   return base.length > 24 ? base.slice(0, 24) + "…" : base;
 }
 const paneCount = (t: Tab): number => t.rows.reduce((n, r) => n + r.panes.length, 0);
@@ -122,7 +125,10 @@ export function TabBar({ layout, attention, unseenByTab, bellOpen, onToggleBell,
               className={`cockpit-tab${active ? " is-active" : ""}${attn ? " is-attention" : ""}`}
               draggable={!editing}
               onClick={() => onSelect(t.id)}
-              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(t.id); } }}
+              onKeyDown={(e) => {
+                if (e.target !== e.currentTarget) return;
+                if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(t.id); }
+              }}
               onDragStart={(e) => e.dataTransfer.setData("text/plain", t.id)}
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => {
@@ -152,7 +158,7 @@ export function TabBar({ layout, attention, unseenByTab, bellOpen, onToggleBell,
               ) : (
                 <span
                   className="cockpit-tab__title"
-                  onDoubleClick={(e) => { e.stopPropagation(); setDraft(tabName(t)); setEditingTabId(t.id); }}
+                  onDoubleClick={(e) => { e.stopPropagation(); setDraft(rawTabName(t)); setEditingTabId(t.id); }}
                 >
                   {tabName(t)}
                 </span>
