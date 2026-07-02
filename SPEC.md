@@ -122,3 +122,11 @@ rendered to feel satisfying. "Game-like" = aesthetic JUICE, not game mechanics (
   Beacon "waiting" mode + waiting-first rows, Mission Control bays/stat, one-shot
   toast/macOS/chime burst through the existing notification switches. Claude-only (Codex
   panes keep the PTY heuristic). Spec: docs/superpowers/specs/2026-07-02-waiting-state-design.md.
+
+## Status — updated 2026-07-03
+
+- **M12 — Vertical tab bar**: `Settings → Tab bar (top/left)`. Left mode docks the tab list
+  in a 200px sidebar under the unchanged top chrome; TabBar refactored into a shared
+  TabItem + useTabStrip so both orientations are one implementation (select, drag-reorder,
+  rename with focus-steal defense, close+confirm, working/waiting/unseen indicators).
+  Setting persisted with backfill. Spec: docs/superpowers/specs/2026-07-03-vertical-tab-bar-design.md.
