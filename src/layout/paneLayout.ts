@@ -17,12 +17,12 @@ export interface Pane {
   handoffFromSessionId?: string;
 }
 export interface Row { id: string; panes: Pane[]; size: number }
-export interface Tab { id: string; rows: Row[] }
+export interface Tab { id: string; title?: string; rows: Row[] }
 export interface Layout { tabs: Tab[]; activeTabId: string; focusedPaneId: string }
 
 export interface SavedPane { cwd: string; title: string; autoTitle: boolean; size: number; sessionId?: string; headroom?: boolean; ponytail?: PonytailLevel; provider?: AgentProvider; handoffFromSessionId?: string }
 export interface SavedRow { size: number; panes: SavedPane[] }
-export interface SavedTab { rows: SavedRow[] }
+export interface SavedTab { title?: string; rows: SavedRow[] }
 export interface SavedLayout { tabs: SavedTab[]; activeTabIndex: number }
 
 export type Action =
@@ -34,6 +34,8 @@ export type Action =
   | { type: "focusTab"; tabId: string }
   | { type: "setCwd"; paneId: string; cwd: string }
   | { type: "moveTab"; tabId: string; toIndex: number }
+  | { type: "renameTab"; tabId: string; title: string }
+  | { type: "closeTab"; tabId: string }
   | { type: "setRowSizes"; tabId: string; sizes: number[] }
   | { type: "setPaneSizes"; rowId: string; sizes: number[] }
   | { type: "renamePane"; paneId: string; title: string }
@@ -75,6 +77,7 @@ export function serializeLayout(l: Layout, keepSessions: boolean): SavedLayout {
   return {
     activeTabIndex: Math.max(0, l.tabs.findIndex((t) => t.id === l.activeTabId)),
     tabs: l.tabs.map((t) => ({
+      ...(t.title ? { title: t.title } : {}),
       rows: t.rows.map((r) => ({
         size: r.size,
         panes: r.panes.map((p) => ({
@@ -99,6 +102,7 @@ export function layoutHasSessions(s: SavedLayout): boolean {
 export function deserializeLayout(s: SavedLayout): Layout {
   const tabs: Tab[] = s.tabs.map((t) => ({
     id: nextId("tab"),
+    title: t.title,
     rows: t.rows.map((r) => ({
       id: nextId("row"), size: r.size,
       panes: r.panes.map((p) => ({
@@ -224,6 +228,20 @@ export function reduce(l: Layout, a: Action): Layout {
       const [moved] = tabs.splice(from, 1);
       tabs.splice(Math.max(0, Math.min(a.toIndex, tabs.length)), 0, moved);
       return { ...l, tabs };
+    }
+    case "renameTab": {
+      const title = a.title.trim();
+      const tabs = l.tabs.map((t) => (t.id === a.tabId ? { ...t, title: title || undefined } : t));
+      return { ...l, tabs };
+    }
+    case "closeTab": {
+      if (l.tabs.length <= 1) return l; // never close the last tab anywhere
+      const idx = l.tabs.findIndex((t) => t.id === a.tabId);
+      if (idx < 0) return l;
+      const tabs = l.tabs.filter((t) => t.id !== a.tabId);
+      if (l.activeTabId !== a.tabId) return { ...l, tabs };
+      const next = tabs[Math.min(idx, tabs.length - 1)];
+      return { tabs, activeTabId: next.id, focusedPaneId: next.rows[0].panes[0].id };
     }
     case "setRowSizes": {
       const tabs = l.tabs.map((t) =>

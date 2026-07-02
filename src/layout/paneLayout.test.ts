@@ -265,6 +265,70 @@ describe("headroom flag", () => {
   });
 });
 
+describe("tab title", () => {
+  it("renameTab sets a custom title on the target tab only", () => {
+    let l = initLayout(CWD);
+    l = reduce(l, { type: "newTab", cwd: "/two" });
+    const [t0, t1] = l.tabs.map((t) => t.id);
+    l = reduce(l, { type: "renameTab", tabId: t0, title: "frontend" });
+    expect(l.tabs.find((t) => t.id === t0)!.title).toBe("frontend");
+    expect(l.tabs.find((t) => t.id === t1)!.title).toBeUndefined();
+  });
+  it("renameTab with an empty/whitespace title clears the override", () => {
+    let l = initLayout(CWD);
+    const id = l.tabs[0].id;
+    l = reduce(l, { type: "renameTab", tabId: id, title: "frontend" });
+    l = reduce(l, { type: "renameTab", tabId: id, title: "   " });
+    expect(l.tabs[0].title).toBeUndefined();
+  });
+  it("round-trips a tab title through serialize/deserialize", () => {
+    let l = initLayout(CWD);
+    l = reduce(l, { type: "renameTab", tabId: l.tabs[0].id, title: "frontend" });
+    const back = deserializeLayout(serializeLayout(l, true));
+    expect(back.tabs[0].title).toBe("frontend");
+  });
+  it("serialize omits title when unset", () => {
+    const l = initLayout(CWD);
+    expect(serializeLayout(l, true).tabs[0].title).toBeUndefined();
+  });
+});
+
+describe("closeTab", () => {
+  it("removes the target tab and its panes", () => {
+    let l = initLayout(CWD);
+    l = reduce(l, { type: "newTab", cwd: "/two" });
+    const [t0, t1] = l.tabs.map((t) => t.id);
+    l = reduce(l, { type: "closeTab", tabId: t0 });
+    expect(l.tabs.map((t) => t.id)).toEqual([t1]);
+  });
+  it("is a no-op when it's the only remaining tab", () => {
+    let l = initLayout(CWD);
+    const id = l.tabs[0].id;
+    l = reduce(l, { type: "closeTab", tabId: id });
+    expect(l.tabs.map((t) => t.id)).toEqual([id]);
+  });
+  it("reassigns activeTabId + focusedPaneId to the tab that slides into its slot", () => {
+    let l = initLayout(CWD);
+    l = reduce(l, { type: "newTab", cwd: "/two" });
+    l = reduce(l, { type: "newTab", cwd: "/three" });
+    const [t0, t1, t2] = l.tabs.map((t) => t.id);
+    l = reduce(l, { type: "focusTab", tabId: t1 });
+    l = reduce(l, { type: "closeTab", tabId: t1 });
+    expect(l.tabs.map((t) => t.id)).toEqual([t0, t2]);
+    expect(l.activeTabId).toBe(t2);
+    expect(l.focusedPaneId).toBe(l.tabs[1].rows[0].panes[0].id);
+  });
+  it("leaves activeTabId alone when closing a background tab", () => {
+    let l = initLayout(CWD);
+    l = reduce(l, { type: "newTab", cwd: "/two" });
+    const [t0, t1] = l.tabs.map((t) => t.id);
+    l = reduce(l, { type: "focusTab", tabId: t0 });
+    l = reduce(l, { type: "closeTab", tabId: t1 });
+    expect(l.tabs.map((t) => t.id)).toEqual([t0]);
+    expect(l.activeTabId).toBe(t0);
+  });
+});
+
 describe("empty layout (no project open yet)", () => {
   it("emptyLayout has zero tabs", () => {
     const l = emptyLayout();
