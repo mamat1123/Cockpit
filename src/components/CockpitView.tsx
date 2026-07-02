@@ -4,7 +4,7 @@ import { loadLast, saveLast, savePreset } from "../lib/persistence";
 import { loadSettings, saveSettings } from "../lib/settings";
 import { themeById, applyTheme } from "../lib/themes";
 import { useKeybindings } from "../layout/useKeybindings";
-import { TabBar } from "./TabBar";
+import { TabBar, TabSidebar } from "./TabBar";
 import { Juice } from "./Juice";
 import { TabPanes } from "./TabPanes";
 import { PaneHost } from "./PaneHost";
@@ -132,6 +132,12 @@ export function CockpitView() {
 
   useCompletionNotifier(layout, settings);
 
+  const selectTab = useCallback((tabId: string) => {
+    dispatch({ type: "focusTab", tabId });
+    const pid = layout.tabs.find((t) => t.id === tabId)?.rows[0]?.panes[0]?.id;
+    if (pid) requestAnimationFrame(() => requestAnimationFrame(() => focusTerminal(pid)));
+  }, [layout]);
+
   const jumpToSession = useCallback((sessionId: string) => {
     const hit = findPaneBySession(layout, sessionId);
     if (hit) {
@@ -180,11 +186,8 @@ export function CockpitView() {
         bellOpen={bellOpen}
         onToggleBell={() => setBellOpen((o) => !o)}
         onJumpSession={(c) => { jumpToSession(c.sessionId); setBellOpen(false); }}
-        onSelect={(tabId) => {
-          dispatch({ type: "focusTab", tabId });
-          const pid = layout.tabs.find((t) => t.id === tabId)?.rows[0]?.panes[0]?.id;
-          if (pid) requestAnimationFrame(() => requestAnimationFrame(() => focusTerminal(pid)));
-        }}
+        onSelect={selectTab}
+        showTabs={settings.tabBar !== "left"}
         onNewTab={() => setPickerOpen(true)}
         onReorder={(tabId, toIndex) => dispatch({ type: "moveTab", tabId, toIndex })}
         onRenameTab={(tabId, title) => dispatch({ type: "renameTab", tabId, title })}
@@ -194,24 +197,37 @@ export function CockpitView() {
         onOpenWorkspaces={() => setWsOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
       />
-      <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
-        {layout.tabs.length === 0 ? (
-          <button className="cockpit-empty" onClick={() => setPickerOpen(true)}>
-            <span className="cockpit-empty__icon" aria-hidden="true">⌘O</span>
-            <span className="cockpit-empty__title">No project open</span>
-            <span className="cockpit-empty__sub">Open a folder to start a Claude session</span>
-          </button>
-        ) : (
-          layout.tabs.map((t) => (
-            <TabPanes
-              key={t.id}
-              tab={t}
-              active={t.id === layout.activeTabId}
-              dispatch={dispatch}
-              registerSlot={registerSlot}
-            />
-          ))
+      <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
+        {settings.tabBar === "left" && layout.tabs.length > 0 && (
+          <TabSidebar
+            layout={layout}
+            attention={attention}
+            unseenByTab={unseen}
+            onSelect={selectTab}
+            onReorder={(tabId, toIndex) => dispatch({ type: "moveTab", tabId, toIndex })}
+            onRenameTab={(tabId, title) => dispatch({ type: "renameTab", tabId, title })}
+            onCloseTab={(tabId) => dispatch({ type: "closeTab", tabId })}
+          />
         )}
+        <div style={{ position: "relative", flex: 1, minWidth: 0, minHeight: 0 }}>
+          {layout.tabs.length === 0 ? (
+            <button className="cockpit-empty" onClick={() => setPickerOpen(true)}>
+              <span className="cockpit-empty__icon" aria-hidden="true">⌘O</span>
+              <span className="cockpit-empty__title">No project open</span>
+              <span className="cockpit-empty__sub">Open a folder to start a Claude session</span>
+            </button>
+          ) : (
+            layout.tabs.map((t) => (
+              <TabPanes
+                key={t.id}
+                tab={t}
+                active={t.id === layout.activeTabId}
+                dispatch={dispatch}
+                registerSlot={registerSlot}
+              />
+            ))
+          )}
+        </div>
       </div>
       <PaneHost layout={layout} slots={slots} dispatch={dispatch} />
       <Juice layout={layout} onAttention={addAttention} />
