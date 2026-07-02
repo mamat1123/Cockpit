@@ -110,3 +110,18 @@
   font-size: 9.5px; font-weight: 800; color: var(--ck-bg); background: var(--ck-yellow); animation: cockpit-tab-ask 1.6s ease-in-out infinite; }
 @keyframes cockpit-tab-ask { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
 @media (prefers-reduced-motion: reduce) { .cockpit-tab__ask { animation: none; } }
+
+/* ── left-docked tab sidebar (settings.tabBar = "left") ── */
+.cockpit-side {
+  width: 200px; flex: none; display: flex; flex-direction: column; align-items: stretch;
+  overflow-y: auto; overflow-x: hidden;
+  background: color-mix(in srgb, var(--ck-surface) 72%, transparent);
+  border-right: 1px solid var(--ck-border);
+}
+.cockpit-tab--v { max-width: none; width: 100%; flex: none; height: 38px; padding: 0 12px; border-right: 0; border-bottom: 1px solid var(--ck-surface-2); }
+.cockpit-tab--v .cockpit-tab__title { flex: 1; text-align: left; }
+.cockpit-tab--v.is-active::before,
+.cockpit-tab--v.is-attention::before { top: 0; bottom: 0; left: 0; right: auto; width: 2px; height: auto; }
+.cockpit-tab--v.is-active::before { box-shadow: 1px 0 10px var(--ck-accent); }
+.cockpit-tab--v.is-confirming { max-width: none; height: auto; padding: 8px 12px; }
+.cockpit-tab--v .confirm-chip { flex-wrap: wrap; white-space: normal; }

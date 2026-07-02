@@ -57,29 +57,18 @@ const CloseIcon = () => (
   </svg>
 );
 
-export function TabBar({ layout, attention, unseenByTab, bellOpen, onToggleBell, onJumpSession, onSelect, onReorder, onRenameTab, onCloseTab, onOpenDashboard, onOpenPicker, onOpenWorkspaces, onOpenSettings }: {
-  layout: Layout;
-  attention: Set<string>;
-  unseenByTab: Map<string, number>;
-  bellOpen: boolean;
-  onToggleBell: () => void;
-  onJumpSession: (c: import("../lib/notifications").Completion) => void;
-  onSelect: (tabId: string) => void;
-  onNewTab: () => void;
-  onReorder: (tabId: string, toIndex: number) => void;
-  onRenameTab: (tabId: string, title: string) => void;
-  onCloseTab: (tabId: string) => void;
-  onOpenDashboard: () => void;
-  onOpenPicker: () => void;
-  onOpenWorkspaces: () => void;
-  onOpenSettings: () => void;
-}) {
+/** Shared state/behavior for a tab strip (horizontal list or vertical sidebar): the
+ *  working/waiting poll, double-click rename with the focus-steal grace defense, and
+ *  the close-confirm chip. Exactly one strip renders items at a time; `enabled` skips
+ *  the poll when this strip's list is hidden (the top bar in sidebar mode). */
+function useTabStrip(layout: Layout, onRenameTab: (tabId: string, title: string) => void, onCloseTab: (tabId: string) => void, enabled: boolean) {
   // per-tab aggregate working state (any pane in the tab thinking) — drives the dot/equalizer
   const [working, setWorking] = useState<Set<string>>(() => new Set());
   const [waiting, setWaiting] = useState<Set<string>>(() => new Set());
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
   useEffect(() => {
+    if (!enabled) return;
     const id = setInterval(() => {
       const now = Date.now();
       const w = new Set<string>();
@@ -94,7 +83,7 @@ export function TabBar({ layout, attention, unseenByTab, bellOpen, onToggleBell,
       setWaiting((prev) => (same(prev, ask) ? prev : ask));
     }, 400);
     return () => clearInterval(id);
-  }, []);
+  }, [enabled]);
 
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
@@ -147,97 +136,141 @@ export function TabBar({ layout, attention, unseenByTab, bellOpen, onToggleBell,
     else onCloseTab(t.id);
   };
 
+  return {
+    working, waiting,
+    editingTabId, setEditingTabId, draft, setDraft, inputRef, graceUntilRef, commitRename,
+    confirmingTabId, setConfirmingTabId, requestClose, onCloseTab,
+  };
+}
+type TabStrip = ReturnType<typeof useTabStrip>;
+
+/** One tab row — identical behavior in both orientations; `vertical` only switches CSS. */
+function TabItem({ t, index, layout, attention, unseenByTab, vertical, strip, onSelect, onReorder }: {
+  t: Tab;
+  index: number;
+  layout: Layout;
+  attention: Set<string>;
+  unseenByTab: Map<string, number>;
+  vertical?: boolean;
+  strip: TabStrip;
+  onSelect: (tabId: string) => void;
+  onReorder: (tabId: string, toIndex: number) => void;
+}) {
+  const active = t.id === layout.activeTabId;
+  const isWorking = strip.working.has(t.id);
+  const isWaiting = strip.waiting.has(t.id);
+  const attn = attention.has(t.id) && !active;
+  const editing = strip.editingTabId === t.id;
+  const confirming = strip.confirmingTabId === t.id;
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      className={`cockpit-tab${vertical ? " cockpit-tab--v" : ""}${active ? " is-active" : ""}${attn ? " is-attention" : ""}${confirming ? " is-confirming" : ""}`}
+      draggable={!editing}
+      onClick={() => onSelect(t.id)}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return;
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(t.id); }
+      }}
+      onDragStart={(e) => e.dataTransfer.setData("text/plain", t.id)}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={(e) => {
+        e.preventDefault();
+        const fromId = e.dataTransfer.getData("text/plain");
+        if (fromId && fromId !== t.id) onReorder(fromId, index);
+      }}
+    >
+      {confirming ? (
+        <span className="confirm-chip">
+          {`Close ${paneCount(t)} sessions?`}
+          <button className="confirm-chip__go" onClick={(e) => { e.stopPropagation(); strip.setConfirmingTabId(null); strip.onCloseTab(t.id); }}>Close</button>
+          <button className="confirm-chip__cancel" onClick={(e) => { e.stopPropagation(); strip.setConfirmingTabId(null); }}>Cancel</button>
+        </span>
+      ) : (
+      <>
+      {isWaiting ? (
+        <span className="cockpit-tab__ask" aria-hidden="true">?</span>
+      ) : isWorking ? (
+        <span className="cockpit-tab__eq" aria-hidden="true"><i /><i /><i /></span>
+      ) : (
+        <span className="cockpit-tab__dot" aria-hidden="true" />
+      )}
+      {editing ? (
+        <input
+          ref={strip.inputRef}
+          className="cockpit-tab__input"
+          value={strip.draft}
+          onChange={(e) => strip.setDraft(e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+          onBlur={() => {
+            // Ignore blur during the steal-defense grace window above — the tick loop is
+            // already reclaiming focus every frame, so this blur is the race, not the user.
+            if (performance.now() < strip.graceUntilRef.current) return;
+            strip.commitRename(t.id);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { e.preventDefault(); strip.commitRename(t.id); }
+            else if (e.key === "Escape") { e.preventDefault(); strip.setEditingTabId(null); }
+          }}
+        />
+      ) : (
+        <span
+          className="cockpit-tab__title"
+          onDoubleClick={(e) => { e.stopPropagation(); strip.setDraft(rawTabName(t)); strip.setEditingTabId(t.id); }}
+        >
+          {tabName(t)}
+        </span>
+      )}
+      <span className="cockpit-tab__meta">
+        <span className="cockpit-tab__ct">{paneCount(t)}</span>
+        <button
+          className="cockpit-tab__x"
+          aria-label="Close tab"
+          title="Close tab"
+          onClick={(e) => { e.stopPropagation(); strip.requestClose(t); }}
+        >
+          <CloseIcon />
+        </button>
+      </span>
+      {!active && (unseenByTab.get(t.id) ?? 0) > 0 && (
+        <span className="cockpit-tab__badge">{unseenByTab.get(t.id)}</span>
+      )}
+      </>
+      )}
+    </div>
+  );
+}
+
+export function TabBar({ layout, attention, unseenByTab, bellOpen, showTabs = true, onToggleBell, onJumpSession, onSelect, onReorder, onRenameTab, onCloseTab, onOpenDashboard, onOpenPicker, onOpenWorkspaces, onOpenSettings }: {
+  layout: Layout;
+  attention: Set<string>;
+  unseenByTab: Map<string, number>;
+  bellOpen: boolean;
+  /** false = the tab list lives in the TabSidebar; only the chrome renders here. */
+  showTabs?: boolean;
+  onToggleBell: () => void;
+  onJumpSession: (c: import("../lib/notifications").Completion) => void;
+  onSelect: (tabId: string) => void;
+  onNewTab: () => void;
+  onReorder: (tabId: string, toIndex: number) => void;
+  onRenameTab: (tabId: string, title: string) => void;
+  onCloseTab: (tabId: string) => void;
+  onOpenDashboard: () => void;
+  onOpenPicker: () => void;
+  onOpenWorkspaces: () => void;
+  onOpenSettings: () => void;
+}) {
+  const strip = useTabStrip(layout, onRenameTab, onCloseTab, showTabs);
   return (
     <div className="cockpit-tabs">
-      <div className="cockpit-tabs__list">
-        {layout.tabs.map((t, i) => {
-          const active = t.id === layout.activeTabId;
-          const isWorking = working.has(t.id);
-          const isWaiting = waiting.has(t.id);
-          const attn = attention.has(t.id) && !active;
-          const editing = editingTabId === t.id;
-          const confirming = confirmingTabId === t.id;
-          return (
-            <div
-              key={t.id}
-              role="button"
-              tabIndex={0}
-              className={`cockpit-tab${active ? " is-active" : ""}${attn ? " is-attention" : ""}${confirming ? " is-confirming" : ""}`}
-              draggable={!editing}
-              onClick={() => onSelect(t.id)}
-              onKeyDown={(e) => {
-                if (e.target !== e.currentTarget) return;
-                if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(t.id); }
-              }}
-              onDragStart={(e) => e.dataTransfer.setData("text/plain", t.id)}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault();
-                const fromId = e.dataTransfer.getData("text/plain");
-                if (fromId && fromId !== t.id) onReorder(fromId, i);
-              }}
-            >
-              {confirming ? (
-                <span className="confirm-chip">
-                  {`Close ${paneCount(t)} sessions?`}
-                  <button className="confirm-chip__go" onClick={(e) => { e.stopPropagation(); setConfirmingTabId(null); onCloseTab(t.id); }}>Close</button>
-                  <button className="confirm-chip__cancel" onClick={(e) => { e.stopPropagation(); setConfirmingTabId(null); }}>Cancel</button>
-                </span>
-              ) : (
-              <>
-              {isWaiting ? (
-                <span className="cockpit-tab__ask" aria-hidden="true">?</span>
-              ) : isWorking ? (
-                <span className="cockpit-tab__eq" aria-hidden="true"><i /><i /><i /></span>
-              ) : (
-                <span className="cockpit-tab__dot" aria-hidden="true" />
-              )}
-              {editing ? (
-                <input
-                  ref={inputRef}
-                  className="cockpit-tab__input"
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                  onBlur={() => {
-                    // Ignore blur during the steal-defense grace window above — the tick loop is
-                    // already reclaiming focus every frame, so this blur is the race, not the user.
-                    if (performance.now() < graceUntilRef.current) return;
-                    commitRename(t.id);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") { e.preventDefault(); commitRename(t.id); }
-                    else if (e.key === "Escape") { e.preventDefault(); setEditingTabId(null); }
-                  }}
-                />
-              ) : (
-                <span
-                  className="cockpit-tab__title"
-                  onDoubleClick={(e) => { e.stopPropagation(); setDraft(rawTabName(t)); setEditingTabId(t.id); }}
-                >
-                  {tabName(t)}
-                </span>
-              )}
-              <span className="cockpit-tab__meta">
-                <span className="cockpit-tab__ct">{paneCount(t)}</span>
-                <button
-                  className="cockpit-tab__x"
-                  aria-label="Close tab"
-                  title="Close tab"
-                  onClick={(e) => { e.stopPropagation(); requestClose(t); }}
-                >
-                  <CloseIcon />
-                </button>
-              </span>
-              {!active && (unseenByTab.get(t.id) ?? 0) > 0 && (
-                <span className="cockpit-tab__badge">{unseenByTab.get(t.id)}</span>
-              )}
-              </>
-              )}
-            </div>
-          );
-        })}
-      </div>
+      {showTabs && (
+        <div className="cockpit-tabs__list">
+          {layout.tabs.map((t, i) => (
+            <TabItem key={t.id} t={t} index={i} layout={layout} attention={attention} unseenByTab={unseenByTab} strip={strip} onSelect={onSelect} onReorder={onReorder} />
+          ))}
+        </div>
+      )}
       <div className="cockpit-tabs__drag" data-tauri-drag-region></div>
       <UsageStrip />
       <div className="cockpit-tabs__tools">
@@ -248,5 +281,26 @@ export function TabBar({ layout, attention, unseenByTab, bellOpen, onToggleBell,
         <button className="cockpit-tool cockpit-tool--add" onClick={onOpenPicker} aria-label="Open project (Cmd+O)" title="Open project (⌘O)"><FolderPlusIcon /></button>
       </div>
     </div>
+  );
+}
+
+/** Left-docked vertical tab list (settings.tabBar === "left"); the top bar keeps the
+ *  drag region / usage / tools and hides its horizontal list via showTabs={false}. */
+export function TabSidebar({ layout, attention, unseenByTab, onSelect, onReorder, onRenameTab, onCloseTab }: {
+  layout: Layout;
+  attention: Set<string>;
+  unseenByTab: Map<string, number>;
+  onSelect: (tabId: string) => void;
+  onReorder: (tabId: string, toIndex: number) => void;
+  onRenameTab: (tabId: string, title: string) => void;
+  onCloseTab: (tabId: string) => void;
+}) {
+  const strip = useTabStrip(layout, onRenameTab, onCloseTab, true);
+  return (
+    <nav className="cockpit-side" aria-label="Tabs">
+      {layout.tabs.map((t, i) => (
+        <TabItem key={t.id} t={t} index={i} layout={layout} attention={attention} unseenByTab={unseenByTab} vertical strip={strip} onSelect={onSelect} onReorder={onReorder} />
+      ))}
+    </nav>
   );
 }
