@@ -6,6 +6,9 @@ export interface NotificationSettings {
 
 export const DEFAULT_NOTIFICATIONS: NotificationSettings = { enabled: true, os: true, sound: true, toast: true, beacon: true };
 
+/** Where the tab list docks. The top chrome (drag/usage/tools/bell) stays either way. */
+export type TabBarPosition = "top" | "left";
+
 export interface Settings {
   /** Cockpit background opacity (0 = fully see-through to the macOS blur, 1 = opaque). */
   bgOpacity: number;
@@ -19,9 +22,11 @@ export interface Settings {
   fontSize: number;
   /** Completion-notification switches (see CONTEXT.md). */
   notifications: NotificationSettings;
+  /** Tab list orientation: horizontal top strip or 200px left sidebar. */
+  tabBar: TabBarPosition;
 }
 
-export const DEFAULT_SETTINGS: Settings = { bgOpacity: 0.62, themeId: "amber-hud", accent: null, blurRadius: 24, fontFamily: "Menlo", fontSize: 13, notifications: DEFAULT_NOTIFICATIONS };
+export const DEFAULT_SETTINGS: Settings = { bgOpacity: 0.62, themeId: "amber-hud", accent: null, blurRadius: 24, fontFamily: "Menlo", fontSize: 13, notifications: DEFAULT_NOTIFICATIONS, tabBar: "top" };
 
 export function loadSettings(): Settings {
   try {
@@ -36,6 +41,7 @@ export function loadSettings(): Settings {
         fontFamily: typeof m.fontFamily === "string" && m.fontFamily ? m.fontFamily : DEFAULT_SETTINGS.fontFamily,
         fontSize: typeof m.fontSize === "number" && m.fontSize > 0 ? m.fontSize : DEFAULT_SETTINGS.fontSize,
         notifications: { ...DEFAULT_NOTIFICATIONS, ...(m.notifications ?? {}) },
+        tabBar: m.tabBar === "left" ? "left" : "top",
       };
     }
   } catch { /* no localStorage / bad json — use defaults */ }
