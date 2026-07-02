@@ -6,6 +6,7 @@ import { spawnPty, writePty, resizePty, killPty, onPtyOutput, onPtyExit } from "
 import { startLogtail, sessionExists } from "./logClient";
 import { emitSend } from "./juiceBus";
 import { type Theme, themeById, DEFAULT_THEME_ID } from "./themes";
+import { waitingPanes } from "./waiting";
 import { headroomEnsure, HEADROOM_BASE_URL } from "./headroomClient";
 import { resolveHeadroomRouting } from "./headroomRouting";
 import { paneLaunchEnv } from "./paneLaunchEnv";
@@ -189,7 +190,7 @@ export function acquireTerminal(paneId: string, cwd: string, sessionId: string, 
       lastLineAt.current = now;
     }
   });
-  onPtyExit(paneId, () => term.write(`\r\n[${opts.provider} exited]\r\n`));
+  onPtyExit(paneId, () => { waitingPanes.clear(paneId); term.write(`\r\n[${opts.provider} exited]\r\n`); });
   term.onData((data) => {
     lastInputAt.current = Date.now();
     if (data.includes("\r")) emitSend();
@@ -246,6 +247,7 @@ export function releaseTerminal(paneId: string) {
   e.hostEl.remove();
   registry.delete(paneId);
   routed.delete(paneId);
+  waitingPanes.clear(paneId);
 }
 
 /** Live activity timestamp for a pane (last meaningful PTY output), or null. */
