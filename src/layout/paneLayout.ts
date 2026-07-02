@@ -241,7 +241,7 @@ export function reduce(l: Layout, a: Action): Layout {
       const tabs = l.tabs.filter((t) => t.id !== a.tabId);
       if (l.activeTabId !== a.tabId) return { ...l, tabs };
       const next = tabs[Math.min(idx, tabs.length - 1)];
-      return { tabs, activeTabId: next.id, focusedPaneId: next.rows[0].panes[0].id };
+      return { ...l, tabs, activeTabId: next.id, focusedPaneId: next.rows[0].panes[0].id };
     }
     case "setRowSizes": {
       const tabs = l.tabs.map((t) =>
