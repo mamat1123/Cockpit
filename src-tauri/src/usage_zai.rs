@@ -37,8 +37,11 @@ fn is_window(limit: &Value, unit: i64, number: i64) -> bool {
 
 fn window_from_limit(limit: &Value) -> Option<UsageWindow> {
     let percentage = limit.get("percentage").and_then(|x| x.as_f64())?;
-    let next_reset = limit.get("nextResetTime").and_then(|x| x.as_i64())?;
-    Some(UsageWindow { utilization: percentage, resets_at: unix_ms_to_iso(next_reset) })
+    let resets_at = limit
+        .get("nextResetTime")
+        .and_then(|x| x.as_i64())
+        .and_then(unix_ms_to_iso);
+    Some(UsageWindow { utilization: percentage, resets_at })
 }
 
 /// Parse the z.ai `quota/limit` response body. `status: "ok"` requires finding at
@@ -154,6 +157,20 @@ mod tests {
         assert_eq!(r.five_hour.as_ref().unwrap().utilization, 24.0);
         assert_eq!(r.five_hour.as_ref().unwrap().resets_at.as_deref(), Some("2026-07-01T12:00:00+00:00"));
         assert_eq!(r.seven_day.as_ref().unwrap().utilization, 41.0);
+    }
+
+    #[test]
+    fn five_hour_window_without_reset_time_is_ok() {
+        // Real z.ai response shape at 0% usage: the 5-hour window omits nextResetTime
+        // entirely (the window hasn't started counting down yet).
+        let body = br#"{"data":{"limits":[
+            {"type":"TOKENS_LIMIT","unit":3,"number":5,"percentage":0},
+            {"type":"TOKENS_LIMIT","unit":6,"number":1,"percentage":1,"nextResetTime":1783353822988}
+        ]}}"#;
+        let r = report_from_body(body);
+        assert_eq!(r.status, "ok");
+        assert_eq!(r.five_hour.as_ref().unwrap().utilization, 0.0);
+        assert_eq!(r.five_hour.as_ref().unwrap().resets_at, None);
     }
 
     #[test]
