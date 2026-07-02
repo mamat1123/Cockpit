@@ -136,5 +136,120 @@ export const USER_TOOL_RESULT = JSON.stringify({
   gitBranch: "main",
 });
 
+/** Assistant message calling AskUserQuestion — the session is now WAITING on the user.
+ *  Shape verified against a real transcript (2026-07-02 schema check). */
+export const ASSISTANT_ASK = JSON.stringify({
+  parentUuid: "41d1a92f-820f-44d2-b374-1ce8f24eb703",
+  isSidechain: false,
+  message: {
+    model: "claude-fable-5",
+    id: "msg_ASK1",
+    type: "message",
+    role: "assistant",
+    content: [
+      {
+        type: "tool_use",
+        id: "toolu_ASK1",
+        name: "AskUserQuestion",
+        input: { questions: [{ question: "Which auth method should the API use?", header: "Auth", options: [], multiSelect: false }] },
+      },
+    ],
+    stop_reason: "tool_use",
+    stop_sequence: null,
+    stop_details: null,
+    usage: { input_tokens: 2, cache_read_input_tokens: 290000, output_tokens: 120 },
+    diagnostics: null,
+  },
+  requestId: "req_ASK1",
+  type: "assistant",
+  uuid: "a1a1a1a1-0000-4000-8000-000000000001",
+  timestamp: "2026-07-02T10:00:00.000Z",
+  userType: "external",
+  entrypoint: "cli",
+  cwd: "/Users/example/project",
+  sessionId: "ad31a042-e0c0-48d9-9392-850df5077453",
+  version: "2.1.185",
+  gitBranch: "main",
+});
+
+/** A parallel tool_use block of the SAME assistant message (same message.id), written as
+ *  its own JSONL record — observed in a real log. Must NOT clear waiting. */
+export const ASSISTANT_ASK_SIBLING = JSON.stringify({
+  parentUuid: "a1a1a1a1-0000-4000-8000-000000000001",
+  isSidechain: false,
+  message: {
+    model: "claude-fable-5",
+    id: "msg_ASK1",
+    type: "message",
+    role: "assistant",
+    content: [
+      { type: "tool_use", id: "toolu_OTHER1", name: "mcp__designer__designer_session", input: { action: "status" } },
+    ],
+    stop_reason: "tool_use",
+    stop_sequence: null,
+    stop_details: null,
+    usage: { input_tokens: 2, cache_read_input_tokens: 290000, output_tokens: 40 },
+    diagnostics: null,
+  },
+  requestId: "req_ASK1",
+  type: "assistant",
+  uuid: "a1a1a1a1-0000-4000-8000-000000000002",
+  timestamp: "2026-07-02T10:00:00.300Z",
+  userType: "external",
+  entrypoint: "cli",
+  cwd: "/Users/example/project",
+  sessionId: "ad31a042-e0c0-48d9-9392-850df5077453",
+  version: "2.1.185",
+  gitBranch: "main",
+});
+
+/** The user answered the question — tool_result matching the ask's tool_use_id. Clears waiting. */
+export const USER_ASK_ANSWER = JSON.stringify({
+  parentUuid: "a1a1a1a1-0000-4000-8000-000000000001",
+  isSidechain: false,
+  promptId: "b2b2b2b2-0000-4000-8000-000000000001",
+  type: "user",
+  message: {
+    role: "user",
+    content: [{ tool_use_id: "toolu_ASK1", type: "tool_result", content: "User selected: JWT" }],
+  },
+  uuid: "a1a1a1a1-0000-4000-8000-000000000003",
+  timestamp: "2026-07-02T10:01:50.000Z",
+  userType: "external",
+  entrypoint: "cli",
+  cwd: "/Users/example/project",
+  sessionId: "ad31a042-e0c0-48d9-9392-850df5077453",
+  version: "2.1.185",
+  gitBranch: "main",
+});
+
+/** A sidechain (subagent) assistant line with a DIFFERENT message id — must NOT clear waiting. */
+export const SIDECHAIN_ASSISTANT = JSON.stringify({
+  parentUuid: "c3c3c3c3-0000-4000-8000-000000000001",
+  isSidechain: true,
+  message: {
+    model: "claude-fable-5",
+    id: "msg_SIDE1",
+    type: "message",
+    role: "assistant",
+    content: [{ type: "text", text: "subagent output" }],
+    stop_reason: "end_turn",
+    stop_sequence: null,
+    stop_details: null,
+    usage: { input_tokens: 2, cache_read_input_tokens: 1000, output_tokens: 10 },
+    diagnostics: null,
+  },
+  requestId: "req_SIDE1",
+  type: "assistant",
+  uuid: "a1a1a1a1-0000-4000-8000-000000000004",
+  timestamp: "2026-07-02T10:00:30.000Z",
+  userType: "external",
+  entrypoint: "cli",
+  cwd: "/Users/example/project",
+  sessionId: "ad31a042-e0c0-48d9-9392-850df5077453",
+  version: "2.1.185",
+  gitBranch: "main",
+});
+
 /** Malformed / non-JSON line. */
 export const GARBAGE = "not json {";
