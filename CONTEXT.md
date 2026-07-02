@@ -33,11 +33,12 @@ A purely cosmetic flourish when firing prompts — juice only. NO score, streak,
 _Avoid_: combo system, score, multiplier
 
 **Working state**:
-A Session's live status: `working` (turn in progress) or `idle` (turn finished,
-awaiting you). A third value `waiting` (blocked on a permission/confirmation) is
-defined but currently inert — panes run with permissions skipped, so it never occurs.
+A Session's live status: `working` (turn in progress), `idle` (turn finished, awaiting
+you), or `waiting` (blocked mid-turn on a question YOU must answer — an AskUserQuestion
+in the transcript; permissions are skipped, but questions still block). Waiting is a live
+state, not a ledger event: one notification burst on entry, self-clears when answered.
 Drives the per-pane status + ambient juice.
-_Avoid_: busy, running (be specific: working vs idle)
+_Avoid_: busy, running, blocked (be specific: working vs idle vs waiting)
 
 **Completion**:
 The moment a Session finishes its turn and hands control back to you — Claude *ended*

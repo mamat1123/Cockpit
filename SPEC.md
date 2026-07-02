@@ -112,3 +112,13 @@ rendered to feel satisfying. "Game-like" = aesthetic JUICE, not game mechanics (
   ambient = the existing breathing vignette. `juiceBus` + a `<Juice>` overlay polling registry state.
 
 **Next candidates:** native folder dialog in the picker, price-editor UI, tool-use blips (needs log tool_use parsing), per-pane cost in the dashboard bays.
+
+## Status — updated 2026-07-02
+
+- **M11 — Waiting state**: panes detect "blocked on AskUserQuestion" from the tailed JSONL
+  (enter on the tool_use; clear on matching tool_result / new assistant message id / typed
+  prompt / pty exit; ADR-0007 freshness gate for resume backfill). Third PaneState value
+  `waiting` overrides the PTY heuristic; amber chip with elapsed time, tab `?` indicator,
+  Beacon "waiting" mode + waiting-first rows, Mission Control bays/stat, one-shot
+  toast/macOS/chime burst through the existing notification switches. Claude-only (Codex
+  panes keep the PTY heuristic). Spec: docs/superpowers/specs/2026-07-02-waiting-state-design.md.
