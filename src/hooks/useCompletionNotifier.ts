@@ -3,8 +3,9 @@ import type { Layout } from "../layout/paneLayout";
 import type { Settings } from "../lib/settings";
 import { onLogLine } from "../lib/logClient";
 import { parseTurnEnd } from "../lib/completion";
+import { waitingPanes } from "../lib/waiting";
 import { notifications, type Completion } from "../lib/notifications";
-import { notifyCompletion } from "../lib/osNotify";
+import { notifyCompletion, notifyWaiting } from "../lib/osNotify";
 import { emitToast } from "../lib/toastBus";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 
@@ -18,10 +19,10 @@ function paneIndex(layout: Layout): Map<string, PaneCtx> {
   return m;
 }
 
-/** Detects Completions from each live pane's transcript and fans them out to the
- *  store, the OS notification, and the toast bus. Listeners are added/removed as panes
- *  appear/disappear. Settings + active tab are read via refs so changing them doesn't
- *  re-subscribe every listener. */
+/** Detects Completions AND waiting (blocked-on-question) transitions from each live
+ *  pane's transcript and fans them out to the store, the OS notification, and the toast
+ *  bus. Listeners are added/removed as panes appear/disappear. Settings + active tab are
+ *  read via refs so changing them doesn't re-subscribe every listener. */
 export function useCompletionNotifier(layout: Layout, settings: Settings): void {
   const idx = paneIndex(layout);
   const idxRef = useRef(idx); idxRef.current = idx;
@@ -40,6 +41,21 @@ export function useCompletionNotifier(layout: Layout, settings: Settings): void 
       let unlisten: UnlistenFn = () => {};
       let disposed = false;
       onLogLine(paneId, (line) => {
+        const entered = waitingPanes.apply(paneId, line);
+        // ADR-0007 freshness gate: resume backfill may re-enter the STATE silently, never alerts.
+        if (entered && Date.now() - entered.askedAt < 8000) {
+          const wctx = idxRef.current.get(paneId);
+          const ws = settingsRef.current.notifications;
+          if (wctx && ws.enabled) {
+            if (ws.os) void notifyWaiting({ name: wctx.name, question: entered.question }, { sound: ws.sound });
+            if (ws.toast) emitToast({
+              kind: "waiting", question: entered.question,
+              id: `${paneId}:${entered.askedAt}:waiting`, paneId,
+              sessionId: wctx.sessionId, tabId: wctx.tabId, name: wctx.name, project: wctx.project,
+              at: entered.askedAt, seen: true,
+            });
+          }
+        }
         const hit = parseTurnEnd(line, Date.now());
         if (!hit) return;
         // debounce burst per pane (~300ms)
