@@ -3,6 +3,7 @@ import type { Layout } from "../layout/paneLayout";
 import { overviewItems } from "./paneFlatten";
 import { paneLastLineAt } from "../lib/terminalRegistry";
 import { deriveState } from "../lib/paneState";
+import { waitingPanes, waitingLabel } from "../lib/waiting";
 import { sessionUsage } from "../lib/costClient";
 import { costOf } from "../lib/pricing";
 import { CostView } from "./CostView";
@@ -53,9 +54,16 @@ export function Dashboard({ layout, onJump, onJumpSession, onClose }: {
 
   const items = overviewItems(layout).map((it) => {
     const last = paneLastLineAt(it.paneId);
-    return { ...it, working: deriveState({ lastLineAt: last }, now, 800) === "working", when: ago(last, now) };
+    const w = waitingPanes.get(it.paneId);
+    return {
+      ...it,
+      working: !w && deriveState({ lastLineAt: last }, now, 800) === "working",
+      waitLabel: w ? waitingLabel(w.askedAt, now) : null,
+      when: ago(last, now),
+    };
   });
   const workCount = items.filter((i) => i.working).length;
+  const waitCount = items.filter((i) => i.waitLabel != null).length;
 
   return (
     <div className="cockpit-dash" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -73,7 +81,8 @@ export function Dashboard({ layout, onJump, onJumpSession, onClose }: {
           <div className="cockpit-dash__readout">
             <div className="cockpit-dash__stat"><b>{items.length}</b><span>sessions</span></div>
             <div className="cockpit-dash__stat is-work"><b>{workCount}</b><span>working</span></div>
-            <div className="cockpit-dash__stat is-idle"><b>{items.length - workCount}</b><span>idle</span></div>
+            <div className="cockpit-dash__stat is-ask"><b>{waitCount}</b><span>waiting</span></div>
+            <div className="cockpit-dash__stat is-idle"><b>{items.length - workCount - waitCount}</b><span>idle</span></div>
             <div className="cockpit-dash__stat is-cost"><b>{fmt(totalCost)}</b><span>total</span></div>
           </div>
           )}
@@ -84,7 +93,7 @@ export function Dashboard({ layout, onJump, onJumpSession, onClose }: {
           {items.map((it) => (
             <button
               key={it.paneId}
-              className={`cockpit-bay${it.working ? " is-working" : ""}`}
+              className={`cockpit-bay${it.working ? " is-working" : ""}${it.waitLabel ? " is-waiting" : ""}`}
               onClick={() => onJump(it.tabId, it.paneId)}
             >
               <span className="cockpit-bay__rail" />
@@ -98,7 +107,7 @@ export function Dashboard({ layout, onJump, onJumpSession, onClose }: {
                   <span className="cockpit-bay__badge">
                     <span className="cockpit-bay__dot" />
                     <span className="cockpit-bay__bars"><i /><i /><i /></span>
-                    {it.working ? "working" : "idle"}
+                    {it.waitLabel ?? (it.working ? "working" : "idle")}
                   </span>
                   <span className="cockpit-bay__when">{it.when}</span>
                   <span className="cockpit-bay__cost">{fmt(costs[it.paneId] ?? 0)}</span>
