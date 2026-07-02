@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Layout, Tab } from "../layout/paneLayout";
 import { paneLastLineAt } from "../lib/terminalRegistry";
 import { deriveState } from "../lib/paneState";
+import { waitingPanes } from "../lib/waiting";
 import { UsageStrip } from "./UsageGauges";
 import { NotificationBell } from "./NotificationBell";
 import "./TabBar.css";
@@ -75,18 +76,22 @@ export function TabBar({ layout, attention, unseenByTab, bellOpen, onToggleBell,
 }) {
   // per-tab aggregate working state (any pane in the tab thinking) — drives the dot/equalizer
   const [working, setWorking] = useState<Set<string>>(() => new Set());
+  const [waiting, setWaiting] = useState<Set<string>>(() => new Set());
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
   useEffect(() => {
     const id = setInterval(() => {
       const now = Date.now();
       const w = new Set<string>();
+      const ask = new Set<string>();
       for (const t of layoutRef.current.tabs) {
-        if (t.rows.some((r) => r.panes.some((p) => deriveState({ lastLineAt: paneLastLineAt(p.id) }, now, 800) === "working"))) {
-          w.add(t.id);
-        }
+        const panes = t.rows.flatMap((r) => r.panes);
+        if (panes.some((p) => waitingPanes.get(p.id))) ask.add(t.id);
+        if (panes.some((p) => deriveState({ lastLineAt: paneLastLineAt(p.id) }, now, 800) === "working")) w.add(t.id);
       }
-      setWorking((prev) => (prev.size === w.size && [...w].every((x) => prev.has(x)) ? prev : w));
+      const same = (a: Set<string>, b: Set<string>) => a.size === b.size && [...b].every((x) => a.has(x));
+      setWorking((prev) => (same(prev, w) ? prev : w));
+      setWaiting((prev) => (same(prev, ask) ? prev : ask));
     }, 400);
     return () => clearInterval(id);
   }, []);
@@ -148,6 +153,7 @@ export function TabBar({ layout, attention, unseenByTab, bellOpen, onToggleBell,
         {layout.tabs.map((t, i) => {
           const active = t.id === layout.activeTabId;
           const isWorking = working.has(t.id);
+          const isWaiting = waiting.has(t.id);
           const attn = attention.has(t.id) && !active;
           const editing = editingTabId === t.id;
           const confirming = confirmingTabId === t.id;
@@ -179,7 +185,9 @@ export function TabBar({ layout, attention, unseenByTab, bellOpen, onToggleBell,
                 </span>
               ) : (
               <>
-              {isWorking ? (
+              {isWaiting ? (
+                <span className="cockpit-tab__ask" aria-hidden="true">?</span>
+              ) : isWorking ? (
                 <span className="cockpit-tab__eq" aria-hidden="true"><i /><i /><i /></span>
               ) : (
                 <span className="cockpit-tab__dot" aria-hidden="true" />

@@ -105,3 +105,8 @@
 @media (prefers-reduced-motion: reduce) {
   .cockpit-tab__eq i, .cockpit-tab.is-attention::before { animation: none; }
 }
+
+.cockpit-tab__ask { flex: none; width: 13px; height: 13px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  font-size: 9.5px; font-weight: 800; color: var(--ck-bg); background: var(--ck-yellow); animation: cockpit-tab-ask 1.6s ease-in-out infinite; }
+@keyframes cockpit-tab-ask { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) { .cockpit-tab__ask { animation: none; } }
