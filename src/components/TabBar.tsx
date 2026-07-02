@@ -34,7 +34,7 @@ const FolderPlusIcon = () => (
 );
 
 function tabName(t: Tab): string {
-  const base = t.rows.flatMap((r) => r.panes)[0]?.title || "shell";
+  const base = t.title || t.rows.flatMap((r) => r.panes)[0]?.title || "shell";
   return base.length > 24 ? base.slice(0, 24) + "…" : base;
 }
 const paneCount = (t: Tab): number => t.rows.reduce((n, r) => n + r.panes.length, 0);
@@ -47,7 +47,7 @@ const SettingsIcon = () => (
   </svg>
 );
 
-export function TabBar({ layout, attention, unseenByTab, bellOpen, onToggleBell, onJumpSession, onSelect, onReorder, onOpenDashboard, onOpenPicker, onOpenWorkspaces, onOpenSettings }: {
+export function TabBar({ layout, attention, unseenByTab, bellOpen, onToggleBell, onJumpSession, onSelect, onReorder, onRenameTab, onOpenDashboard, onOpenPicker, onOpenWorkspaces, onOpenSettings }: {
   layout: Layout;
   attention: Set<string>;
   unseenByTab: Map<string, number>;
@@ -57,6 +57,7 @@ export function TabBar({ layout, attention, unseenByTab, bellOpen, onToggleBell,
   onSelect: (tabId: string) => void;
   onNewTab: () => void;
   onReorder: (tabId: string, toIndex: number) => void;
+  onRenameTab: (tabId: string, title: string) => void;
   onOpenDashboard: () => void;
   onOpenPicker: () => void;
   onOpenWorkspaces: () => void;
@@ -80,6 +81,31 @@ export function TabBar({ layout, attention, unseenByTab, bellOpen, onToggleBell,
     return () => clearInterval(id);
   }, []);
 
+  const [editingTabId, setEditingTabId] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!editingTabId) return;
+    const el = inputRef.current;
+    if (!el) return;
+    el.focus();
+    el.select();
+    // Selecting a tab (see onSelect below) schedules a double-rAF focusTerminal() to pull focus
+    // into the terminal once it's visible. Re-assert focus on that same delay so double-clicking
+    // a tab to rename it doesn't get the first few keystrokes silently redirected into a live
+    // terminal a beat later.
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => { el.focus(); el.select(); });
+    });
+    return () => { cancelAnimationFrame(raf1); cancelAnimationFrame(raf2); };
+  }, [editingTabId]);
+
+  const commitRename = (tabId: string) => {
+    setEditingTabId(null);
+    onRenameTab(tabId, draft);
+  };
+
   return (
     <div className="cockpit-tabs">
       <div className="cockpit-tabs__list">
@@ -87,12 +113,16 @@ export function TabBar({ layout, attention, unseenByTab, bellOpen, onToggleBell,
           const active = t.id === layout.activeTabId;
           const isWorking = working.has(t.id);
           const attn = attention.has(t.id) && !active;
+          const editing = editingTabId === t.id;
           return (
-            <button
+            <div
               key={t.id}
+              role="button"
+              tabIndex={0}
               className={`cockpit-tab${active ? " is-active" : ""}${attn ? " is-attention" : ""}`}
-              draggable
+              draggable={!editing}
               onClick={() => onSelect(t.id)}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(t.id); } }}
               onDragStart={(e) => e.dataTransfer.setData("text/plain", t.id)}
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => {
@@ -106,12 +136,32 @@ export function TabBar({ layout, attention, unseenByTab, bellOpen, onToggleBell,
               ) : (
                 <span className="cockpit-tab__dot" aria-hidden="true" />
               )}
-              <span className="cockpit-tab__title">{tabName(t)}</span>
+              {editing ? (
+                <input
+                  ref={inputRef}
+                  className="cockpit-tab__input"
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  onBlur={() => commitRename(t.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") { e.preventDefault(); commitRename(t.id); }
+                    else if (e.key === "Escape") { e.preventDefault(); setEditingTabId(null); }
+                  }}
+                />
+              ) : (
+                <span
+                  className="cockpit-tab__title"
+                  onDoubleClick={(e) => { e.stopPropagation(); setDraft(tabName(t)); setEditingTabId(t.id); }}
+                >
+                  {tabName(t)}
+                </span>
+              )}
               <span className="cockpit-tab__ct">{paneCount(t)}</span>
               {!active && (unseenByTab.get(t.id) ?? 0) > 0 && (
                 <span className="cockpit-tab__badge">{unseenByTab.get(t.id)}</span>
               )}
-            </button>
+            </div>
           );
         })}
       </div>

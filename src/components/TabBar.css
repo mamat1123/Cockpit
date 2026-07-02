@@ -34,6 +34,9 @@
 }
 
 .cockpit-tab__title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cockpit-tab__input { font: inherit; color: var(--ck-bright); background: var(--ck-bg);
+  border: 1px solid var(--ck-accent); border-radius: 4px; padding: 0 4px; margin: 0 -4px;
+  outline: none; min-width: 40px; max-width: 140px; }
 .cockpit-tab__ct {
   font-size: 10px; letter-spacing: 0.06em; color: var(--ck-dim); font-variant-numeric: tabular-nums;
   background: var(--ck-surface-2); border-radius: 5px; padding: 1px 6px;
