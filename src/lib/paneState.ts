@@ -1,4 +1,4 @@
-export type PaneState = "idle" | "working";
+export type PaneState = "idle" | "working" | "waiting";
 
 /** Signals distilled from the log tail. `lastLineAt` = ms timestamp of the most
  *  recent jsonl line for this pane, or null if none seen yet. */

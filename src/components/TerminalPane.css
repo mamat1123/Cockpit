@@ -65,3 +65,5 @@
 .xterm,
 .xterm .xterm-viewport,
 .xterm .xterm-screen { background-color: transparent !important; }
+
+.cockpit-pane.is-waiting { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ck-yellow) 30%, transparent); }

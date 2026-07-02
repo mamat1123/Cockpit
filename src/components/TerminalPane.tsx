@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { debounce } from "../lib/debounce";
 import { deriveState, type PaneState } from "../lib/paneState";
+import { waitingPanes, waitingLabel } from "../lib/waiting";
 import { paneTopic } from "../lib/logClient";
 import { acquireTerminal, attachTerminal, parkTerminalNode, refit, focusTerminal } from "../lib/terminalRegistry";
 import { writePty } from "../lib/ptyClient";
@@ -36,6 +37,7 @@ export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, ponytai
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<PaneState>("idle");
+  const [waitLabel, setWaitLabel] = useState<string | null>(null);
   const [ptInstalled, setPtInstalled] = useState(false);
   useEffect(() => { ponytailInstalled().then(setPtInstalled).catch(() => {}); }, []);
   const onAutoTitleRef = useRef(onAutoTitle);
@@ -68,10 +70,12 @@ export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, ponytai
     });
     ro.observe(container);
 
-    const tick = setInterval(
-      () => setState(deriveState({ lastLineAt: entry.lastLineAt.current }, Date.now(), 800)),
-      400,
-    );
+    const tick = setInterval(() => {
+      const w = waitingPanes.get(paneId);
+      const now = Date.now();
+      setState(w ? "waiting" : deriveState({ lastLineAt: entry.lastLineAt.current }, now, 800));
+      setWaitLabel(w ? waitingLabel(w.askedAt, now) : null);
+    }, 400);
 
     return () => {
       ro.disconnect();
@@ -156,7 +160,7 @@ export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, ponytai
 
   return (
     <div
-      className={`cockpit-pane${state === "working" ? " is-working" : ""}${focused ? " is-focused" : ""}${isDragging ? " is-dragging" : ""}${isDropTarget ? " is-drop-target" : ""}`}
+      className={`cockpit-pane${state === "working" ? " is-working" : ""}${state === "waiting" ? " is-waiting" : ""}${focused ? " is-focused" : ""}${isDragging ? " is-dragging" : ""}${isDropTarget ? " is-drop-target" : ""}`}
       onMouseDown={onFocus}
       {...dropZoneProps}
     >
@@ -164,7 +168,8 @@ export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, ponytai
         paneId={paneId}
         title={title}
         repo={cwd.split("/").filter(Boolean).slice(-2).join("/")}
-        working={state === "working"}
+        state={state}
+        waitLabel={waitLabel}
         headroom={!!headroom}
         ponytail={ponytail ?? "off"}
         provider={provider}

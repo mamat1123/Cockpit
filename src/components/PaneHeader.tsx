@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePaneSavings } from "../lib/savingsStore";
 import { PONYTAIL_LEVELS, PONYTAIL_META, type PonytailLevel } from "../lib/ponytailClient";
 import type { AgentProvider } from "../layout/paneLayout";
+import type { PaneState } from "../lib/paneState";
 import { PROVIDERS, providerMeta } from "../lib/providers";
 import { ProviderIcon } from "./icons/ProviderIcons";
 import "./PaneHeader.css";
@@ -19,11 +20,12 @@ const CloseIcon = () => (
   </svg>
 );
 
-export function PaneHeader({ paneId, title, repo, working, headroom, ponytail, provider, ponytailInstalled, onRename, onPopOut, onClose, onToggleHeadroom, onSetPonytail, onSelectProvider, dragHandleProps }: {
+export function PaneHeader({ paneId, title, repo, state, waitLabel, headroom, ponytail, provider, ponytailInstalled, onRename, onPopOut, onClose, onToggleHeadroom, onSetPonytail, onSelectProvider, dragHandleProps }: {
   paneId: string;
   title: string;
   repo: string;
-  working: boolean;
+  state: PaneState;
+  waitLabel: string | null;
   headroom: boolean;
   ponytail: PonytailLevel;
   provider: AgentProvider;
@@ -87,10 +89,10 @@ export function PaneHeader({ paneId, title, repo, working, headroom, ponytail, p
         </span>
       )}
       {repo ? <span className="pane-head__repo">{repo}</span> : null}
-      <span className={`pane-head__chip${working ? " is-working" : ""}`}>
+      <span className={`pane-head__chip${state === "working" ? " is-working" : ""}${state === "waiting" ? " is-waiting" : ""}`}>
         <span className="pane-head__dot" />
         <span className="pane-head__bars"><i /><i /><i /></span>
-        <span className="pane-head__lbl">{working ? "working" : "idle"}</span>
+        <span className="pane-head__lbl">{state === "waiting" ? (waitLabel ?? "waiting") : state}</span>
       </span>
       <span className="pane-head__provider-wrap" ref={providerWrapRef}>
         <button

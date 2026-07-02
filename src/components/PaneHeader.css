@@ -115,3 +115,9 @@
 .pane-head__pt-nudge-cmd { display: block; background: var(--ck-bg); border: 1px solid var(--ck-border); border-radius: 5px;
   padding: 3px 6px; color: var(--ck-green); user-select: all; font-size: 10.5px; }
 .pane-head__pt-nudge-foot { color: var(--ck-dim); font-size: 9.5px; }
+
+.pane-head__chip.is-waiting { background: color-mix(in srgb, var(--ck-yellow) 16%, transparent); color: var(--ck-yellow);
+  border-color: color-mix(in srgb, var(--ck-yellow) 55%, transparent); }
+.pane-head__chip.is-waiting .pane-head__dot { animation: pane-wait 1.6s ease-in-out infinite; }
+@keyframes pane-wait { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) { .pane-head__chip.is-waiting .pane-head__dot { animation: none; } }
