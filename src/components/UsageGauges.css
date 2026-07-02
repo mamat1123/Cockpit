@@ -52,6 +52,7 @@
   font-size: 9px; font-weight: 800; font-family: ui-monospace, Menlo, monospace;
   border: 1px solid currentColor; background: color-mix(in srgb, currentColor 18%, transparent);
 }
+.cu-badge svg { width: 10px; height: 10px; fill: currentColor; }
 .cu-badge.provider-claude { color: var(--ck-accent); }
 .cu-badge.provider-codex { color: var(--ck-blue); }
 .cu-badge.provider-zai { color: var(--ck-magenta); }

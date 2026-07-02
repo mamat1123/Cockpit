@@ -3,6 +3,7 @@ import { usePaneSavings } from "../lib/savingsStore";
 import { PONYTAIL_LEVELS, PONYTAIL_META, type PonytailLevel } from "../lib/ponytailClient";
 import type { AgentProvider } from "../layout/paneLayout";
 import { PROVIDERS, providerMeta } from "../lib/providers";
+import { ProviderIcon } from "./icons/ProviderIcons";
 import "./PaneHeader.css";
 
 const PopOutIcon = () => (
@@ -99,7 +100,7 @@ export function PaneHeader({ paneId, title, repo, working, headroom, ponytail, p
           aria-expanded={providerOpen}
           title={`Provider: ${activeProvider.label}`}
         >
-          <span className="pane-head__provider-mark">{activeProvider.mark}</span>
+          <span className="pane-head__provider-mark"><ProviderIcon id={provider} /></span>
           <span className="pane-head__provider-car">▾</span>
         </button>
         {providerOpen && (
@@ -117,7 +118,7 @@ export function PaneHeader({ paneId, title, repo, working, headroom, ponytail, p
                   if (p.id !== provider) onSelectProvider(p.id);
                 }}
               >
-                <span className="pane-head__provider-item-mark">{p.mark}</span>
+                <span className="pane-head__provider-item-mark"><ProviderIcon id={p.id} /></span>
                 <span className="pane-head__provider-item-copy">
                   <b>{p.label}</b>
                   <small>{p.enabled ? p.description : "coming soon"}</small>

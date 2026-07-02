@@ -10,6 +10,7 @@ import { TabPanes } from "./TabPanes";
 import { PaneHost } from "./PaneHost";
 import { Dashboard } from "./Dashboard";
 import { ProjectPicker } from "./ProjectPicker";
+import { ProviderPicker, type ProviderPickerContext } from "./ProviderPicker";
 import { WorkspacesMenu } from "./WorkspacesMenu";
 import { SettingsMenu } from "./SettingsMenu";
 import { UpdateModal } from "./UpdateModal";
@@ -62,6 +63,7 @@ export function CockpitView() {
   // Open the picker immediately on a fresh start (empty layout) so the user always
   // begins by choosing a real folder rather than landing on a hardcoded default.
   const [pickerOpen, setPickerOpen] = useState(() => layout.tabs.length === 0);
+  const [pendingCreation, setPendingCreation] = useState<ProviderPickerContext | null>(null);
   const [wsOpen, setWsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [bellOpen, setBellOpen] = useState(false);
@@ -86,7 +88,7 @@ export function CockpitView() {
   }, []);
   const toggleDash = useCallback(() => setDashOpen((o) => !o), []);
   // ⌘T opens the picker (a tab must always start in a chosen folder), same as ⌘O / the + button.
-  useKeybindings(dispatch, { onNewTab: () => setPickerOpen(true), onToggleDashboard: toggleDash, onOpenProject: () => setPickerOpen(true), onOpenWorkspaces: () => setWsOpen(true), onOpenSettings: () => setSettingsOpen(true), onToggleBell: () => setBellOpen((o) => !o) });
+  useKeybindings(dispatch, { onNewTab: () => setPickerOpen(true), onSplit: (down) => setPendingCreation(down ? { kind: "splitDown" } : { kind: "split" }), onToggleDashboard: toggleDash, onOpenProject: () => setPickerOpen(true), onOpenWorkspaces: () => setWsOpen(true), onOpenSettings: () => setSettingsOpen(true), onToggleBell: () => setBellOpen((o) => !o) });
 
   // Auto-restore: persist the layout (with session ids) shortly after each change.
   useEffect(() => {
@@ -237,7 +239,18 @@ export function CockpitView() {
       {pickerOpen && (
         <ProjectPicker
           onClose={() => setPickerOpen(false)}
-          onPick={(cwd) => { dispatch({ type: "newTab", cwd }); setPickerOpen(false); }}
+          onPick={(cwd) => { setPickerOpen(false); setPendingCreation({ kind: "newTab", cwd }); }}
+        />
+      )}
+      {pendingCreation && (
+        <ProviderPicker
+          context={pendingCreation}
+          onCancel={() => setPendingCreation(null)}
+          onPick={(provider) => {
+            if (pendingCreation.kind === "newTab") dispatch({ type: "newTab", cwd: pendingCreation.cwd, provider });
+            else dispatch({ type: pendingCreation.kind, provider });
+            setPendingCreation(null);
+          }}
         />
       )}
       {wsOpen && (

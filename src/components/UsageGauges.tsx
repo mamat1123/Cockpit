@@ -5,6 +5,7 @@ import type { Budget } from "../lib/budget";
 import type { UsageWindow } from "../lib/usageClient";
 import { clampPct, levelFor, formatReset, formatResetClock } from "../lib/usage";
 import { providerMeta } from "../lib/providers";
+import { ProviderIcon } from "./icons/ProviderIcons";
 import "./UsageGauges.css";
 
 type Mode = "data" | "loading" | "na";
@@ -166,7 +167,7 @@ function ProviderGaugeGroup({ id, state, now, budget }: {
   return (
     <div className="cu-provider-group">
       <div className="cu-provider-group__head">
-        <span className={`cu-badge provider-${id}`}>{meta.mark}</span>
+        <span className={`cu-badge provider-${id}`}><ProviderIcon id={id} /></span>
         <span className="cu-provider-group__name">{meta.label}</span>
       </div>
       <Gauge label="5-hour window" win={five} now={now} stale={stale} mode={mode} naLabel={NA_LABEL[id]} />
@@ -196,7 +197,7 @@ function MiniProviderRow({ id, state, budget }: {
   if (mode === "loading") {
     return (
       <span className="cu-provider-row is-loading" aria-label={`Loading ${meta.label} usage`}>
-        <span className={`cu-badge provider-${id}`}>{meta.mark}</span>
+        <span className={`cu-badge provider-${id}`}><ProviderIcon id={id} /></span>
         <span className="cu-provider-row__bars"><span className="cu-mini-sk" /><span className="cu-mini-sk" /></span>
       </span>
     );
@@ -204,7 +205,7 @@ function MiniProviderRow({ id, state, budget }: {
   if (mode === "na") {
     return (
       <span className="cu-provider-row is-na" title={NA_LABEL[id]} aria-label={`${meta.label} usage unavailable — ${NA_LABEL[id]}`}>
-        <span className={`cu-badge provider-${id}`}>{meta.mark}</span>
+        <span className={`cu-badge provider-${id}`}><ProviderIcon id={id} /></span>
         <span className="cu-na">—</span>
       </span>
     );
@@ -222,7 +223,7 @@ function MiniProviderRow({ id, state, budget }: {
       onFocus={() => setOpen(true)}
       onBlur={() => setOpen(false)}
     >
-      <span className={`cu-badge provider-${id}`}>{meta.mark}</span>
+      <span className={`cu-badge provider-${id}`}><ProviderIcon id={id} /></span>
       <span className="cu-provider-row__bars">
         <MiniWithReset win={five} now={now} stale={stale} />
         <MiniWithReset win={week} now={now} stale={stale} />
