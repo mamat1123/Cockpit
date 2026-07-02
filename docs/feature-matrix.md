@@ -21,6 +21,7 @@ Status snapshot: v0.7.0
 | Theme / font / blur settings | Shipped | Theme palette, accent, terminal font, opacity, and blur controls. |
 | Auto-update | Shipped | GitHub Release updater with `latest.json`; current release is `v0.7.0`. |
 | Codex provider toggle | Shipped in v0.7.0 | Header has a `Claude / Codex` provider toggle. |
+| z.ai provider | Shipped after v0.10.1 | Pane runs the claude binary on the GLM backend via the user's `claude --glm` wrapper; picker card enabled, claude ↔ z.ai switch-in-place resumes the same session; logtail/waiting/PT work, HR stays claude-only. |
 | Claude to Codex handoff | Shipped in v0.7.0 | Reads the Claude JSONL transcript and opens a Codex pane beside it. |
 | Codex launch flags | Shipped in v0.7.0 | Every Codex launch uses `--dangerously-bypass-approvals-and-sandbox`. |
 | Codex pane via PTY | Shipped in v0.7.0 | Runs `codex --cd <cwd> <handoff prompt>` in a pane. |
