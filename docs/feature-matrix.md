@@ -13,6 +13,7 @@ Status snapshot: v0.7.0
 | Working / idle state | Shipped | Derived from PTY/logtail activity. |
 | Completion notifications | Shipped | Toasts, Beacon, and macOS notifications. |
 | Waiting state (question detection) | Shipped after v0.9.0 | JSONL `AskUserQuestion` detection → amber chip/tab/Beacon/bays + one-shot toast/macOS alert. |
+| Vertical tab bar | Shipped after v0.10.1 | Settings → Tab bar: top / left; 200px sidebar keeps full tab behavior (rename/close/reorder/badges). |
 | Cost analytics | Shipped | Reads Claude logs from `~/.claude`, grouped by session/project/model. |
 | Usage gauges | Shipped | Account usage/rate-limit panel. |
 | Headroom toggle `HR` | Shipped | Per-pane proxy routing. |
