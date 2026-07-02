@@ -39,9 +39,10 @@ export default defineConfig(async () => ({
     },
   },
   test: {
-    // Nested git worktrees live under .worktrees/ and carry their own copies
+    // Nested git worktrees live under .worktrees/ (git-fallback convention) or
+    // .claude/worktrees/ (harness-native convention) and carry their own copies
     // of every test file — without this, vitest picks those up too and runs
     // each test twice.
-    exclude: ["**/node_modules/**", "**/dist/**", "**/.worktrees/**"],
+    exclude: ["**/node_modules/**", "**/dist/**", "**/.worktrees/**", "**/.claude/worktrees/**"],
   },
 }));
