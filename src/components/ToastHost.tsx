@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { onToast } from "../lib/toastBus";
+import { onToast, type ToastItem } from "../lib/toastBus";
 import type { Completion } from "../lib/notifications";
 import "./ToastHost.css";
 
-interface Shown { c: Completion; key: number }
+interface Shown { c: ToastItem; key: number }
 const TTL = 5000;
 
 export function ToastHost({ onJump }: { onJump: (c: Completion) => void }) {
@@ -32,10 +32,10 @@ export function ToastHost({ onJump }: { onJump: (c: Completion) => void }) {
       {items.map(({ c, key }) => (
         <button type="button" key={key} className="toast" onMouseEnter={() => pause(key)} onMouseLeave={() => resume(key)}
                 onClick={() => { onJump(c); dismiss(key); }}>
-          <span className="toast__check" aria-hidden="true">✓</span>
+          <span className={`toast__check${c.kind === "waiting" ? " toast__check--ask" : ""}`} aria-hidden="true">{c.kind === "waiting" ? "?" : "✓"}</span>
           <span className="toast__tx">
-            <b>{c.name} finished</b>
-            <span>{c.project}</span>
+            <b>{c.kind === "waiting" ? `${c.name} is asking` : `${c.name} finished`}</b>
+            <span>{c.kind === "waiting" ? (c.question || c.project) : c.project}</span>
           </span>
           <span className="toast__jump">Jump ↗</span>
         </button>

@@ -11,3 +11,5 @@
 .toast__tx span { font-size: 10.5px; color: var(--ck-muted); }
 .toast__jump { font-size: 11.5px; color: var(--ck-accent); margin-left: auto; white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
+
+.toast__check--ask { color: var(--ck-yellow); }
