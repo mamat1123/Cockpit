@@ -87,3 +87,9 @@
 .settings__zai-input:focus-visible { outline: 2px solid var(--ck-accent); outline-offset: 2px; }
 .settings__zai-status { font-size: 11px; color: var(--ck-dim); }
 .settings__zai-status.is-on { color: var(--ck-green); font-weight: 600; }
+
+.settings__seg { display: inline-flex; border: 1px solid var(--ck-border); border-radius: 7px; overflow: hidden; }
+.settings__seg-btn { appearance: none; -webkit-appearance: none; border: 0; margin: 0; padding: 5px 14px;
+  font: 600 12px/1 ui-monospace, Menlo, monospace; color: var(--ck-muted); background: transparent; cursor: pointer; }
+.settings__seg-btn + .settings__seg-btn { border-left: 1px solid var(--ck-border); }
+.settings__seg-btn.is-active { color: var(--ck-accent); background: color-mix(in srgb, var(--ck-accent) 14%, transparent); }

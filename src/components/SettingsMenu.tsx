@@ -190,6 +190,29 @@ export function SettingsMenu({ settings, onPatch, onClose, onUpdateFound }: {
 
         <div className="settings__row">
           <div className="settings__label">
+            <span className="settings__name">Tab bar</span>
+            <span className="settings__desc">dock the tab list along the top or the left edge</span>
+          </div>
+          <div className="settings__control">
+            <div className="settings__seg" role="radiogroup" aria-label="Tab bar position">
+              {(["top", "left"] as const).map((pos) => (
+                <button
+                  key={pos}
+                  type="button"
+                  className={`settings__seg-btn${settings.tabBar === pos ? " is-active" : ""}`}
+                  role="radio"
+                  aria-checked={settings.tabBar === pos}
+                  onClick={() => onPatch({ tabBar: pos })}
+                >
+                  {pos}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="settings__row">
+          <div className="settings__label">
             <span className="settings__name">z.ai monitor token</span>
             <span className="settings__desc">shows the z.ai (GLM Coding Plan) usage gauge — token from your own z.ai account, saved in macOS Keychain</span>
           </div>
