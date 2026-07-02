@@ -7,7 +7,7 @@ const { sendNotification, isPermissionGranted, requestPermission } = vi.hoisted(
 }));
 vi.mock("@tauri-apps/plugin-notification", () => ({ sendNotification, isPermissionGranted, requestPermission }));
 
-import { notifyCompletion } from "./osNotify";
+import { notifyCompletion, notifyWaiting } from "./osNotify";
 import type { Completion } from "./notifications";
 
 const c: Completion = { id: "1", paneId: "p", sessionId: "s", tabId: "t", name: "fix-bug", project: "web", at: 1, seen: false };
@@ -31,5 +31,21 @@ describe("notifyCompletion", () => {
     await notifyCompletion(c, { sound: true });
     expect(requestPermission).toHaveBeenCalledOnce();
     expect(sendNotification).not.toHaveBeenCalled();
+  });
+});
+
+describe("notifyWaiting", () => {
+  it("sends title '<name> is asking' with the question as body", async () => {
+    await notifyWaiting({ name: "fix-bug", question: "Which DB?" }, { sound: true });
+    expect(sendNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "fix-bug is asking", body: "Which DB?", sound: "default" }),
+    );
+  });
+  it("falls back to a generic body when the question is empty", async () => {
+    await notifyWaiting({ name: "fix-bug", question: "" }, { sound: false });
+    expect(sendNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ body: "waiting for your answer" }),
+    );
+    expect(sendNotification.mock.calls[0][0].sound).toBeUndefined();
   });
 });
