@@ -26,9 +26,9 @@ export interface SavedTab { rows: SavedRow[] }
 export interface SavedLayout { tabs: SavedTab[]; activeTabIndex: number }
 
 export type Action =
-  | { type: "newTab"; cwd?: string }
-  | { type: "split" }       // split right: add a column in the focused pane's row
-  | { type: "splitDown" }   // split down: add a new row after the focused pane's row
+  | { type: "newTab"; cwd?: string; provider?: AgentProvider }
+  | { type: "split"; provider?: AgentProvider }       // split right: add a column in the focused pane's row
+  | { type: "splitDown"; provider?: AgentProvider }   // split down: add a new row after the focused pane's row
   | { type: "close" }
   | { type: "focusPane"; paneId: string }
   | { type: "focusTab"; tabId: string }
@@ -49,8 +49,8 @@ export type Action =
 let counter = 0;
 const nextId = (p: string) => `${p}-${++counter}`;
 const defaultTitle = (cwd: string) => cwd.split("/").filter(Boolean).pop() ?? "shell";
-const makePane = (cwd: string): Pane => ({ id: nextId("pane"), cwd, size: 1, title: defaultTitle(cwd), autoTitle: true, sessionId: crypto.randomUUID() });
-const makeRow = (cwd: string): Row => ({ id: nextId("row"), panes: [makePane(cwd)], size: 1 });
+const makePane = (cwd: string, provider?: AgentProvider): Pane => ({ id: nextId("pane"), cwd, size: 1, title: defaultTitle(cwd), autoTitle: true, sessionId: crypto.randomUUID(), provider });
+const makeRow = (cwd: string, provider?: AgentProvider): Row => ({ id: nextId("row"), panes: [makePane(cwd, provider)], size: 1 });
 
 export function findPaneBySession(l: Layout, sessionId: string): { tabId: string; paneId: string } | null {
   for (const t of l.tabs) for (const r of t.rows) for (const p of r.panes)
@@ -150,13 +150,13 @@ export function reduce(l: Layout, a: Action): Layout {
       // (the UI routes ⌘T / + through the ProjectPicker), so this is a no-op.
       const cwd = a.cwd ?? focusedCwd(l);
       if (!cwd) return l;
-      const row = makeRow(cwd);
+      const row = makeRow(cwd, a.provider);
       const tab: Tab = { id: nextId("tab"), rows: [row] };
       return { tabs: [...l.tabs, tab], activeTabId: tab.id, focusedPaneId: row.panes[0].id };
     }
     case "split": {
       if (l.tabs.length === 0) return l;
-      const pane = makePane(focusedCwd(l));
+      const pane = makePane(focusedCwd(l), a.provider);
       const tabs = l.tabs.map((t) => {
         if (t.id !== l.activeTabId) return t;
         return {
@@ -174,7 +174,7 @@ export function reduce(l: Layout, a: Action): Layout {
     }
     case "splitDown": {
       if (l.tabs.length === 0) return l;
-      const row = makeRow(focusedCwd(l));
+      const row = makeRow(focusedCwd(l), a.provider);
       const tabs = l.tabs.map((t) => {
         if (t.id !== l.activeTabId) return t;
         const rIdx = t.rows.findIndex((r) => r.panes.some((p) => p.id === l.focusedPaneId));

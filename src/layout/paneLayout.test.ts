@@ -321,3 +321,29 @@ describe("ponytail level", () => {
     expect(serializeLayout(l, true).tabs[0].rows[0].panes[0].ponytail).toBeUndefined();
   });
 });
+
+describe("provider selection on creation", () => {
+  it("newTab creates its pane with the given provider", () => {
+    let l = initLayout(CWD);
+    l = reduce(l, { type: "newTab", cwd: CWD, provider: "codex" });
+    expect(panesOf(l, 1)[0].provider).toBe("codex");
+  });
+
+  it("split creates its new pane with the given provider", () => {
+    let l = initLayout(CWD);
+    l = reduce(l, { type: "split", provider: "codex" });
+    expect(panesOf(l)[1].provider).toBe("codex");
+  });
+
+  it("splitDown creates its new pane with the given provider", () => {
+    let l = initLayout(CWD);
+    l = reduce(l, { type: "splitDown", provider: "codex" });
+    expect(l.tabs[0].rows[1].panes[0].provider).toBe("codex");
+  });
+
+  it("omitting provider on split leaves it unset, same as before this feature", () => {
+    let l = initLayout(CWD);
+    l = reduce(l, { type: "split" });
+    expect(panesOf(l)[1].provider).toBeUndefined();
+  });
+});
