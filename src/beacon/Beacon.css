@@ -54,3 +54,9 @@
 .beacon-row__sub { font-size: 10px; color: var(--ck-muted,#6B7280); }
 .beacon-row__jmp { color: var(--ck-dim,#565d68); }
 .beacon-row:hover .beacon-row__jmp { color: var(--ck-accent,#F5A623); }
+
+.beacon--ask { --bn-ec: var(--ck-yellow, #E8B64C); --bn-eg: rgba(232, 182, 76, 0.5); animation: beacon-edge 1.6s ease-in-out infinite; }
+.beacon--ask .beacon__num { color: var(--ck-yellow, #E8B64C); }
+.beacon__ping--ask b { background: var(--ck-yellow, #E8B64C); box-shadow: 0 0 10px var(--ck-yellow, #E8B64C); }
+.beacon__ping--ask i { border-color: var(--ck-yellow, #E8B64C); }
+.beacon-row--waiting .beacon-row__mark { background: var(--ck-yellow, #E8B64C); box-shadow: 0 0 7px var(--ck-yellow, #E8B64C); }

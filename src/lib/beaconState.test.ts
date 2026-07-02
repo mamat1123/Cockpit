@@ -10,7 +10,7 @@ const entry = (over: Partial<Completion>): Completion => ({ id: "1", paneId: "p2
 
 describe("buildBeaconState", () => {
   it("marks working panes, counts unseen, and sorts unseen-first", () => {
-    const st = buildBeaconState(layout, [entry({})], new Set(["p1"]));
+    const st = buildBeaconState(layout, [entry({})], new Set(["p1"]), new Set());
     expect(st.working).toBe(1);
     expect(st.totalUnseen).toBe(1);
     expect(st.sessions[0].sessionId).toBe("s2"); // unseen first
@@ -18,7 +18,13 @@ describe("buildBeaconState", () => {
     expect(st.sessions.find((s) => s.sessionId === "s2")!.unseen).toBe(true);
   });
   it("a seen completion contributes no unseen", () => {
-    const st = buildBeaconState(layout, [entry({ seen: true })], new Set());
+    const st = buildBeaconState(layout, [entry({ seen: true })], new Set(), new Set());
     expect(st.totalUnseen).toBe(0);
+  });
+  it("waiting outranks unseen and is counted", () => {
+    const st = buildBeaconState(layout, [entry({})], new Set(), new Set(["p1"]));
+    expect(st.waiting).toBe(1);
+    expect(st.sessions[0].sessionId).toBe("s1"); // waiting first, above unseen s2
+    expect(st.sessions[0].status).toBe("waiting");
   });
 });

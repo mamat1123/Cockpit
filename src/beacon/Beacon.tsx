@@ -5,7 +5,7 @@ import { getCurrentWindow, LogicalSize, PhysicalPosition } from "@tauri-apps/api
 import type { BeaconState } from "../lib/beaconState";
 import "./Beacon.css";
 
-const EMPTY: BeaconState = { sessions: [], totalUnseen: 0, working: 0 };
+const EMPTY: BeaconState = { sessions: [], totalUnseen: 0, working: 0, waiting: 0 };
 
 export function Beacon() {
   const [st, setSt] = useState<BeaconState>(EMPTY);
@@ -35,22 +35,23 @@ export function Beacon() {
   }, []);
 
   const jump = (sessionId: string) => { void invoke("beacon_jump", { sessionId }); setOpen(false); };
-  const mode = st.totalUnseen > 0 ? "done" : st.working > 0 ? "work" : "idle";
+  const mode = st.waiting > 0 ? "ask" : st.totalUnseen > 0 ? "done" : st.working > 0 ? "work" : "idle";
 
   return (
     <div className="beacon-root">
       <button className={`beacon beacon--${mode}`} data-tauri-drag-region onClick={() => setOpen((o) => !o)}>
+        {mode === "ask" && <span className="beacon__ping beacon__ping--ask"><i /><b /></span>}
         {mode === "done" && <span className="beacon__ping"><i /><b /></span>}
         {mode === "work" && <span className="beacon__eq"><i /><i /><i /></span>}
         {mode === "idle" && <span className="beacon__dot" />}
-        {mode !== "idle" && <span className="beacon__num">{mode === "done" ? st.totalUnseen : st.working}</span>}
-        <span className="beacon__lbl">{mode === "done" ? "done" : mode === "work" ? "working" : "idle"}</span>
+        {mode !== "idle" && <span className="beacon__num">{mode === "ask" ? st.waiting : mode === "done" ? st.totalUnseen : st.working}</span>}
+        <span className="beacon__lbl">{mode === "ask" ? "waiting" : mode === "done" ? "done" : mode === "work" ? "working" : "idle"}</span>
       </button>
       {open && (
         <div className="beacon-list">
           {st.sessions.length === 0 ? <div className="beacon-list__empty">No sessions</div>
             : st.sessions.map((s) => (
-            <button key={s.sessionId} className={`beacon-row beacon-row--${s.unseen ? "done" : s.status}`} onClick={() => jump(s.sessionId)}>
+            <button key={s.sessionId} className={`beacon-row beacon-row--${s.status === "waiting" ? "waiting" : s.unseen ? "done" : s.status}`} onClick={() => jump(s.sessionId)}>
               <span className="beacon-row__mark" />
               <span className="beacon-row__meta"><span className="beacon-row__nm">{s.name}</span>
                 <span className="beacon-row__sub">{s.project} · tab {s.tabIndex}</span></span>

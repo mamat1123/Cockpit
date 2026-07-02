@@ -28,6 +28,7 @@ import { emit, listen } from "@tauri-apps/api/event";
 import { buildBeaconState } from "../lib/beaconState";
 import { paneLastLineAt } from "../lib/terminalRegistry";
 import { deriveState } from "../lib/paneState";
+import { waitingPanes } from "../lib/waiting";
 import { startSavings } from "../lib/savingsStore";
 
 function livePaneIds(l: Layout): Set<string> {
@@ -152,9 +153,12 @@ export function CockpitView() {
     const tick = () => {
       const now = Date.now();
       const working = new Set<string>();
-      for (const t of layout.tabs) for (const r of t.rows) for (const p of r.panes)
-        if (deriveState({ lastLineAt: paneLastLineAt(p.id) }, now, 800) === "working") working.add(p.id);
-      void emit("cockpit://beacon-state", buildBeaconState(layout, notifications.list(), working));
+      const waiting = new Set<string>();
+      for (const t of layout.tabs) for (const r of t.rows) for (const p of r.panes) {
+        if (waitingPanes.get(p.id)) waiting.add(p.id);
+        else if (deriveState({ lastLineAt: paneLastLineAt(p.id) }, now, 800) === "working") working.add(p.id);
+      }
+      void emit("cockpit://beacon-state", buildBeaconState(layout, notifications.list(), working, waiting));
     };
     tick();
     const id = setInterval(tick, 500);
