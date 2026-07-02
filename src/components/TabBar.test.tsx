@@ -23,6 +23,7 @@ function baseProps(layout: Layout) {
     onNewTab: () => {},
     onReorder: () => {},
     onRenameTab: vi.fn(),
+    onCloseTab: vi.fn(),
     onOpenDashboard: () => {},
     onOpenPicker: () => {},
     onOpenWorkspaces: () => {},
@@ -118,5 +119,55 @@ describe("TabBar — rename", () => {
     const callsBefore = onSelect.mock.calls.length;
     act(() => input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })));
     expect(onSelect.mock.calls.length).toBe(callsBefore);
+  });
+});
+
+describe("TabBar — close", () => {
+  it("clicking × on a 1-pane tab closes it immediately", () => {
+    const layout = initLayout("/tmp/proj");
+    const onCloseTab = vi.fn();
+    const { container } = mount(layout, { onCloseTab });
+    const x = container.querySelector(".cockpit-tab__x") as HTMLButtonElement;
+    act(() => x.click());
+    expect(onCloseTab).toHaveBeenCalledWith(layout.tabs[0].id);
+    expect(container.querySelector(".confirm-chip")).toBeNull();
+  });
+
+  it("clicking × on a >1-pane tab shows a confirm chip instead of closing", () => {
+    const layout = reduce(initLayout("/tmp/proj"), { type: "split" });
+    const onCloseTab = vi.fn();
+    const { container } = mount(layout, { onCloseTab });
+    const x = container.querySelector(".cockpit-tab__x") as HTMLButtonElement;
+    act(() => x.click());
+    expect(onCloseTab).not.toHaveBeenCalled();
+    expect(container.querySelector(".confirm-chip")!.textContent).toContain("Close 2 sessions?");
+  });
+
+  it("Cancel in the confirm chip dismisses it without closing", () => {
+    const layout = reduce(initLayout("/tmp/proj"), { type: "split" });
+    const onCloseTab = vi.fn();
+    const { container } = mount(layout, { onCloseTab });
+    act(() => (container.querySelector(".cockpit-tab__x") as HTMLButtonElement).click());
+    act(() => (container.querySelector(".confirm-chip__cancel") as HTMLButtonElement).click());
+    expect(onCloseTab).not.toHaveBeenCalled();
+    expect(container.querySelector(".confirm-chip")).toBeNull();
+  });
+
+  it("Close in the confirm chip calls onCloseTab", () => {
+    const layout = reduce(initLayout("/tmp/proj"), { type: "split" });
+    const onCloseTab = vi.fn();
+    const { container } = mount(layout, { onCloseTab });
+    act(() => (container.querySelector(".cockpit-tab__x") as HTMLButtonElement).click());
+    act(() => (container.querySelector(".confirm-chip__go") as HTMLButtonElement).click());
+    expect(onCloseTab).toHaveBeenCalledWith(layout.tabs[0].id);
+  });
+
+  it("clicking outside the confirm chip dismisses it", () => {
+    const layout = reduce(initLayout("/tmp/proj"), { type: "split" });
+    const { container } = mount(layout);
+    act(() => (container.querySelector(".cockpit-tab__x") as HTMLButtonElement).click());
+    expect(container.querySelector(".confirm-chip")).not.toBeNull();
+    act(() => document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true })));
+    expect(container.querySelector(".confirm-chip")).toBeNull();
   });
 });

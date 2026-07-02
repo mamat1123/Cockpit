@@ -49,8 +49,14 @@ const SettingsIcon = () => (
     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
   </svg>
 );
+/** Close — X, used for the per-tab close button. */
+const CloseIcon = () => (
+  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round">
+    <path d="M6 6 L18 18 M18 6 L6 18" />
+  </svg>
+);
 
-export function TabBar({ layout, attention, unseenByTab, bellOpen, onToggleBell, onJumpSession, onSelect, onReorder, onRenameTab, onOpenDashboard, onOpenPicker, onOpenWorkspaces, onOpenSettings }: {
+export function TabBar({ layout, attention, unseenByTab, bellOpen, onToggleBell, onJumpSession, onSelect, onReorder, onRenameTab, onCloseTab, onOpenDashboard, onOpenPicker, onOpenWorkspaces, onOpenSettings }: {
   layout: Layout;
   attention: Set<string>;
   unseenByTab: Map<string, number>;
@@ -61,6 +67,7 @@ export function TabBar({ layout, attention, unseenByTab, bellOpen, onToggleBell,
   onNewTab: () => void;
   onReorder: (tabId: string, toIndex: number) => void;
   onRenameTab: (tabId: string, title: string) => void;
+  onCloseTab: (tabId: string) => void;
   onOpenDashboard: () => void;
   onOpenPicker: () => void;
   onOpenWorkspaces: () => void;
@@ -109,6 +116,21 @@ export function TabBar({ layout, attention, unseenByTab, bellOpen, onToggleBell,
     onRenameTab(tabId, draft);
   };
 
+  const [confirmingTabId, setConfirmingTabId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!confirmingTabId) return;
+    const onDown = (e: MouseEvent) => {
+      if (!(e.target as Element).closest(".cockpit-tab.is-confirming")) setConfirmingTabId(null);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [confirmingTabId]);
+
+  const requestClose = (t: Tab) => {
+    if (paneCount(t) > 1) setConfirmingTabId(t.id);
+    else onCloseTab(t.id);
+  };
+
   return (
     <div className="cockpit-tabs">
       <div className="cockpit-tabs__list">
@@ -117,12 +139,13 @@ export function TabBar({ layout, attention, unseenByTab, bellOpen, onToggleBell,
           const isWorking = working.has(t.id);
           const attn = attention.has(t.id) && !active;
           const editing = editingTabId === t.id;
+          const confirming = confirmingTabId === t.id;
           return (
             <div
               key={t.id}
               role="button"
               tabIndex={0}
-              className={`cockpit-tab${active ? " is-active" : ""}${attn ? " is-attention" : ""}`}
+              className={`cockpit-tab${active ? " is-active" : ""}${attn ? " is-attention" : ""}${confirming ? " is-confirming" : ""}`}
               draggable={!editing}
               onClick={() => onSelect(t.id)}
               onKeyDown={(e) => {
@@ -137,6 +160,14 @@ export function TabBar({ layout, attention, unseenByTab, bellOpen, onToggleBell,
                 if (fromId && fromId !== t.id) onReorder(fromId, i);
               }}
             >
+              {confirming ? (
+                <span className="confirm-chip">
+                  {`Close ${paneCount(t)} sessions?`}
+                  <button className="confirm-chip__go" onClick={(e) => { e.stopPropagation(); setConfirmingTabId(null); onCloseTab(t.id); }}>Close</button>
+                  <button className="confirm-chip__cancel" onClick={(e) => { e.stopPropagation(); setConfirmingTabId(null); }}>Cancel</button>
+                </span>
+              ) : (
+              <>
               {isWorking ? (
                 <span className="cockpit-tab__eq" aria-hidden="true"><i /><i /><i /></span>
               ) : (
@@ -163,9 +194,21 @@ export function TabBar({ layout, attention, unseenByTab, bellOpen, onToggleBell,
                   {tabName(t)}
                 </span>
               )}
-              <span className="cockpit-tab__ct">{paneCount(t)}</span>
+              <span className="cockpit-tab__meta">
+                <span className="cockpit-tab__ct">{paneCount(t)}</span>
+                <button
+                  className="cockpit-tab__x"
+                  aria-label="Close tab"
+                  title="Close tab"
+                  onClick={(e) => { e.stopPropagation(); requestClose(t); }}
+                >
+                  <CloseIcon />
+                </button>
+              </span>
               {!active && (unseenByTab.get(t.id) ?? 0) > 0 && (
                 <span className="cockpit-tab__badge">{unseenByTab.get(t.id)}</span>
+              )}
+              </>
               )}
             </div>
           );
