@@ -77,4 +77,53 @@ describe("ProviderPicker", () => {
     act(() => backdrop.dispatchEvent(new MouseEvent("mousedown", { bubbles: true })));
     expect(onCancel).toHaveBeenCalledOnce();
   });
+
+  it("ArrowRight moves focus and Enter confirms the focused card", () => {
+    const onPick = vi.fn();
+    const c = mount(onPick, () => {});
+    const panel = c.querySelector(".provider-picker__panel") as HTMLElement;
+
+    // Claude starts focused (focusIdx = 0)
+    let focused = c.querySelector(".provider-picker__card.is-focused") as HTMLElement;
+    expect(focused.classList.contains("provider-claude")).toBe(true);
+
+    // ArrowRight moves focus to Codex
+    act(() => panel.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })));
+    focused = c.querySelector(".provider-picker__card.is-focused") as HTMLElement;
+    expect(focused.classList.contains("provider-codex")).toBe(true);
+
+    // Enter confirms Codex
+    act(() => panel.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })));
+    expect(onPick).toHaveBeenCalledWith("codex");
+  });
+
+  it("ArrowRight does not navigate past the last enabled card to Z.ai", () => {
+    const onPick = vi.fn();
+    const c = mount(onPick, () => {});
+    const panel = c.querySelector(".provider-picker__panel") as HTMLElement;
+
+    // Move from Claude to Codex
+    act(() => panel.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })));
+    let focused = c.querySelector(".provider-picker__card.is-focused") as HTMLElement;
+    expect(focused.classList.contains("provider-codex")).toBe(true);
+
+    // Try to move past Codex (should stay on Codex, not go to Z.ai)
+    act(() => panel.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })));
+    focused = c.querySelector(".provider-picker__card.is-focused") as HTMLElement;
+    expect(focused.classList.contains("provider-codex")).toBe(true);
+    expect(focused.classList.contains("provider-zai")).toBe(false);
+
+    // Verify Z.ai card never gets is-focused (even though it exists)
+    const zaiCard = c.querySelector(".provider-picker__card.provider-zai") as HTMLElement;
+    expect(zaiCard.classList.contains("is-focused")).toBe(false);
+  });
+
+  it("pressing digit 3 is a no-op (Z.ai is disabled, not in enabled list)", () => {
+    const onPick = vi.fn();
+    const c = mount(onPick, () => {});
+    const panel = c.querySelector(".provider-picker__panel") as HTMLElement;
+
+    act(() => panel.dispatchEvent(new KeyboardEvent("keydown", { key: "3", bubbles: true })));
+    expect(onPick).not.toHaveBeenCalled();
+  });
 });
