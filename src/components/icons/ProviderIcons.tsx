@@ -1,4 +1,4 @@
-import type { SVGProps } from "react";
+import type { SVGProps, JSX } from "react";
 import type { AgentProvider } from "../../layout/paneLayout";
 
 export function ClaudeIcon(props: SVGProps<SVGSVGElement>) {
