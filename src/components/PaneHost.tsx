@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { findPaneBySession, type Action, type AgentProvider, type Layout } from "../layout/paneLayout";
 import { flattenPanes } from "./paneFlatten";
 import { TerminalPane } from "./TerminalPane";
-import { setPaneHeadroom, setPanePonytail } from "../lib/terminalRegistry";
+import { setPaneHeadroom, setPanePonytail, setPaneProvider } from "../lib/terminalRegistry";
 import type { PonytailLevel } from "../lib/ponytailClient";
 import { createCodexHandoff } from "../lib/handoffClient";
 
@@ -66,13 +66,19 @@ export function PaneHost({ layout, slots, dispatch }: {
               }}
               onSetPonytail={(level: PonytailLevel) => {
                 dispatch({ type: "setPonytail", paneId: pane.id, level });
-                void setPanePonytail(pane.id, pane.cwd, pane.sessionId, level, !!pane.headroom);
+                void setPanePonytail(pane.id, pane.cwd, pane.sessionId, level, !!pane.headroom, pane.provider ?? "claude");
               }}
               onSelectProvider={(provider: AgentProvider) => {
                 const current = pane.provider ?? "claude";
                 if (current === provider || handoffBusy === pane.id) return;
-                if (provider === "zai") return;
-                if (current === "claude" && provider === "codex") {
+                if (current !== "codex" && (provider === "claude" || provider === "zai")) {
+                  // claude ↔ zai: same claude binary on another backend — relaunch this
+                  // pane with --resume so the conversation continues.
+                  dispatch({ type: "setProvider", paneId: pane.id, provider });
+                  void setPaneProvider(pane.id, pane.cwd, pane.sessionId, provider, pane.ponytail ?? "off", !!pane.headroom);
+                  return;
+                }
+                if (current !== "codex" && provider === "codex") {
                   setHandoffBusy(pane.id);
                   void createCodexHandoff(pane.cwd, pane.sessionId)
                     .then((handoff) => {

@@ -105,14 +105,21 @@ function shellQuote(s: string): string {
  *  the HR + ponytail env via paneLaunchEnv (PONYTAIL_DEFAULT_MODE is always set, incl.
  *  "off", so Cockpit's per-pane level is authoritative). Resumes if the session log
  *  exists. Returns whether Headroom routing actually engaged (false = direct / proxy down,
- *  which falls back to direct so the pane is never stuck). */
-async function launchClaude(paneId: string, cwd: string, sessionId: string, resume: boolean, opts: { headroom: boolean; ponytail: PonytailLevel }, cols: number, rows: number): Promise<boolean> {
-  const flags = "--dangerously-skip-permissions";
-  let launch = `claude ${flags} --session-id ${sessionId}`;
+ *  which falls back to direct so the pane is never stuck).
+ *
+ *  `glm` launches through the user's `claude --glm` zsh wrapper — the claude binary on the
+ *  GLM (z.ai) backend, configured in ~/.claude/glm.env. The wrapper adds
+ *  --dangerously-skip-permissions itself and pins ANTHROPIC_BASE_URL to z.ai, so Headroom
+ *  routing never engages for a glm pane. */
+async function launchClaude(paneId: string, cwd: string, sessionId: string, resume: boolean, opts: { headroom: boolean; ponytail: PonytailLevel; glm?: boolean }, cols: number, rows: number): Promise<boolean> {
+  const bin = opts.glm ? "claude --glm" : "claude --dangerously-skip-permissions";
+  let launch = `${bin} --session-id ${sessionId}`;
   if (resume) {
-    try { if (await sessionExists(cwd, sessionId)) launch = `claude ${flags} --resume ${sessionId}`; } catch { /* not under tauri */ }
+    try { if (await sessionExists(cwd, sessionId)) launch = `${bin} --resume ${sessionId}`; } catch { /* not under tauri */ }
   }
-  const { engaged } = await resolveHeadroomRouting(opts.headroom, headroomEnsure, HEADROOM_BASE_URL);
+  const { engaged } = opts.glm
+    ? { engaged: false }
+    : await resolveHeadroomRouting(opts.headroom, headroomEnsure, HEADROOM_BASE_URL);
   const env = paneLaunchEnv({ headroomEngaged: engaged, ponytail: opts.ponytail, headroomBaseUrl: HEADROOM_BASE_URL });
   void spawnPty(paneId, cwd, cols, rows, launch, env);
   return engaged;
@@ -137,9 +144,7 @@ async function launchAgent(
   rows: number,
 ): Promise<boolean> {
   if (opts.provider === "codex") return launchCodex(paneId, cwd, opts.codexPromptPath, cols, rows);
-  if (opts.provider === "claude") return launchClaude(paneId, cwd, sessionId, resume, { headroom: opts.headroom, ponytail: opts.ponytail }, cols, rows);
-  await spawnPty(paneId, cwd, cols, rows, "printf 'z.ai provider is not wired yet\\n'", null);
-  return false;
+  return launchClaude(paneId, cwd, sessionId, resume, { headroom: opts.headroom, ponytail: opts.ponytail, glm: opts.provider === "zai" }, cols, rows);
 }
 
 /** Create (once) or return the persistent terminal for a pane. Spawns the PTY +
@@ -199,7 +204,9 @@ export function acquireTerminal(paneId: string, cwd: string, sessionId: string, 
 
   void launchAgent(paneId, cwd, sessionId, resume, opts, term.cols, term.rows)
     .then((engaged) => { if (engaged) routed.add(paneId); else routed.delete(paneId); });
-  if (opts.provider === "claude") void startLogtail(paneId, cwd, sessionId);
+  // z.ai panes run the claude binary, so their session jsonl feeds the same logtail
+  // (auto-title, waiting detection, notifications). Only codex has no claude log.
+  if (opts.provider !== "codex") void startLogtail(paneId, cwd, sessionId);
 
   const entry: TermEntry = { term, hostEl, fit, lastLineAt, lastInputAt, lastResizeAt };
   registry.set(paneId, entry);
@@ -301,13 +308,27 @@ export async function setPaneHeadroom(paneId: string, cwd: string, sessionId: st
 
 /** Switch a LIVE pane's Ponytail level: kill its claude and relaunch with --resume so the
  *  conversation is preserved (PONYTAIL_DEFAULT_MODE is read at session start, so a restart is
- *  the only way to switch). Passes the pane's current HR state so routing is preserved. No
- *  failure path: env injection always succeeds; a missing plugin is gated by the UI. */
-export async function setPanePonytail(paneId: string, cwd: string, sessionId: string, level: PonytailLevel, headroom: boolean): Promise<void> {
+ *  the only way to switch). Passes the pane's current HR state so routing is preserved, and
+ *  the provider so a z.ai pane relaunches on the GLM backend. No failure path: env injection
+ *  always succeeds; a missing plugin is gated by the UI. */
+export async function setPanePonytail(paneId: string, cwd: string, sessionId: string, level: PonytailLevel, headroom: boolean, provider: AgentProvider = "claude"): Promise<void> {
   const e = registry.get(paneId);
   if (!e) return;
   await killPty(paneId);
   e.term.write(`\r\n[switching ponytail → ${level}…]\r\n`);
-  const engaged = await launchClaude(paneId, cwd, sessionId, true, { headroom, ponytail: level }, e.term.cols, e.term.rows);
+  const engaged = await launchClaude(paneId, cwd, sessionId, true, { headroom, ponytail: level, glm: provider === "zai" }, e.term.cols, e.term.rows);
+  if (engaged) routed.add(paneId); else routed.delete(paneId);
+}
+
+/** Switch a LIVE pane between the Anthropic and GLM (z.ai) claude backends: kill its claude
+ *  and relaunch with --resume so the conversation continues on the other backend (both run
+ *  the claude binary, so the session transcript is shared). Headroom can only re-engage on
+ *  the Anthropic side; glm panes always run direct. */
+export async function setPaneProvider(paneId: string, cwd: string, sessionId: string, provider: AgentProvider, ponytail: PonytailLevel, headroom: boolean): Promise<void> {
+  const e = registry.get(paneId);
+  if (!e) return;
+  await killPty(paneId);
+  e.term.write(`\r\n[switching provider → ${provider}…]\r\n`);
+  const engaged = await launchClaude(paneId, cwd, sessionId, true, { headroom, ponytail, glm: provider === "zai" }, e.term.cols, e.term.rows);
   if (engaged) routed.add(paneId); else routed.delete(paneId);
 }

@@ -31,8 +31,8 @@ export const PROVIDERS: ProviderMeta[] = [
     label: "z.ai",
     shortLabel: "ZA",
     mark: "Z",
-    description: "Provider slot reserved for future support",
-    enabled: false,
+    description: "Claude Code on the GLM (z.ai) backend",
+    enabled: true,
   },
 ];
 

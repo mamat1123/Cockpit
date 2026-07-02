@@ -153,7 +153,9 @@ export function PaneHeader({ paneId, title, repo, state, waitLabel, headroom, po
           <span className="pane-head__hr-pop-foot">since app start</span>
         </span>
       </span>}
-      {provider === "claude" && <span className="pane-head__pt-wrap" ref={ptWrapRef}>
+      {/* PT works on any claude-binary pane (incl. z.ai/GLM); HR above stays claude-only
+          because the GLM wrapper pins ANTHROPIC_BASE_URL. */}
+      {provider !== "codex" && <span className="pane-head__pt-wrap" ref={ptWrapRef}>
         <button
           className={`pane-head__pt lvl-${ponytail}${ponytailInstalled ? "" : " is-disabled"}`}
           onClick={() => setPtOpen((o) => !o)}

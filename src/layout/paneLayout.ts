@@ -46,7 +46,8 @@ export type Action =
   | { type: "openCodexHandoff"; sourcePaneId: string; cwd: string; promptPath: string; fromSessionId: string; title?: string }
   | { type: "loadLayout"; saved: SavedLayout }
   | { type: "setHeadroom"; paneId: string; on: boolean }
-  | { type: "setPonytail"; paneId: string; level: PonytailLevel };
+  | { type: "setPonytail"; paneId: string; level: PonytailLevel }
+  | { type: "setProvider"; paneId: string; provider: AgentProvider };
 
 let counter = 0;
 const nextId = (p: string) => `${p}-${++counter}`;
@@ -362,6 +363,16 @@ export function reduce(l: Layout, a: Action): Layout {
         rows: t.rows.map((r) => ({
           ...r,
           panes: r.panes.map((p) => (p.id === a.paneId ? { ...p, ponytail: a.level } : p)),
+        })),
+      }));
+      return { ...l, tabs };
+    }
+    case "setProvider": {
+      const tabs = l.tabs.map((t) => ({
+        ...t,
+        rows: t.rows.map((r) => ({
+          ...r,
+          panes: r.panes.map((p) => (p.id === a.paneId ? { ...p, provider: a.provider } : p)),
         })),
       }));
       return { ...l, tabs };

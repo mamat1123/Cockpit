@@ -26,13 +26,13 @@ describe("ProviderPicker", () => {
     return container;
   }
 
-  it("renders one card per provider, Z.ai disabled", () => {
+  it("renders one card per provider, all enabled", () => {
     const c = mount(() => {}, () => {});
     const cards = Array.from(c.querySelectorAll(".provider-picker__card")) as HTMLButtonElement[];
     expect(cards).toHaveLength(3);
     expect(cards[0].disabled).toBe(false); // claude
     expect(cards[1].disabled).toBe(false); // codex
-    expect(cards[2].disabled).toBe(true);  // zai
+    expect(cards[2].disabled).toBe(false); // zai
   });
 
   it("clicking an enabled card confirms it immediately", () => {
@@ -44,12 +44,13 @@ describe("ProviderPicker", () => {
     expect(onPick).toHaveBeenCalledWith("codex");
   });
 
-  it("clicking the disabled Z.ai card does nothing", () => {
+  it("clicking the Z.ai card confirms it", () => {
     const onPick = vi.fn();
     const c = mount(onPick, () => {});
     const cards = Array.from(c.querySelectorAll(".provider-picker__card")) as HTMLButtonElement[];
     act(() => cards[2].click());
-    expect(onPick).not.toHaveBeenCalled();
+    expect(onPick).toHaveBeenCalledOnce();
+    expect(onPick).toHaveBeenCalledWith("zai");
   });
 
   it("Escape cancels without picking", () => {
@@ -97,33 +98,33 @@ describe("ProviderPicker", () => {
     expect(onPick).toHaveBeenCalledWith("codex");
   });
 
-  it("ArrowRight does not navigate past the last enabled card to Z.ai", () => {
+  it("ArrowRight reaches Z.ai and stops at the last card", () => {
     const onPick = vi.fn();
     const c = mount(onPick, () => {});
     const panel = c.querySelector(".provider-picker__panel") as HTMLElement;
 
-    // Move from Claude to Codex
+    // Claude → Codex → Z.ai
+    act(() => panel.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })));
     act(() => panel.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })));
     let focused = c.querySelector(".provider-picker__card.is-focused") as HTMLElement;
-    expect(focused.classList.contains("provider-codex")).toBe(true);
+    expect(focused.classList.contains("provider-zai")).toBe(true);
 
-    // Try to move past Codex (should stay on Codex, not go to Z.ai)
+    // Past the last card is clamped
     act(() => panel.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })));
     focused = c.querySelector(".provider-picker__card.is-focused") as HTMLElement;
-    expect(focused.classList.contains("provider-codex")).toBe(true);
-    expect(focused.classList.contains("provider-zai")).toBe(false);
+    expect(focused.classList.contains("provider-zai")).toBe(true);
 
-    // Verify Z.ai card never gets is-focused (even though it exists)
-    const zaiCard = c.querySelector(".provider-picker__card.provider-zai") as HTMLElement;
-    expect(zaiCard.classList.contains("is-focused")).toBe(false);
+    // Enter confirms Z.ai
+    act(() => panel.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })));
+    expect(onPick).toHaveBeenCalledWith("zai");
   });
 
-  it("pressing digit 3 is a no-op (Z.ai is disabled, not in enabled list)", () => {
+  it("pressing digit 3 confirms Z.ai directly", () => {
     const onPick = vi.fn();
     const c = mount(onPick, () => {});
     const panel = c.querySelector(".provider-picker__panel") as HTMLElement;
 
     act(() => panel.dispatchEvent(new KeyboardEvent("keydown", { key: "3", bubbles: true })));
-    expect(onPick).not.toHaveBeenCalled();
+    expect(onPick).toHaveBeenCalledWith("zai");
   });
 });

@@ -411,3 +411,23 @@ describe("provider selection on creation", () => {
     expect(panesOf(l)[1].provider).toBeUndefined();
   });
 });
+
+describe("provider switching", () => {
+  it("setProvider changes the target pane only", () => {
+    let l = initLayout(CWD);
+    l = reduce(l, { type: "split" });
+    const [p0, p1] = panesOf(l);
+    l = reduce(l, { type: "setProvider", paneId: p0.id, provider: "zai" });
+    expect(panesOf(l).find((p) => p.id === p0.id)!.provider).toBe("zai");
+    expect(panesOf(l).find((p) => p.id === p1.id)!.provider).toBeUndefined();
+  });
+
+  it("a zai pane round-trips through serialize/deserialize", () => {
+    let l = initLayout(CWD);
+    const pid = panesOf(l)[0].id;
+    l = reduce(l, { type: "setProvider", paneId: pid, provider: "zai" });
+    const saved = serializeLayout(l, true);
+    expect(saved.tabs[0].rows[0].panes[0].provider).toBe("zai");
+    expect(deserializeLayout(saved).tabs[0].rows[0].panes[0].provider).toBe("zai");
+  });
+});
