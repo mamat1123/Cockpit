@@ -181,6 +181,8 @@ export function CockpitView() {
         }}
         onNewTab={() => setPickerOpen(true)}
         onReorder={(tabId, toIndex) => dispatch({ type: "moveTab", tabId, toIndex })}
+        onRenameTab={(tabId, title) => dispatch({ type: "renameTab", tabId, title })}
+        onCloseTab={(tabId) => dispatch({ type: "closeTab", tabId })}
         onOpenDashboard={() => setDashOpen(true)}
         onOpenPicker={() => setPickerOpen(true)}
         onOpenWorkspaces={() => setWsOpen(true)}
