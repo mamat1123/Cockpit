@@ -94,21 +94,29 @@ export function TabBar({ layout, attention, unseenByTab, bellOpen, onToggleBell,
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const graceUntilRef = useRef(0);
   useEffect(() => {
     if (!editingTabId) return;
     const el = inputRef.current;
     if (!el) return;
     el.focus();
     el.select();
-    // Selecting a tab (see onSelect below) schedules a double-rAF focusTerminal() to pull focus
-    // into the terminal once it's visible. Re-assert focus on that same delay so double-clicking
-    // a tab to rename it doesn't get the first few keystrokes silently redirected into a live
-    // terminal a beat later.
-    let raf2 = 0;
-    const raf1 = requestAnimationFrame(() => {
-      raf2 = requestAnimationFrame(() => { el.focus(); el.select(); });
-    });
-    return () => { cancelAnimationFrame(raf1); cancelAnimationFrame(raf2); };
+    // Double-clicking a tab is two clicks + a dblclick. Both clicks call onSelect (below), which
+    // schedules a double-rAF focusTerminal() to pull focus into the terminal once it's visible —
+    // that steal can land a couple of frames AFTER this input has already mounted and focused. A
+    // single re-assertion can't reliably win that race, and since onBlur commits immediately,
+    // losing focus even once tears the input down before a later re-assertion could matter. So for
+    // a short grace window after opening rename, reclaim focus every frame and (see onBlur below)
+    // ignore blur entirely, instead of trying to win a one-shot race.
+    graceUntilRef.current = performance.now() + 200;
+    let raf = 0;
+    const tick = () => {
+      if (performance.now() >= graceUntilRef.current) return;
+      if (document.activeElement !== el) { el.focus(); el.select(); }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
   }, [editingTabId]);
 
   const commitRename = (tabId: string) => {
@@ -180,7 +188,12 @@ export function TabBar({ layout, attention, unseenByTab, bellOpen, onToggleBell,
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   onClick={(e) => e.stopPropagation()}
-                  onBlur={() => commitRename(t.id)}
+                  onBlur={() => {
+                    // Ignore blur during the steal-defense grace window above — the tick loop is
+                    // already reclaiming focus every frame, so this blur is the race, not the user.
+                    if (performance.now() < graceUntilRef.current) return;
+                    commitRename(t.id);
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") { e.preventDefault(); commitRename(t.id); }
                     else if (e.key === "Escape") { e.preventDefault(); setEditingTabId(null); }
