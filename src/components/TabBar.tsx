@@ -112,7 +112,10 @@ export function TabBar({ layout, attention, unseenByTab, bellOpen, onToggleBell,
     let raf = 0;
     const tick = () => {
       if (performance.now() >= graceUntilRef.current) return;
-      if (document.activeElement !== el) { el.focus(); el.select(); }
+      // focus() only — select()ing here would re-select the whole draft on every reclaim,
+      // so a steal+reclaim mid-typing would make the next keystroke overwrite everything
+      // typed so far instead of just landing at the caret.
+      if (document.activeElement !== el) el.focus();
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
