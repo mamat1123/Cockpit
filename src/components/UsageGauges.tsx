@@ -223,7 +223,7 @@ function MiniProviderRow({ id, state, budget }: {
       onFocus={() => setOpen(true)}
       onBlur={() => setOpen(false)}
     >
-      <span className={`cu-badge provider-${id}`}>{meta.mark}</span>
+      <span className={`cu-badge provider-${id}`}><ProviderIcon id={id} /></span>
       <span className="cu-provider-row__bars">
         <MiniWithReset win={five} now={now} stale={stale} />
         <MiniWithReset win={week} now={now} stale={stale} />
