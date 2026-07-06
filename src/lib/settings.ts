@@ -24,9 +24,11 @@ export interface Settings {
   notifications: NotificationSettings;
   /** Tab list orientation: horizontal top strip or 200px left sidebar. */
   tabBar: TabBarPosition;
+  /** Create a git worktree ("Burrow") per new Session. See ADR 0011. */
+  burrows: boolean;
 }
 
-export const DEFAULT_SETTINGS: Settings = { bgOpacity: 0.62, themeId: "amber-hud", accent: null, blurRadius: 24, fontFamily: "Menlo", fontSize: 13, notifications: DEFAULT_NOTIFICATIONS, tabBar: "top" };
+export const DEFAULT_SETTINGS: Settings = { bgOpacity: 0.62, themeId: "amber-hud", accent: null, blurRadius: 24, fontFamily: "Menlo", fontSize: 13, notifications: DEFAULT_NOTIFICATIONS, tabBar: "top", burrows: true };
 
 export function loadSettings(): Settings {
   try {
@@ -42,6 +44,7 @@ export function loadSettings(): Settings {
         fontSize: typeof m.fontSize === "number" && m.fontSize > 0 ? m.fontSize : DEFAULT_SETTINGS.fontSize,
         notifications: { ...DEFAULT_NOTIFICATIONS, ...(m.notifications ?? {}) },
         tabBar: m.tabBar === "left" ? "left" : "top",
+        burrows: typeof m.burrows === "boolean" ? m.burrows : true,
       };
     }
   } catch { /* no localStorage / bad json — use defaults */ }

@@ -213,6 +213,18 @@ export function SettingsMenu({ settings, onPatch, onClose, onUpdateFound }: {
 
         <div className="settings__row">
           <div className="settings__label">
+            <span className="settings__name">New Session in its own Burrow</span>
+            <span className="settings__desc">create a git worktree per new Session so it can work in isolation</span>
+          </div>
+          <div className="settings__control">
+            <input className="settings__toggle" type="checkbox" checked={settings.burrows}
+              onChange={(e) => onPatch({ burrows: e.target.checked })}
+              aria-label="New Session in its own Burrow" />
+          </div>
+        </div>
+
+        <div className="settings__row">
+          <div className="settings__label">
             <span className="settings__name">z.ai monitor token</span>
             <span className="settings__desc">shows the z.ai (GLM Coding Plan) usage gauge — token from your own z.ai account, saved in macOS Keychain</span>
           </div>
