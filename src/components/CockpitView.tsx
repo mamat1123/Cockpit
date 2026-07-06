@@ -280,19 +280,21 @@ export function CockpitView() {
           context={pendingCreation}
           onCancel={() => setPendingCreation(null)}
           onPick={async (provider) => {
+            const pc = pendingCreation;
+            setPendingCreation(null);
+            if (!pc) return;
             // A z.ai pane launches via the `claude --glm` wrapper, which sources its creds
             // from ~/.claude/glm.env — no Cockpit-side token gate needed (the monitor token
             // in Settings is only for the usage gauge, a separate credential).
-            if (pendingCreation.kind === "newTab") {
-              const burrow = await maybeBurrow(pendingCreation.cwd);
-              dispatch({ type: "newTab", cwd: pendingCreation.cwd, provider, burrow });
+            if (pc.kind === "newTab") {
+              const burrow = await maybeBurrow(pc.cwd);
+              dispatch({ type: "newTab", cwd: pc.cwd, provider, burrow });
             } else {
               // split / splitDown: cut a fresh Burrow off the default branch, located via
               // the focused pane's cwd (which itself may be a Burrow — create_burrow resolves it).
               const burrow = await maybeBurrow(focusedPaneCwd());
-              dispatch({ type: pendingCreation.kind, provider, burrow });
+              dispatch({ type: pc.kind, provider, burrow });
             }
-            setPendingCreation(null);
           }}
         />
       )}
