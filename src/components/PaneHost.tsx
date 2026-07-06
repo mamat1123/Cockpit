@@ -15,10 +15,11 @@ import { createCodexHandoff, createClaudeHandoff } from "../lib/handoffClient";
  *  Drag-to-reposition feedback: the header is the drag handle; the whole pane is a drop
  *  zone. `dragId`/`overId` drive the dimmed-source + highlighted-target visuals so you
  *  can see where a pane will land (it's inserted AFTER the highlighted target). */
-export function PaneHost({ layout, slots, dispatch }: {
+export function PaneHost({ layout, slots, dispatch, onRequestClose }: {
   layout: Layout;
   slots: Record<string, HTMLElement>;
   dispatch: (a: Action) => void;
+  onRequestClose: (paneId: string) => void;
 }) {
   const parkRef = useRef<HTMLDivElement>(null);
   const [, force] = useState(0);
@@ -54,7 +55,7 @@ export function PaneHost({ layout, slots, dispatch }: {
               onRename={(t) => dispatch({ type: "renamePane", paneId: pane.id, title: t })}
               onAutoTitle={(t) => dispatch({ type: "autoTitlePane", paneId: pane.id, title: t })}
               onPopOut={() => dispatch({ type: "popOut", paneId: pane.id })}
-              onClose={() => { dispatch({ type: "focusPane", paneId: pane.id }); dispatch({ type: "close" }); }}
+              onClose={() => onRequestClose(pane.id)}
               onToggleHeadroom={() => {
                 // Optimistic flip for instant feedback, then bounce back to off if turning
                 // ON couldn't actually engage the proxy (it fell back to direct) — so the

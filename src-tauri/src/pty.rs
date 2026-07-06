@@ -13,6 +13,16 @@ pub fn validate_cwd(path: &str) -> Result<String, String> {
         .map_err(|e| format!("cannot canonicalize {path}: {e}"))
 }
 
+/// The cwd to actually spawn in: the requested path if it validates, else its
+/// parent Project root (a removed Burrow → resume in the repo), else the request
+/// unchanged (let the normal validate error surface).
+pub fn resolve_spawn_cwd(cwd: &str) -> String {
+    if validate_cwd(cwd).is_ok() { return cwd.to_string(); }
+    let root = crate::worktree::project_root_of(cwd);
+    if root != cwd && validate_cwd(&root).is_ok() { return root; }
+    cwd.to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -29,6 +39,17 @@ mod tests {
         let tmp = std::env::temp_dir();
         let r = validate_cwd(tmp.to_str().unwrap());
         assert!(r.is_ok());
+    }
+
+    #[test]
+    fn resolve_falls_back_to_project_root() {
+        // A missing Burrow path resolves to its (existing) parent project dir.
+        let tmp = std::env::temp_dir();
+        let root = tmp.to_string_lossy().into_owned();
+        let gone = format!("{root}/.worktrees/otter"); // does not exist
+        assert_eq!(resolve_spawn_cwd(&gone), root);
+        // An existing path is returned canonicalized (unchanged parent).
+        assert!(resolve_spawn_cwd(&root).len() > 0);
     }
 }
 
@@ -71,7 +92,7 @@ pub fn pty_spawn(
     if mgr.0.lock().unwrap().contains_key(&pane_id) {
         return Ok(());
     }
-    let cwd = validate_cwd(&cwd)?;
+    let cwd = validate_cwd(&resolve_spawn_cwd(&cwd))?;
     let pty = native_pty_system();
     let pair = pty
         .openpty(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })

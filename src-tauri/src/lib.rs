@@ -10,6 +10,7 @@ mod headroom;
 mod headroomlog;
 mod ponytail;
 mod handoff;
+mod worktree;
 
 use tauri::{Emitter, Manager};
 
@@ -132,6 +133,9 @@ pub fn run() {
             ponytail::ponytail_installed,
             handoff::create_codex_handoff,
             handoff::create_claude_handoff,
+            worktree::create_burrow,
+            worktree::remove_burrow,
+            worktree::burrow_dirty,
         ])
         .setup(|app| {
             use tauri::{WebviewWindowBuilder, WebviewUrl, WindowEvent};
