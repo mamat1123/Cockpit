@@ -2,6 +2,8 @@ import type { PonytailLevel } from "../lib/ponytailClient";
 
 export type AgentProvider = "claude" | "codex" | "zai";
 
+export interface BurrowInfo { path: string; branch: string; codename: string; emoji: string }
+
 export interface Pane {
   id: string;
   cwd: string;
@@ -16,20 +18,24 @@ export interface Pane {
   codexPromptPath?: string;
   claudePromptPath?: string;
   handoffFromSessionId?: string;
+  codename?: string;
+  emoji?: string;
+  burrowBranch?: string;
+  isBurrow?: boolean;
 }
 export interface Row { id: string; panes: Pane[]; size: number }
 export interface Tab { id: string; title?: string; rows: Row[] }
 export interface Layout { tabs: Tab[]; activeTabId: string; focusedPaneId: string }
 
-export interface SavedPane { cwd: string; title: string; autoTitle: boolean; size: number; sessionId?: string; headroom?: boolean; ponytail?: PonytailLevel; provider?: AgentProvider; handoffFromSessionId?: string }
+export interface SavedPane { cwd: string; title: string; autoTitle: boolean; size: number; sessionId?: string; headroom?: boolean; ponytail?: PonytailLevel; provider?: AgentProvider; handoffFromSessionId?: string; codename?: string; emoji?: string; burrowBranch?: string; isBurrow?: boolean }
 export interface SavedRow { size: number; panes: SavedPane[] }
 export interface SavedTab { title?: string; rows: SavedRow[] }
 export interface SavedLayout { tabs: SavedTab[]; activeTabIndex: number }
 
 export type Action =
-  | { type: "newTab"; cwd?: string; provider?: AgentProvider }
-  | { type: "split"; provider?: AgentProvider }       // split right: add a column in the focused pane's row
-  | { type: "splitDown"; provider?: AgentProvider }   // split down: add a new row after the focused pane's row
+  | { type: "newTab"; cwd?: string; provider?: AgentProvider; burrow?: BurrowInfo }
+  | { type: "split"; provider?: AgentProvider; burrow?: BurrowInfo }       // split right: add a column in the focused pane's row
+  | { type: "splitDown"; provider?: AgentProvider; burrow?: BurrowInfo }   // split down: add a new row after the focused pane's row
   | { type: "close" }
   | { type: "focusPane"; paneId: string }
   | { type: "focusTab"; tabId: string }
@@ -54,8 +60,10 @@ export type Action =
 let counter = 0;
 const nextId = (p: string) => `${p}-${++counter}`;
 const defaultTitle = (cwd: string) => cwd.split("/").filter(Boolean).pop() ?? "shell";
-const makePane = (cwd: string, provider?: AgentProvider): Pane => ({ id: nextId("pane"), cwd, size: 1, title: defaultTitle(cwd), autoTitle: true, sessionId: crypto.randomUUID(), provider });
-const makeRow = (cwd: string, provider?: AgentProvider): Row => ({ id: nextId("row"), panes: [makePane(cwd, provider)], size: 1 });
+const makePane = (cwd: string, provider?: AgentProvider, burrow?: BurrowInfo): Pane => burrow
+  ? { id: nextId("pane"), cwd: burrow.path, size: 1, title: `${burrow.emoji} ${burrow.codename}`, autoTitle: false, sessionId: crypto.randomUUID(), provider, codename: burrow.codename, emoji: burrow.emoji, burrowBranch: burrow.branch, isBurrow: true }
+  : { id: nextId("pane"), cwd, size: 1, title: defaultTitle(cwd), autoTitle: true, sessionId: crypto.randomUUID(), provider };
+const makeRow = (cwd: string, provider?: AgentProvider, burrow?: BurrowInfo): Row => ({ id: nextId("row"), panes: [makePane(cwd, provider, burrow)], size: 1 });
 
 export function findPaneBySession(l: Layout, sessionId: string): { tabId: string; paneId: string } | null {
   for (const t of l.tabs) for (const r of t.rows) for (const p of r.panes)
@@ -89,6 +97,7 @@ export function serializeLayout(l: Layout, keepSessions: boolean): SavedLayout {
           ...(p.ponytail && p.ponytail !== "off" ? { ponytail: p.ponytail } : {}),
           ...(p.provider && p.provider !== "claude" ? { provider: p.provider } : {}),
           ...(p.handoffFromSessionId ? { handoffFromSessionId: p.handoffFromSessionId } : {}),
+          ...(p.isBurrow ? { isBurrow: true, codename: p.codename, emoji: p.emoji, burrowBranch: p.burrowBranch } : {}),
           ...(keepSessions ? { sessionId: p.sessionId } : {}),
         })),
       })),
@@ -115,6 +124,10 @@ export function deserializeLayout(s: SavedLayout): Layout {
         ponytail: p.ponytail ?? "off",
         provider: p.provider ?? "claude",
         handoffFromSessionId: p.handoffFromSessionId,
+        codename: p.codename,
+        emoji: p.emoji,
+        burrowBranch: p.burrowBranch,
+        isBurrow: !!p.isBurrow,
       })),
     })),
   }));
@@ -155,15 +168,15 @@ export function reduce(l: Layout, a: Action): Layout {
       // A tab always opens in a real folder. With no cwd given AND nothing focused
       // (empty layout), there's nothing to inherit — the caller must pick a folder
       // (the UI routes ⌘T / + through the ProjectPicker), so this is a no-op.
-      const cwd = a.cwd ?? focusedCwd(l);
+      const cwd = a.burrow?.path ?? a.cwd ?? focusedCwd(l);
       if (!cwd) return l;
-      const row = makeRow(cwd, a.provider);
+      const row = makeRow(cwd, a.provider, a.burrow);
       const tab: Tab = { id: nextId("tab"), rows: [row] };
       return { tabs: [...l.tabs, tab], activeTabId: tab.id, focusedPaneId: row.panes[0].id };
     }
     case "split": {
       if (l.tabs.length === 0) return l;
-      const pane = makePane(focusedCwd(l), a.provider);
+      const pane = makePane(a.burrow?.path ?? focusedCwd(l), a.provider, a.burrow);
       const tabs = l.tabs.map((t) => {
         if (t.id !== l.activeTabId) return t;
         return {
@@ -181,7 +194,7 @@ export function reduce(l: Layout, a: Action): Layout {
     }
     case "splitDown": {
       if (l.tabs.length === 0) return l;
-      const row = makeRow(focusedCwd(l), a.provider);
+      const row = makeRow(a.burrow?.path ?? focusedCwd(l), a.provider, a.burrow);
       const tabs = l.tabs.map((t) => {
         if (t.id !== l.activeTabId) return t;
         const rIdx = t.rows.findIndex((r) => r.panes.some((p) => p.id === l.focusedPaneId));

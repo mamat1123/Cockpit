@@ -474,3 +474,38 @@ describe("provider switching", () => {
     expect(deserializeLayout(saved).tabs[0].rows[0].panes[0].provider).toBe("zai");
   });
 });
+
+import type { BurrowInfo } from "./paneLayout";
+
+const BURROW: BurrowInfo = { path: "/repo/.worktrees/otter", branch: "otter", codename: "otter", emoji: "🦦" };
+
+describe("burrow panes", () => {
+  it("newTab with a burrow spawns in the worktree path and titles as emoji+codename", () => {
+    const l = reduce(initLayout("/repo"), { type: "newTab", cwd: "/repo", provider: "claude", burrow: BURROW });
+    const pane = l.tabs[l.tabs.length - 1].rows[0].panes[0];
+    expect(pane.cwd).toBe("/repo/.worktrees/otter");
+    expect(pane.title).toBe("🦦 otter");
+    expect(pane.autoTitle).toBe(false);
+    expect(pane.isBurrow).toBe(true);
+    expect(pane.burrowBranch).toBe("otter");
+  });
+
+  it("split with a burrow ignores the inherited cwd and uses the worktree", () => {
+    const base = initLayout("/repo/.worktrees/panda");
+    const l = reduce(base, { type: "split", provider: "claude", burrow: BURROW });
+    const pane = l.tabs[0].rows[0].panes.find((p) => p.id === l.focusedPaneId)!;
+    expect(pane.cwd).toBe("/repo/.worktrees/otter");
+    expect(pane.isBurrow).toBe(true);
+  });
+
+  it("serialize→deserialize round-trips burrow fields", () => {
+    const l = reduce(initLayout("/repo"), { type: "newTab", cwd: "/repo", burrow: BURROW });
+    const back = deserializeLayout(serializeLayout(l, true));
+    const pane = back.tabs[back.tabs.length - 1].rows[0].panes[0];
+    expect(pane.isBurrow).toBe(true);
+    expect(pane.codename).toBe("otter");
+    expect(pane.emoji).toBe("🦦");
+    expect(pane.burrowBranch).toBe("otter");
+    expect(pane.title).toBe("🦦 otter");
+  });
+});
