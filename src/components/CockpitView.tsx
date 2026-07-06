@@ -101,10 +101,16 @@ export function CockpitView() {
     return out;
   }, [layout]);
 
-  // Remove every Burrow in `list` (force = keep-nothing) then run the layout change.
+  // Burrows to remove once their pane ACTUALLY leaves the layout — gated by the
+  // removed-pane effect below so the reducer's "never close the last pane/tab" guard
+  // can't leave us deleting a worktree out from under a still-live terminal.
+  const pendingBurrowPurge = useRef(new Map<string, { path: string; branch: string }>());
+
+  // Register each Burrow for removal, then run the layout change. Actual removal happens
+  // in the removed-pane effect below, only if the pane really left the layout.
   const purgeAndClose = useCallback((list: BurrowToClose[], commit: () => void) => {
+    for (const b of list) pendingBurrowPurge.current.set(b.paneId, { path: b.path, branch: b.branch });
     commit();
-    for (const b of list) void removeBurrow(b.path, b.branch, true);
   }, []);
 
   const closeWithBurrows = useCallback(async (list: BurrowToClose[], commit: () => void) => {
@@ -180,7 +186,14 @@ export function CockpitView() {
   useEffect(() => {
     const now = livePaneIds(layout);
     for (const id of prevIds.current) {
-      if (!now.has(id)) { void killPty(id); void stopLogtail(id); slotCbs.current.delete(id); releaseTerminal(id); }
+      if (!now.has(id)) {
+        void killPty(id); void stopLogtail(id); slotCbs.current.delete(id); releaseTerminal(id);
+        const b = pendingBurrowPurge.current.get(id);
+        if (b) {
+          pendingBurrowPurge.current.delete(id);
+          void removeBurrow(b.path, b.branch, true).catch((e) => console.error("[cockpit] burrow removal failed", e));
+        }
+      }
     }
     prevIds.current = now;
   }, [layout]);
