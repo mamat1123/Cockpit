@@ -205,7 +205,7 @@ pub async fn cost_report(mgr: State<'_, CostReportManager>) -> Result<CostReport
                 let cwd = cwd_opt.unwrap_or_default();
                 let project = if cwd.is_empty() {
                     dpath.file_name().and_then(|s| s.to_str()).unwrap_or("—").to_string()
-                } else { label_from_cwd(&cwd) };
+                } else { label_from_cwd(&crate::worktree::project_root_of(&cwd)) };
                 let title = title_opt.unwrap_or_default();
                 st.meta.insert(session.clone(), (cwd, project, title));
                 st.files.insert(p.clone(), FileState { offset: 0, session });
@@ -282,6 +282,7 @@ pub fn list_projects() -> Vec<Project> {
         }
         if let Some((mtime, path)) = newest {
             if let (Some(cwd), _) = first_meta(&path) {
+                let cwd = crate::worktree::project_root_of(&cwd);
                 let ms = mtime.duration_since(std::time::UNIX_EPOCH).map(|x| x.as_millis() as u64).unwrap_or(0);
                 rows.push((cwd, ms));
             }
@@ -364,5 +365,14 @@ mod tests {
         assert_eq!(cwd.as_deref(), Some("/Users/x/Work/mee-tang/app"));
         assert_eq!(title.as_deref(), Some("fix the login bug"));
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn label_rolls_burrow_up_to_project() {
+        // A Burrow cwd must label as its parent Project, not the Codename.
+        let cwd = "/Users/me/Cockpit/.worktrees/otter";
+        let root = crate::worktree::project_root_of(cwd);
+        assert_eq!(root, "/Users/me/Cockpit");
+        assert_eq!(label_from_cwd(&root), "me/Cockpit");
     }
 }
