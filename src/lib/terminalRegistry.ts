@@ -110,12 +110,17 @@ function shellQuote(s: string): string {
  *  `glm` launches through the user's `claude --glm` zsh wrapper — the claude binary on the
  *  GLM (z.ai) backend, configured in ~/.claude/glm.env. The wrapper adds
  *  --dangerously-skip-permissions itself and pins ANTHROPIC_BASE_URL to z.ai, so Headroom
- *  routing never engages for a glm pane. */
-async function launchClaude(paneId: string, cwd: string, sessionId: string, resume: boolean, opts: { headroom: boolean; ponytail: PonytailLevel; glm?: boolean }, cols: number, rows: number): Promise<boolean> {
+ *  routing never engages for a glm pane.
+ *
+ *  `promptPath` (a Codex→Claude handoff) seeds the first turn: its file is cat'd into the
+ *  launch as the opening prompt when NOT resuming. */
+async function launchClaude(paneId: string, cwd: string, sessionId: string, resume: boolean, promptPath: string | undefined, opts: { headroom: boolean; ponytail: PonytailLevel; glm?: boolean }, cols: number, rows: number): Promise<boolean> {
   const bin = opts.glm ? "claude --glm" : "claude --dangerously-skip-permissions";
   let launch = `${bin} --session-id ${sessionId}`;
   if (resume) {
     try { if (await sessionExists(cwd, sessionId)) launch = `${bin} --resume ${sessionId}`; } catch { /* not under tauri */ }
+  } else if (promptPath) {
+    launch = `${launch} "$(cat ${shellQuote(promptPath)})"`;
   }
   const { engaged } = opts.glm
     ? { engaged: false }
@@ -139,17 +144,17 @@ async function launchAgent(
   cwd: string,
   sessionId: string,
   resume: boolean,
-  opts: { provider: AgentProvider; headroom: boolean; ponytail: PonytailLevel; codexPromptPath?: string },
+  opts: { provider: AgentProvider; headroom: boolean; ponytail: PonytailLevel; codexPromptPath?: string; claudePromptPath?: string },
   cols: number,
   rows: number,
 ): Promise<boolean> {
   if (opts.provider === "codex") return launchCodex(paneId, cwd, opts.codexPromptPath, cols, rows);
-  return launchClaude(paneId, cwd, sessionId, resume, { headroom: opts.headroom, ponytail: opts.ponytail, glm: opts.provider === "zai" }, cols, rows);
+  return launchClaude(paneId, cwd, sessionId, resume, opts.claudePromptPath, { headroom: opts.headroom, ponytail: opts.ponytail, glm: opts.provider === "zai" }, cols, rows);
 }
 
 /** Create (once) or return the persistent terminal for a pane. Spawns the PTY +
  *  selected agent and starts Claude logtail when applicable. */
-export function acquireTerminal(paneId: string, cwd: string, sessionId: string, resume: boolean, opts: { provider: AgentProvider; headroom: boolean; ponytail: PonytailLevel; codexPromptPath?: string }): TermEntry {
+export function acquireTerminal(paneId: string, cwd: string, sessionId: string, resume: boolean, opts: { provider: AgentProvider; headroom: boolean; ponytail: PonytailLevel; codexPromptPath?: string; claudePromptPath?: string }): TermEntry {
   const existing = registry.get(paneId);
   if (existing) return existing;
 
@@ -300,7 +305,7 @@ export async function setPaneHeadroom(paneId: string, cwd: string, sessionId: st
   if (!e) return false;
   await killPty(paneId);
   e.term.write("\r\n[switching Headroom routing…]\r\n");
-  const engaged = await launchClaude(paneId, cwd, sessionId, true, { headroom: on, ponytail }, e.term.cols, e.term.rows);
+  const engaged = await launchClaude(paneId, cwd, sessionId, true, undefined, { headroom: on, ponytail }, e.term.cols, e.term.rows);
   if (engaged) routed.add(paneId); else routed.delete(paneId);
   if (on && !engaged) e.term.write("[Headroom proxy unavailable — staying on direct]\r\n");
   return engaged;
@@ -316,7 +321,7 @@ export async function setPanePonytail(paneId: string, cwd: string, sessionId: st
   if (!e) return;
   await killPty(paneId);
   e.term.write(`\r\n[switching ponytail → ${level}…]\r\n`);
-  const engaged = await launchClaude(paneId, cwd, sessionId, true, { headroom, ponytail: level, glm: provider === "zai" }, e.term.cols, e.term.rows);
+  const engaged = await launchClaude(paneId, cwd, sessionId, true, undefined, { headroom, ponytail: level, glm: provider === "zai" }, e.term.cols, e.term.rows);
   if (engaged) routed.add(paneId); else routed.delete(paneId);
 }
 
@@ -329,6 +334,6 @@ export async function setPaneProvider(paneId: string, cwd: string, sessionId: st
   if (!e) return;
   await killPty(paneId);
   e.term.write(`\r\n[switching provider → ${provider}…]\r\n`);
-  const engaged = await launchClaude(paneId, cwd, sessionId, true, { headroom, ponytail, glm: provider === "zai" }, e.term.cols, e.term.rows);
+  const engaged = await launchClaude(paneId, cwd, sessionId, true, undefined, { headroom, ponytail, glm: provider === "zai" }, e.term.cols, e.term.rows);
   if (engaged) routed.add(paneId); else routed.delete(paneId);
 }

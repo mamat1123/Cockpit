@@ -14,6 +14,7 @@ export interface Pane {
   ponytail?: PonytailLevel;
   provider?: AgentProvider;
   codexPromptPath?: string;
+  claudePromptPath?: string;
   handoffFromSessionId?: string;
 }
 export interface Row { id: string; panes: Pane[]; size: number }
@@ -44,6 +45,7 @@ export type Action =
   | { type: "movePaneAfter"; paneId: string; targetPaneId: string }
   | { type: "openSession"; cwd: string; sessionId: string }
   | { type: "openCodexHandoff"; sourcePaneId: string; cwd: string; promptPath: string; fromSessionId: string; title?: string }
+  | { type: "openClaudeHandoff"; sourcePaneId: string; cwd: string; promptPath?: string; title?: string; provider?: AgentProvider }
   | { type: "loadLayout"; saved: SavedLayout }
   | { type: "setHeadroom"; paneId: string; on: boolean }
   | { type: "setPonytail"; paneId: string; level: PonytailLevel }
@@ -309,6 +311,36 @@ export function reduce(l: Layout, a: Action): Layout {
         provider: "codex",
         codexPromptPath: a.promptPath,
         handoffFromSessionId: a.fromSessionId,
+      };
+      let activeTabId = l.activeTabId;
+      let inserted = false;
+      const tabs = l.tabs.map((t) => ({
+        ...t,
+        rows: t.rows.map((r) => {
+          const idx = r.panes.findIndex((p) => p.id === a.sourcePaneId);
+          if (idx < 0) return r;
+          activeTabId = t.id;
+          inserted = true;
+          const panes = [...r.panes];
+          panes.splice(idx + 1, 0, pane);
+          return { ...r, panes };
+        }),
+      }));
+      if (inserted) return { ...l, tabs, activeTabId, focusedPaneId: pane.id };
+      const tab: Tab = { id: nextId("tab"), rows: [{ id: nextId("row"), panes: [pane], size: 1 }] };
+      return { tabs: [...l.tabs, tab], activeTabId: tab.id, focusedPaneId: pane.id };
+    }
+    case "openClaudeHandoff": {
+      const provider = a.provider ?? "claude";
+      const pane: Pane = {
+        id: nextId("pane"),
+        cwd: a.cwd,
+        size: 1,
+        title: a.title ? `${provider}: ${a.title}` : defaultTitle(a.cwd),
+        autoTitle: !a.title,
+        sessionId: crypto.randomUUID(),
+        provider,
+        claudePromptPath: a.promptPath,
       };
       let activeTabId = l.activeTabId;
       let inserted = false;

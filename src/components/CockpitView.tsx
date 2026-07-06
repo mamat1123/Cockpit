@@ -267,6 +267,9 @@ export function CockpitView() {
           context={pendingCreation}
           onCancel={() => setPendingCreation(null)}
           onPick={(provider) => {
+            // A z.ai pane launches via the `claude --glm` wrapper, which sources its creds
+            // from ~/.claude/glm.env — no Cockpit-side token gate needed (the monitor token
+            // in Settings is only for the usage gauge, a separate credential).
             if (pendingCreation.kind === "newTab") dispatch({ type: "newTab", cwd: pendingCreation.cwd, provider });
             else dispatch({ type: pendingCreation.kind, provider });
             setPendingCreation(null);

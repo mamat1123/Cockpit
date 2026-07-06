@@ -5,13 +5,13 @@ import { waitingPanes, waitingLabel } from "../lib/waiting";
 import { paneTopic } from "../lib/logClient";
 import { acquireTerminal, attachTerminal, parkTerminalNode, refit, focusTerminal } from "../lib/terminalRegistry";
 import { writePty } from "../lib/ptyClient";
-import { saveDroppedFile, dragHasFiles, imageFiles } from "../lib/dropClient";
+import { saveDroppedFile, dragHasFiles, droppableFiles } from "../lib/dropClient";
 import { PaneHeader } from "./PaneHeader";
 import { ponytailInstalled, type PonytailLevel } from "../lib/ponytailClient";
 import type { AgentProvider } from "../layout/paneLayout";
 import "./TerminalPane.css";
 
-export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, ponytail, provider, codexPromptPath, title, focused, isDragging, isDropTarget, onFocus, onRename, onAutoTitle, onPopOut, onClose, onToggleHeadroom, onSetPonytail, onSelectProvider, dragHandleProps, dropZoneProps }: {
+export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, ponytail, provider, codexPromptPath, claudePromptPath, title, focused, isDragging, isDropTarget, onFocus, onRename, onAutoTitle, onPopOut, onClose, onToggleHeadroom, onSetPonytail, onSelectProvider, dragHandleProps, dropZoneProps }: {
   paneId: string;
   cwd: string;
   sessionId: string;
@@ -20,6 +20,7 @@ export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, ponytai
   ponytail?: PonytailLevel;
   provider: AgentProvider;
   codexPromptPath?: string;
+  claudePromptPath?: string;
   title: string;
   focused: boolean;
   isDragging?: boolean;
@@ -56,6 +57,7 @@ export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, ponytai
       headroom: !!headroom,
       ponytail: ponytail ?? "off",
       codexPromptPath,
+      claudePromptPath,
     });
     const container = containerRef.current!;
     attachTerminal(paneId, container);
@@ -83,13 +85,14 @@ export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, ponytai
       clearInterval(tick);
       parkTerminalNode(paneId);
     };
-  }, [paneId, cwd, sessionId, provider, codexPromptPath]);
+  }, [paneId, cwd, sessionId, provider, codexPromptPath, claudePromptPath]);
 
-  // Drop an image (e.g. a Snapzy screenshot) onto the terminal → type its path
-  // into claude, like a native terminal does. We can't keep Tauri's native
-  // drag-drop bridge (it would give the real path but breaks HTML5 pane
-  // reordering — that's why tauri.conf has dragDropEnabled:false), and a
-  // WKWebView never exposes File.path. So we read the dropped bytes, have Rust
+  // Drop a file (a screenshot, a PDF, a source file) onto the terminal → insert
+  // its path into claude, like a native terminal does. claude turns an image path
+  // into an [Image #N] chip and inserts any other path as text it reads on submit.
+  // We can't keep Tauri's native drag-drop bridge (it would give the real path but
+  // breaks HTML5 pane reordering — that's why tauri.conf has dragDropEnabled:false),
+  // and a WKWebView never exposes File.path. So we read the dropped bytes, have Rust
   // write a temp file, and write that path to this pane's PTY. We listen only
   // for FILE drags (types includes "Files") and stopPropagation so the pane's
   // root-level reorder drop zone never sees them; non-file drags fall through.
@@ -106,7 +109,7 @@ export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, ponytai
       if (!dragHasFiles(e.dataTransfer)) return;
       e.preventDefault();
       e.stopPropagation();
-      const files = imageFiles(e.dataTransfer!.files);
+      const files = droppableFiles(e.dataTransfer!.files);
       if (!files.length) return;
       void (async () => {
         const paths: string[] = [];
@@ -117,9 +120,9 @@ export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, ponytai
         if (!paths.length) return;
         // Wrap the path in bracketed-paste markers (ESC[200~ … ESC[201~). claude runs
         // its image-path → [Image #N] detection ONLY on pasted content, not on typed
-        // text — a raw write leaves the literal path in the prompt. A native terminal
-        // inserts a drag AS a paste, which is why Ghostty shows the [Image] chip; this
-        // makes our drop behave the same.
+        // text; for a non-image path the paste just inserts the literal path (which is
+        // what we want — claude reads it on submit). A native terminal inserts a drag
+        // AS a paste, which is why Ghostty shows the [Image] chip; this matches that.
         await writePty(paneId, `\x1b[200~${paths.join(" ")}\x1b[201~`);
         onFocusRef.current();
         focusTerminal(paneId);

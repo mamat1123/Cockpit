@@ -131,6 +131,7 @@ pub fn run() {
             headroomlog::headroom_log_stop,
             ponytail::ponytail_installed,
             handoff::create_codex_handoff,
+            handoff::create_claude_handoff,
         ])
         .setup(|app| {
             use tauri::{WebviewWindowBuilder, WebviewUrl, WindowEvent};
