@@ -121,7 +121,9 @@ export function CockpitView() {
     setClosingBurrows({
       burrows: dirty,
       onConfirmDelete: () => purgeAndClose(list, commit),
-      onConfirmKeep: commit, // close the layout, leave worktrees
+      // keep: drop any stale purge registration (e.g. from an earlier refused Delete on the
+      // last pane) so a kept worktree can never be deleted, then close.
+      onConfirmKeep: () => { for (const b of list) pendingBurrowPurge.current.delete(b.paneId); commit(); },
     });
   }, [purgeAndClose]);
 
