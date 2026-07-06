@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-import { reduce, emptyLayout, findPaneBySession, serializeLayout, deserializeLayout, type Layout } from "../layout/paneLayout";
+import { reduce, emptyLayout, findPaneBySession, serializeLayout, deserializeLayout, type Layout, type BurrowInfo } from "../layout/paneLayout";
 import { loadLast, saveLast, savePreset } from "../lib/persistence";
+import { createBurrow } from "../lib/worktreeClient";
 import { loadSettings, saveSettings } from "../lib/settings";
 import { themeById, applyTheme } from "../lib/themes";
 import { useKeybindings } from "../layout/useKeybindings";
@@ -74,6 +75,18 @@ export function CockpitView() {
   const [appVersion, setAppVersion] = useState("");
   const [settings, setSettings] = useState(loadSettings);
   const patchSettings = useCallback((p: Partial<typeof settings>) => setSettings((s) => { const n = { ...s, ...p }; saveSettings(n); return n; }), []);
+  const focusedPaneCwd = useCallback((): string => {
+    for (const t of layout.tabs) for (const r of t.rows) for (const p of r.panes)
+      if (p.id === layout.focusedPaneId) return p.cwd;
+    return layout.tabs[0]?.rows[0]?.panes[0]?.cwd ?? "";
+  }, [layout]);
+  // Create a Burrow for `cwd` when the toggle is on; undefined ⇒ caller uses the plain cwd
+  // (setting off, no folder, non-git repo, or git error — all fall back silently).
+  const maybeBurrow = useCallback(async (cwd: string): Promise<BurrowInfo | undefined> => {
+    if (!settings.burrows || !cwd) return undefined;
+    try { return await createBurrow(cwd); }
+    catch (e) { console.warn("[cockpit] burrow skipped:", e); return undefined; }
+  }, [settings.burrows]);
   const theme = themeById(settings.themeId);
   useEffect(() => {
     applyTheme(theme, settings.accent);
@@ -266,12 +279,19 @@ export function CockpitView() {
         <ProviderPicker
           context={pendingCreation}
           onCancel={() => setPendingCreation(null)}
-          onPick={(provider) => {
+          onPick={async (provider) => {
             // A z.ai pane launches via the `claude --glm` wrapper, which sources its creds
             // from ~/.claude/glm.env — no Cockpit-side token gate needed (the monitor token
             // in Settings is only for the usage gauge, a separate credential).
-            if (pendingCreation.kind === "newTab") dispatch({ type: "newTab", cwd: pendingCreation.cwd, provider });
-            else dispatch({ type: pendingCreation.kind, provider });
+            if (pendingCreation.kind === "newTab") {
+              const burrow = await maybeBurrow(pendingCreation.cwd);
+              dispatch({ type: "newTab", cwd: pendingCreation.cwd, provider, burrow });
+            } else {
+              // split / splitDown: cut a fresh Burrow off the default branch, located via
+              // the focused pane's cwd (which itself may be a Burrow — create_burrow resolves it).
+              const burrow = await maybeBurrow(focusedPaneCwd());
+              dispatch({ type: pendingCreation.kind, provider, burrow });
+            }
             setPendingCreation(null);
           }}
         />
