@@ -7,13 +7,13 @@ export interface Camera { x: number; y: number; zoom: number }
 
 export const ZOOM_MIN = 0.25;
 export const ZOOM_MAX = 2;
-/** Card geometry used for placement/framing. CARD_H is nominal — real cards are
- *  content-sized, but placement/fit only need a stable footprint. */
-export const CARD_W = 240;
-export const CARD_H = 170;
+/** Card geometry used for placement/framing. M13b: a card IS a terminal window,
+ *  so both dimensions are real (CanvasView renders cards at exactly this size). */
+export const CARD_W = 640;
+export const CARD_H = 420;
 export const CELL_W = CARD_W + 24;
 export const CELL_H = CARD_H + 24;
-const PLACE_COLS = 4;
+const PLACE_COLS = 2;
 
 export function clampZoom(z: number): number {
   return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z));
@@ -32,6 +32,12 @@ export function zoomAt(c: Camera, s: Pt, factor: number): Camera {
 }
 export function panBy(c: Camera, dx: number, dy: number): Camera {
   return { ...c, x: c.x + dx, y: c.y + dy };
+}
+/** Camera at 100 % zoom with the given card dead-center in the viewport — the
+ *  "I'm going to really type now" snap (only 100 % has sharp text and accurate
+ *  xterm mouse selection under the CSS-transformed world). */
+export function centerOn(pos: Pt, view: { w: number; h: number }): Camera {
+  return { zoom: 1, x: view.w / 2 - (pos.x + CARD_W / 2), y: view.h / 2 - (pos.y + CARD_H / 2) };
 }
 /** A pointer that moved past the threshold is a drag, not a click. */
 export function isDrag(dx: number, dy: number, threshold = 5): boolean {

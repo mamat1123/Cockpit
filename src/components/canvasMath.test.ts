@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   clampZoom, screenToWorld, worldToScreen, zoomAt, panBy, isDrag,
-  nextFreeCell, fitAll, prunePositions,
+  nextFreeCell, fitAll, prunePositions, centerOn,
   ZOOM_MIN, ZOOM_MAX, CARD_W, CARD_H, CELL_W, CELL_H,
 } from "./canvasMath";
 
@@ -45,8 +45,8 @@ describe("nextFreeCell", () => {
     expect(nextFreeCell([])).toEqual({ x: 0, y: 0 });
     expect(nextFreeCell([{ x: 0, y: 0 }])).toEqual({ x: CELL_W, y: 0 });
   });
-  it("wraps to the next row after 4 columns", () => {
-    const row0 = [0, 1, 2, 3].map((c) => ({ x: c * CELL_W, y: 0 }));
+  it("wraps to the next row after 2 columns (terminal cards are wide)", () => {
+    const row0 = [0, 1].map((c) => ({ x: c * CELL_W, y: 0 }));
     expect(nextFreeCell(row0)).toEqual({ x: 0, y: CELL_H });
   });
   it("treats a dragged (off-grid) card as occupying its nearest cell", () => {
@@ -81,5 +81,20 @@ describe("prunePositions", () => {
   it("drops entries whose pane is gone", () => {
     const pos = { a: { x: 1, y: 2 }, b: { x: 3, y: 4 } };
     expect(prunePositions(pos, new Set(["b"]))).toEqual({ b: { x: 3, y: 4 } });
+  });
+});
+
+describe("centerOn", () => {
+  it("frames a card dead-center at 100%", () => {
+    const c = centerOn({ x: 0, y: 0 }, { w: 800, h: 600 });
+    expect(c).toEqual({ zoom: 1, x: 800 / 2 - CARD_W / 2, y: 600 / 2 - CARD_H / 2 });
+    // the card's center lands at the viewport center
+    expect((0 + CARD_W / 2) * c.zoom + c.x).toBeCloseTo(400);
+    expect((0 + CARD_H / 2) * c.zoom + c.y).toBeCloseTo(300);
+  });
+  it("works for off-origin cards", () => {
+    const c = centerOn({ x: 1000, y: -300 }, { w: 800, h: 600 });
+    expect((1000 + CARD_W / 2) * c.zoom + c.x).toBeCloseTo(400);
+    expect((-300 + CARD_H / 2) * c.zoom + c.y).toBeCloseTo(300);
   });
 });
