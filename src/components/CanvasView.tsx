@@ -32,13 +32,12 @@ type Gesture =
 
 /** One session card: header (drag handle · status · open-in-Tabs), the pane's REAL
  *  xterm (borrowed live host node — the pop-out appendChild dance), cost footer. */
-function CanvasCard({ it, now, cost, cardRef, onHeadPointerDown, onHeadDoubleClick, onOpen }: {
+function CanvasCard({ it, now, cost, cardRef, onHeadPointerDown, onOpen }: {
   it: OverviewItem;
   now: number;
   cost: number;
   cardRef: (el: HTMLDivElement | null) => void;
   onHeadPointerDown: (e: React.PointerEvent) => void;
-  onHeadDoubleClick: () => void;
   onOpen: () => void;
 }) {
   const termRef = useRef<HTMLDivElement>(null);
@@ -47,6 +46,8 @@ function CanvasCard({ it, now, cost, cardRef, onHeadPointerDown, onHeadDoubleCli
   // terminal one commit later) — retry per frame until it lands. returnTerminal is
   // a no-op after a real close (releaseTerminal disposed first), and re-parenting
   // a never-borrowed host back to its own container is harmless.
+  // (Relies on: nothing remounts TerminalPane while its card is live — the slot
+  // portal settles before our first retry rAF.)
   useLayoutEffect(() => {
     let raf = 0;
     const tryBorrow = () => {
@@ -67,7 +68,6 @@ function CanvasCard({ it, now, cost, cardRef, onHeadPointerDown, onHeadDoubleCli
       <div
         className="cockpit-cv__head"
         onPointerDown={onHeadPointerDown}
-        onDoubleClick={onHeadDoubleClick}
         title="drag to move · double-click = 100%"
       >
         <span className="cockpit-cv__name">{it.title}</span>
@@ -84,9 +84,12 @@ function CanvasCard({ it, now, cost, cardRef, onHeadPointerDown, onHeadDoubleCli
   );
 }
 
-export function CanvasView({ layout, onJump }: {
+export function CanvasView({ layout, onJump, onFocusPane }: {
   layout: Layout;
   onJump: (tabId: string, paneId: string) => void;
+  /** Sync LAYOUT focus (focusTab+focusPane) when a card is clicked/snapped —
+   *  without this ⌘W would close whichever pane tabs mode last focused. */
+  onFocusPane: (paneId: string) => void;
 }) {
   const items = overviewItems(layout);
   const itemsKey = items.map((i) => i.paneId).join(",");
@@ -263,6 +266,14 @@ export function CanvasView({ layout, onJump }: {
     return cb;
   }, []);
 
+  // Prune ref-callback caches for closed panes (CockpitView does the same for slots).
+  useEffect(() => {
+    for (const id of Array.from(cardRefCbs.current.keys())) {
+      if (!liveIds.has(id)) { cardRefCbs.current.delete(id); cardEls.current.delete(id); }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itemsKey]);
+
   const onBgPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
     rootRef.current?.setPointerCapture(e.pointerId);
@@ -297,13 +308,23 @@ export function CanvasView({ layout, onJump }: {
   };
   // Shared gesture end. A CANCEL (or a lost pointerup detected via buttons===0)
   // must never activate a card — only a real header click focuses its terminal.
+  // Double-press is detected manually (two un-moved clicks < 350 ms on the same
+  // header): native dblclick can be silently retargeted away by setPointerCapture
+  // in WKWebView, so we don't rely on it.
+  const lastTap = useRef<{ paneId: string; at: number }>({ paneId: "", at: 0 });
   const endGesture = (allowClick: boolean) => {
     const g = gesture.current;
     if (!g || g.kind === "wheel") return;
     gesture.current = null;
     if (g.kind === "pan") setCamera(cameraRef.current);
     else if (g.moved) setPositions((p) => ({ ...p, [g.paneId]: g.live }));
-    else if (allowClick) focusTerminal(g.paneId);
+    else if (allowClick) {
+      onFocusPane(g.paneId);
+      focusTerminal(g.paneId);
+      const at = performance.now();
+      if (lastTap.current.paneId === g.paneId && at - lastTap.current.at < 350) snapTo(g.paneId);
+      lastTap.current = { paneId: g.paneId, at };
+    }
   };
   const onPointerUp = () => endGesture(true);
   const onPointerCancel = () => endGesture(false);
@@ -317,6 +338,7 @@ export function CanvasView({ layout, onJump }: {
     const cam = centerOn(p, { w: r.clientWidth, h: r.clientHeight });
     cameraRef.current = cam;
     setCamera(cam);
+    onFocusPane(paneId);
     focusTerminal(paneId);
   };
 
@@ -336,6 +358,7 @@ export function CanvasView({ layout, onJump }: {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
+      onScroll={(e) => { e.currentTarget.scrollLeft = 0; e.currentTarget.scrollTop = 0; }}
     >
       <div ref={worldRef} className="cockpit-cv__world">
         {items.map((it) => (
@@ -346,7 +369,6 @@ export function CanvasView({ layout, onJump }: {
             cost={costs[it.paneId] ?? 0}
             cardRef={registerCard(it.paneId)}
             onHeadPointerDown={onHeadPointerDown(it.paneId)}
-            onHeadDoubleClick={() => snapTo(it.paneId)}
             onOpen={() => onJump(it.tabId, it.paneId)}
           />
         ))}

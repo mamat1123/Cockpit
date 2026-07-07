@@ -243,6 +243,13 @@ export function CockpitView() {
               {viewMode === "canvas" && (
                 <CanvasView
                   layout={layout}
+                  onFocusPane={(paneId) => {
+                    const hit = layout.tabs.find((t) => t.rows.some((r) => r.panes.some((p) => p.id === paneId)));
+                    if (hit) {
+                      dispatch({ type: "focusTab", tabId: hit.id });
+                      dispatch({ type: "focusPane", paneId });
+                    }
+                  }}
                   onJump={(tabId, paneId) => {
                     setViewMode("tabs");
                     dispatch({ type: "focusTab", tabId });
