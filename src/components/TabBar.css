@@ -125,3 +125,23 @@
 .cockpit-tab--v.is-active::before { box-shadow: 1px 0 10px var(--ck-accent); }
 .cockpit-tab--v.is-confirming { max-width: none; height: auto; padding: 8px 12px; }
 .cockpit-tab--v .confirm-chip { flex-wrap: wrap; white-space: normal; }
+
+.cockpit-mode {
+  display: flex;
+  align-items: center;
+  background: var(--ck-bg);
+  border: 1px solid var(--ck-border);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-right: 4px;
+}
+.cockpit-mode__btn {
+  font-size: 11px;
+  padding: 3px 10px;
+  color: var(--ck-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.cockpit-mode__btn.on { background: var(--ck-surface); color: var(--ck-bright); }

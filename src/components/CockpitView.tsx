@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { reduce, emptyLayout, findPaneBySession, serializeLayout, deserializeLayout, type Layout } from "../layout/paneLayout";
-import { loadLast, saveLast, savePreset } from "../lib/persistence";
+import { loadLast, saveLast, savePreset, loadViewMode, saveViewMode, type ViewMode } from "../lib/persistence";
 import { loadSettings, saveSettings } from "../lib/settings";
 import { themeById, applyTheme } from "../lib/themes";
 import { useKeybindings } from "../layout/useKeybindings";
 import { TabBar, TabSidebar } from "./TabBar";
+import { CanvasView } from "./CanvasView";
 import { Juice } from "./Juice";
 import { TabPanes } from "./TabPanes";
 import { PaneHost } from "./PaneHost";
@@ -61,6 +62,9 @@ export function CockpitView() {
     notifications.markTabSeen(layout.activeTabId);
   }, [layout.activeTabId]);
   const [dashOpen, setDashOpen] = useState(false);
+  const [viewMode, setViewModeState] = useState<ViewMode>(loadViewMode);
+  const setViewMode = useCallback((v: ViewMode) => { setViewModeState(v); saveViewMode(v); }, []);
+  const toggleCanvas = useCallback(() => setViewMode(viewMode === "canvas" ? "tabs" : "canvas"), [viewMode, setViewMode]);
   // Open the picker immediately on a fresh start (empty layout) so the user always
   // begins by choosing a real folder rather than landing on a hardcoded default.
   const [pickerOpen, setPickerOpen] = useState(() => layout.tabs.length === 0);
@@ -89,7 +93,7 @@ export function CockpitView() {
   }, []);
   const toggleDash = useCallback(() => setDashOpen((o) => !o), []);
   // ⌘T opens the picker (a tab must always start in a chosen folder), same as ⌘O / the + button.
-  useKeybindings(dispatch, { onNewTab: () => setPickerOpen(true), onSplit: (down) => setPendingCreation(down ? { kind: "splitDown" } : { kind: "split" }), onToggleDashboard: toggleDash, onOpenProject: () => setPickerOpen(true), onOpenWorkspaces: () => setWsOpen(true), onOpenSettings: () => setSettingsOpen(true), onToggleBell: () => setBellOpen((o) => !o) });
+  useKeybindings(dispatch, { onNewTab: () => setPickerOpen(true), onSplit: (down) => setPendingCreation(down ? { kind: "splitDown" } : { kind: "split" }), onToggleDashboard: toggleDash, onOpenProject: () => setPickerOpen(true), onOpenWorkspaces: () => setWsOpen(true), onOpenSettings: () => setSettingsOpen(true), onToggleBell: () => setBellOpen((o) => !o), onToggleCanvas: toggleCanvas });
 
   // Auto-restore: persist the layout (with session ids) shortly after each change.
   useEffect(() => {
@@ -184,6 +188,8 @@ export function CockpitView() {
         attention={attention}
         unseenByTab={unseen}
         bellOpen={bellOpen}
+        viewMode={viewMode}
+        onSetViewMode={setViewMode}
         onToggleBell={() => setBellOpen((o) => !o)}
         onJumpSession={(c) => { jumpToSession(c.sessionId); setBellOpen(false); }}
         onSelect={selectTab}
@@ -217,15 +223,33 @@ export function CockpitView() {
               <span className="cockpit-empty__sub">Open a folder to start a Claude session</span>
             </button>
           ) : (
-            layout.tabs.map((t) => (
-              <TabPanes
-                key={t.id}
-                tab={t}
-                active={t.id === layout.activeTabId}
-                dispatch={dispatch}
-                registerSlot={registerSlot}
-              />
-            ))
+            <>
+              {/* Canvas mode HIDES the tab stack (display:none) — never unmounts it, so
+                  terminal slots, PTYs and xterms are untouched; each pane's
+                  ResizeObserver refits it on the way back. */}
+              <div style={{ position: "absolute", inset: 0, display: viewMode === "canvas" ? "none" : undefined }}>
+                {layout.tabs.map((t) => (
+                  <TabPanes
+                    key={t.id}
+                    tab={t}
+                    active={t.id === layout.activeTabId}
+                    dispatch={dispatch}
+                    registerSlot={registerSlot}
+                  />
+                ))}
+              </div>
+              {viewMode === "canvas" && (
+                <CanvasView
+                  layout={layout}
+                  onJump={(tabId, paneId) => {
+                    setViewMode("tabs");
+                    dispatch({ type: "focusTab", tabId });
+                    dispatch({ type: "focusPane", paneId });
+                    requestAnimationFrame(() => requestAnimationFrame(() => focusTerminal(paneId)));
+                  }}
+                />
+              )}
+            </>
           )}
         </div>
       </div>

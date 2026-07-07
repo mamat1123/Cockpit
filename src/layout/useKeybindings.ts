@@ -1,10 +1,10 @@
 import { useEffect } from "react";
 import type { Action } from "./paneLayout";
 
-/** Cmd+T new tab (picks a folder first), Cmd+D split, Cmd+Shift+D split-down, Cmd+W close, Cmd+0 dashboard, Cmd+O open project, Cmd+E workspaces, Cmd+, settings. */
+/** Cmd+T new tab (picks a folder first), Cmd+D split, Cmd+Shift+D split-down, Cmd+W close, Cmd+0 dashboard, Cmd+O open project, Cmd+E workspaces, Cmd+, settings, Cmd+G canvas. */
 export function useKeybindings(
   dispatch: (a: Action) => void,
-  opts: { onNewTab?: () => void; onSplit?: (down: boolean) => void; onToggleDashboard?: () => void; onOpenProject?: () => void; onOpenWorkspaces?: () => void; onOpenSettings?: () => void; onToggleBell?: () => void } = {},
+  opts: { onNewTab?: () => void; onSplit?: (down: boolean) => void; onToggleDashboard?: () => void; onOpenProject?: () => void; onOpenWorkspaces?: () => void; onOpenSettings?: () => void; onToggleBell?: () => void; onToggleCanvas?: () => void } = {},
 ) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -20,8 +20,9 @@ export function useKeybindings(
       else if (k === "e") { e.preventDefault(); opts.onOpenWorkspaces?.(); }
       else if (k === ",") { e.preventDefault(); opts.onOpenSettings?.(); }
       else if (k === "b") { e.preventDefault(); opts.onToggleBell?.(); }
+      else if (k === "g") { e.preventDefault(); opts.onToggleCanvas?.(); }
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [dispatch, opts.onNewTab, opts.onSplit, opts.onToggleDashboard, opts.onOpenProject, opts.onOpenWorkspaces, opts.onOpenSettings, opts.onToggleBell]);
+  }, [dispatch, opts.onNewTab, opts.onSplit, opts.onToggleDashboard, opts.onOpenProject, opts.onOpenWorkspaces, opts.onOpenSettings, opts.onToggleBell, opts.onToggleCanvas]);
 }

@@ -17,6 +17,8 @@ function baseProps(layout: Layout) {
     attention: new Set<string>(),
     unseenByTab: new Map<string, number>(),
     bellOpen: false,
+    viewMode: "tabs" as const,
+    onSetViewMode: () => {},
     onToggleBell: () => {},
     onJumpSession: () => {},
     onSelect: () => {},

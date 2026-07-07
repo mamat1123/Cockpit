@@ -169,7 +169,7 @@ export function acquireTerminal(paneId: string, cwd: string, sessionId: string, 
   term.loadAddon(fit);
   term.open(hostEl);
   term.attachCustomKeyEventHandler((e) => {
-    if (e.metaKey && !e.ctrlKey && !e.altKey && ["t", "d", "w"].includes(e.key.toLowerCase())) {
+    if (e.metaKey && !e.ctrlKey && !e.altKey && ["t", "d", "w", "g"].includes(e.key.toLowerCase())) {
       return false;
     }
     // Shift+Enter → newline, not submit. Send ESC+CR — the same sequence Option+Enter

@@ -242,13 +242,15 @@ function TabItem({ t, index, layout, attention, unseenByTab, vertical, strip, on
   );
 }
 
-export function TabBar({ layout, attention, unseenByTab, bellOpen, showTabs = true, onToggleBell, onJumpSession, onSelect, onReorder, onRenameTab, onCloseTab, onOpenDashboard, onOpenPicker, onOpenWorkspaces, onOpenSettings }: {
+export function TabBar({ layout, attention, unseenByTab, bellOpen, showTabs = true, viewMode, onSetViewMode, onToggleBell, onJumpSession, onSelect, onReorder, onRenameTab, onCloseTab, onOpenDashboard, onOpenPicker, onOpenWorkspaces, onOpenSettings }: {
   layout: Layout;
   attention: Set<string>;
   unseenByTab: Map<string, number>;
   bellOpen: boolean;
   /** false = the tab list lives in the TabSidebar; only the chrome renders here. */
   showTabs?: boolean;
+  viewMode: "tabs" | "canvas";
+  onSetViewMode: (v: "tabs" | "canvas") => void;
   onToggleBell: () => void;
   onJumpSession: (c: import("../lib/notifications").Completion) => void;
   onSelect: (tabId: string) => void;
@@ -274,6 +276,10 @@ export function TabBar({ layout, attention, unseenByTab, bellOpen, showTabs = tr
       <div className="cockpit-tabs__drag" data-tauri-drag-region></div>
       <UsageStrip />
       <div className="cockpit-tabs__tools">
+        <div className="cockpit-mode" role="group" aria-label="View mode (Cmd+G)" title="View mode (⌘G)">
+          <button className={`cockpit-mode__btn${viewMode === "tabs" ? " on" : ""}`} onClick={() => onSetViewMode("tabs")}>⌶ Tabs</button>
+          <button className={`cockpit-mode__btn${viewMode === "canvas" ? " on" : ""}`} onClick={() => onSetViewMode("canvas")}>▦ Canvas</button>
+        </div>
         <button className="cockpit-tool" onClick={onOpenDashboard} aria-label="Mission Control (Cmd+0)" title="Mission Control (⌘0)"><GridIcon /></button>
         <button className="cockpit-tool" onClick={onOpenWorkspaces} aria-label="Workspaces (Cmd+E)" title="Workspaces (⌘E)"><LayersIcon /></button>
         <NotificationBell open={bellOpen} onToggle={onToggleBell} onJump={onJumpSession} />
