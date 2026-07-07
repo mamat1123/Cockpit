@@ -623,6 +623,7 @@ const fmt = (n: number) => `$${n > 0 && n < 0.01 ? n.toFixed(3) : n.toFixed(2)}`
 const shortCwd = (cwd: string) => cwd.split("/").filter(Boolean).slice(-2).join("/");
 
 type Gesture =
+  | { kind: "wheel" } // trackpad pan/pinch in flight — pauses ticks like any other gesture
   | { kind: "pan"; startX: number; startY: number; cam: Camera }
   | { kind: "card"; paneId: string; tabId: string; startX: number; startY: number; origin: Pt; live: Pt; moved: boolean };
 
@@ -657,14 +658,24 @@ export function CanvasView({ layout, onJump }: {
   const gesture = useRef<Gesture | null>(null);
   const raf = useRef(0);
 
-  // Auto-place panes that have no stored position yet (new pane / first run).
-  // Derived synchronously so this very render can stamp them; committed after.
-  const placed: Record<string, Pt> = { ...positions };
-  let added = false;
+  // Derive this render's positions: prune closed panes (ghosts would mislead
+  // fit-all and block free cells) and auto-place new ones. Derived synchronously
+  // so this very render can stamp them; committed after via a FUNCTIONAL update
+  // so a drag commit queued in the same frame is never clobbered.
+  const liveIds = new Set(items.map((i) => i.paneId));
+  const placed: Record<string, Pt> = prunePositions(positions, liveIds);
+  let dirty = Object.keys(placed).length !== Object.keys(positions).length;
   for (const it of items) {
-    if (!placed[it.paneId]) { placed[it.paneId] = nextFreeCell(Object.values(placed)); added = true; }
+    if (!placed[it.paneId]) { placed[it.paneId] = nextFreeCell(Object.values(placed)); dirty = true; }
   }
-  useEffect(() => { if (added) setPositions(placed); });
+  useEffect(() => {
+    if (!dirty) return;
+    setPositions((p) => {
+      const next = prunePositions(p, liveIds);
+      for (const it of items) if (!next[it.paneId]) next[it.paneId] = nextFreeCell(Object.values(next));
+      return next;
+    });
+  });
 
   const applyCamera = useCallback(() => {
     cancelAnimationFrame(raf.current);
@@ -679,6 +690,7 @@ export function CanvasView({ layout, onJump }: {
       r.style.backgroundSize = `${GRID * c.zoom}px ${GRID * c.zoom}px`;
     });
   }, []);
+  useEffect(() => () => cancelAnimationFrame(raf.current), []);
 
   // Re-stamp committed camera + positions after every render (cheap: a handful of
   // style writes). Skips the card being dragged so a stray render can't yank it.
@@ -694,16 +706,20 @@ export function CanvasView({ layout, onJump }: {
     }
   });
 
-  // First run (nothing persisted): frame whatever exists.
+  // First-run framing: fire once, as soon as there is anything to frame — even if
+  // the canvas mounted empty and panes arrived later. A restored session with real
+  // card positions keeps its saved camera instead.
+  const framed = useRef(initial != null && Object.keys(initial.positions).length > 0);
   useLayoutEffect(() => {
-    if (initial || items.length === 0) return;
+    if (framed.current || items.length === 0) return;
     const r = rootRef.current;
     if (!r) return;
+    framed.current = true;
     const cam = fitAll(Object.values(placed), { w: r.clientWidth, h: r.clientHeight });
     cameraRef.current = cam;
     setCamera(cam);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [itemsKey]);
 
   // Status tick + cost poll — the Dashboard's exact cadence, but paused while a
   // gesture is live so a re-render never lands mid-drag.
@@ -740,13 +756,22 @@ export function CanvasView({ layout, onJump }: {
   useEffect(() => {
     const el = rootRef.current;
     if (!el) return;
-    const commit = debounce(() => setCamera(cameraRef.current), 150);
+    const commit = debounce(() => {
+      if (gesture.current?.kind === "wheel") gesture.current = null;
+      setCamera(cameraRef.current);
+    }, 150);
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
+      // A pointer gesture owns the canvas — ignore concurrent wheel input (a zoom
+      // mid-card-drag would rescale the drag's cumulative delta and jump the card).
+      if (gesture.current && gesture.current.kind !== "wheel") return;
+      gesture.current = { kind: "wheel" }; // wheel IS a gesture: pauses ticks/polls
       const c = cameraRef.current;
       if (e.ctrlKey || e.metaKey) {
         const rect = el.getBoundingClientRect();
-        cameraRef.current = zoomAt(c, { x: e.clientX - rect.left, y: e.clientY - rect.top }, Math.exp(-e.deltaY * 0.01));
+        // Clamp per-event delta so a notched mouse wheel (±120/notch) doesn't jump 3x.
+        const factor = Math.exp(Math.max(-50, Math.min(50, -e.deltaY)) * 0.01);
+        cameraRef.current = zoomAt(c, { x: e.clientX - rect.left, y: e.clientY - rect.top }, factor);
       } else {
         cameraRef.current = panBy(c, -e.deltaX, -e.deltaY);
       }
@@ -784,7 +809,10 @@ export function CanvasView({ layout, onJump }: {
   };
   const onPointerMove = (e: React.PointerEvent) => {
     const g = gesture.current;
-    if (!g) return;
+    if (!g || g.kind === "wheel") return;
+    // Belt-and-braces: if the up was lost (rare WebKit capture edge cases), a
+    // buttons-less move ends the gesture — otherwise ticks stay paused forever.
+    if (e.buttons === 0) { endGesture(false); return; }
     // Cumulative delta from a FIXED origin (the dragMath.ts lesson) — never advance the start point.
     const dx = e.clientX - g.startX, dy = e.clientY - g.startY;
     if (g.kind === "pan") {
@@ -799,14 +827,18 @@ export function CanvasView({ layout, onJump }: {
       if (el) el.style.transform = `translate(${g.live.x}px, ${g.live.y}px)`;
     }
   };
-  const onPointerUp = () => {
+  // Shared gesture end. A CANCEL (or a lost pointerup detected via buttons===0)
+  // must never activate a card — only a real click jumps.
+  const endGesture = (allowClick: boolean) => {
     const g = gesture.current;
+    if (!g || g.kind === "wheel") return;
     gesture.current = null;
-    if (!g) return;
     if (g.kind === "pan") setCamera(cameraRef.current);
     else if (g.moved) setPositions((p) => ({ ...p, [g.paneId]: g.live }));
-    else onJump(g.tabId, g.paneId);
+    else if (allowClick) onJump(g.tabId, g.paneId);
   };
+  const onPointerUp = () => endGesture(true);
+  const onPointerCancel = () => endGesture(false);
 
   const fitView = () => {
     const r = rootRef.current;
@@ -823,7 +855,7 @@ export function CanvasView({ layout, onJump }: {
       onPointerDown={onBgPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
+      onPointerCancel={onPointerCancel}
     >
       <div ref={worldRef} className="cockpit-cv__world">
         {items.map((it) => {
@@ -1141,7 +1173,7 @@ Checklist — every line must be seen working:
 1. Toggle: segmented control click AND ⌘G flip Tabs ⇄ Canvas; the mode survives an app relaunch.
 2. Terminals survive: enter canvas, wait 10 s, return to tabs → sessions still live, pane fits correctly (no squashed grid).
 3. Pan (drag background + two-finger scroll), pinch/⌘scroll zoom toward cursor, clamped 25–200%; HUD % updates; "fit all" frames every card.
-4. **No-lag check (the requirement):** with 4+ panes open and at least one WORKING, pan/zoom/drag continuously — no stutter while activity lines and status update. If the dot grid shows up as jank, apply the noted fallback (static grid) and re-verify.
+4. **No-lag check (the requirement):** with 4+ panes open and at least one WORKING, pan/zoom/drag continuously — no stutter while activity lines and status update. Include a 10 s continuous two-finger trackpad pan while a session streams (the wheel path must pause ticks). If the dot grid shows up as jank, apply the noted fallback (static grid) and re-verify. Also check card text stays sharp at 200% zoom (compositor raster-scale) — fallback: drop `will-change` from `.cockpit-cv__card` (keep it on `__world`).
 5. Cards: green border while working, amber+glow while an AskUserQuestion is pending (with `waiting Xm`), activity log shows real tool lines (`⚙ Bash · …`), cost + last-active tick.
 6. Drag a card, release → position sticks (and survives relaunch); click (no drag) → jumps to that pane in Tabs mode with the terminal focused.
 7. New pane (⌘D split or new tab) appears in canvas auto-placed in a free cell; closing a pane removes its card.
