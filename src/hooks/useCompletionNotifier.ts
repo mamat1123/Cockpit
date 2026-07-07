@@ -22,7 +22,8 @@ function paneIndex(layout: Layout): Map<string, PaneCtx> {
 
 /** Detects Completions AND waiting (blocked-on-question) transitions from each live
  *  pane's transcript and fans them out to the store, the OS notification, and the toast
- *  bus. Listeners are added/removed as panes appear/disappear. Settings + active tab are
+ *  bus; also feeds the paneActivity store (Canvas view cards) from the same line stream.
+ *  Listeners are added/removed as panes appear/disappear. Settings + active tab are
  *  read via refs so changing them doesn't re-subscribe every listener. */
 export function useCompletionNotifier(layout: Layout, settings: Settings): void {
   const idx = paneIndex(layout);
