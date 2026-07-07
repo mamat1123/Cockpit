@@ -70,6 +70,7 @@ export interface TermEntry {
   term: Terminal;
   hostEl: HTMLDivElement;
   fit: FitAddon;
+  paneContainer: HTMLElement | null;
   lastLineAt: { current: number | null };
   lastInputAt: { current: number };
   lastResizeAt: { current: number };
@@ -209,7 +210,7 @@ export function acquireTerminal(paneId: string, cwd: string, sessionId: string, 
   // (auto-title, waiting detection, notifications). Only codex has no claude log.
   if (opts.provider !== "codex") void startLogtail(paneId, cwd, sessionId);
 
-  const entry: TermEntry = { term, hostEl, fit, lastLineAt, lastInputAt, lastResizeAt };
+  const entry: TermEntry = { term, hostEl, fit, paneContainer: null, lastLineAt, lastInputAt, lastResizeAt };
   registry.set(paneId, entry);
   return entry;
 }
@@ -219,6 +220,7 @@ export function acquireTerminal(paneId: string, cwd: string, sessionId: string, 
 export function attachTerminal(paneId: string, container: HTMLElement) {
   const e = registry.get(paneId);
   if (!e) return;
+  e.paneContainer = container;
   container.appendChild(e.hostEl);
   refit(paneId);
   e.term.focus();
@@ -229,6 +231,30 @@ export function attachTerminal(paneId: string, container: HTMLElement) {
 export function parkTerminalNode(paneId: string) {
   const e = registry.get(paneId);
   if (e) parkingNode().appendChild(e.hostEl);
+}
+
+/** Move a pane's LIVE terminal into a canvas card (the pop-out appendChild dance —
+ *  session, PTY and scrollback are untouched; only the host node moves). Refits to
+ *  the card grid. Never steals focus. */
+export function borrowTerminal(paneId: string, container: HTMLElement) {
+  const e = registry.get(paneId);
+  if (!e) return;
+  container.appendChild(e.hostEl);
+  refit(paneId);
+}
+
+/** Give a borrowed terminal back to the pane container recorded by the last
+ *  attachTerminal. The refit there is skipped while the tab stack is hidden
+ *  (zero-size guard) — the reveal refit catches up. Parks if the container is gone. */
+export function returnTerminal(paneId: string) {
+  const e = registry.get(paneId);
+  if (!e) return;
+  if (e.paneContainer?.isConnected) {
+    e.paneContainer.appendChild(e.hostEl);
+    refit(paneId);
+  } else {
+    parkTerminalNode(paneId);
+  }
 }
 
 export function refit(paneId: string) {
