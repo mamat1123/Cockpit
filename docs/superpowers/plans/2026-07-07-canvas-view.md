@@ -325,6 +325,17 @@ describe("createActivityStore", () => {
     expect(store.get("p1")).toEqual([]);
     expect(store.get("p2")).toHaveLength(1);
   });
+  it("ignores replayed lines whose entries were already evicted (full-file re-tail)", () => {
+    const store = createActivityStore(3);
+    store.apply("p1", ASSISTANT_TOOL_USE); // Bash — will be evicted by the next two lines
+    store.apply("p1", ASSISTANT_EDIT);     // Edit + Read
+    store.apply("p1", ASSISTANT_ASK);      // AskUserQuestion → Bash evicted
+    // logtail_start always re-reads from offset 0 → the whole file replays:
+    store.apply("p1", ASSISTANT_TOOL_USE);
+    store.apply("p1", ASSISTANT_EDIT);
+    store.apply("p1", ASSISTANT_ASK);
+    expect(store.get("p1").map((a) => a.tool)).toEqual(["AskUserQuestion", "Edit", "Read"]);
+  });
 });
 ```
 
@@ -388,20 +399,23 @@ export function activityOf(line: string): ActivityEntry[] {
 }
 
 /** Per-pane ring buffer of the newest `cap` entries, newest line first (block order
- *  preserved within a line). Dedupes by toolUseId so resume backfill can't double-add. */
+ *  preserved within a line). Dedupes by toolUseId against everything the pane has EVER
+ *  seen — not just the visible window — because logtail re-tails files from offset 0,
+ *  and a full-file replay must not resurrect evicted entries as "newest". */
 export function createActivityStore(cap = 3) {
-  const panes = new Map<string, ActivityEntry[]>();
+  const panes = new Map<string, { entries: ActivityEntry[]; seen: Set<string> }>();
   return {
     apply(paneId: string, line: string): void {
-      const entries = activityOf(line);
-      if (!entries.length) return;
-      const prev = panes.get(paneId) ?? [];
-      const seen = new Set(prev.map((e) => e.toolUseId));
-      const fresh = entries.filter((e) => !seen.has(e.toolUseId));
+      const parsed = activityOf(line);
+      if (!parsed.length) return;
+      let pane = panes.get(paneId);
+      if (!pane) { pane = { entries: [], seen: new Set() }; panes.set(paneId, pane); }
+      const fresh = parsed.filter((e) => !pane.seen.has(e.toolUseId));
       if (!fresh.length) return;
-      panes.set(paneId, [...fresh, ...prev].slice(0, cap));
+      for (const e of fresh) pane.seen.add(e.toolUseId);
+      pane.entries = [...fresh, ...pane.entries].slice(0, cap);
     },
-    get(paneId: string): ActivityEntry[] { return panes.get(paneId) ?? []; },
+    get(paneId: string): ActivityEntry[] { return panes.get(paneId)?.entries ?? []; },
     clear(paneId: string): void { panes.delete(paneId); },
   };
 }
@@ -413,7 +427,7 @@ export const paneActivity = createActivityStore();
 - [ ] **Step 5: Run tests to verify they pass**
 
 Run: `npm test -- src/lib/activity.test.ts`
-Expected: PASS (7 tests). Also run `npm test -- src/lib/waiting.test.ts src/lib/completion.test.ts` — the fixture append must not break existing suites.
+Expected: PASS (8 tests). Also run `npm test -- src/lib/waiting.test.ts src/lib/completion.test.ts` — the fixture append must not break existing suites.
 
 - [ ] **Step 6: Commit**
 
