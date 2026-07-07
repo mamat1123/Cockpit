@@ -235,17 +235,24 @@ export function parkTerminalNode(paneId: string) {
 
 /** Move a pane's LIVE terminal into a canvas card (the pop-out appendChild dance —
  *  session, PTY and scrollback are untouched; only the host node moves). Refits to
- *  the card grid. Never steals focus. */
-export function borrowTerminal(paneId: string, container: HTMLElement) {
+ *  the card grid. Never steals focus. Returns false when the pane has no registry
+ *  entry YET — a card can mount in the same commit that created its pane, and
+ *  TerminalPane only acquires the terminal one commit later (slots round-trip
+ *  through state) — so the caller must retry until this returns true. */
+export function borrowTerminal(paneId: string, container: HTMLElement): boolean {
   const e = registry.get(paneId);
-  if (!e) return;
+  if (!e) return false;
   container.appendChild(e.hostEl);
   refit(paneId);
+  return true;
 }
 
 /** Give a borrowed terminal back to the pane container recorded by the last
  *  attachTerminal. The refit there is skipped while the tab stack is hidden
- *  (zero-size guard) — the reveal refit catches up. Parks if the container is gone. */
+ *  (zero-size guard) — the reveal refit catches up. Parks if the container is gone.
+ *  NOTE: paneContainer cannot go stale-but-connected today only because the
+ *  pane-mutation UI (drag re-slot / pop-out) is unreachable while canvas mode is
+ *  showing — if a future feature moves panes FROM canvas, re-derive the container. */
 export function returnTerminal(paneId: string) {
   const e = registry.get(paneId);
   if (!e) return;

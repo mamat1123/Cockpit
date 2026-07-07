@@ -142,17 +142,24 @@ Append after `parkTerminalNode`:
 ```ts
 /** Move a pane's LIVE terminal into a canvas card (the pop-out appendChild dance —
  *  session, PTY and scrollback are untouched; only the host node moves). Refits to
- *  the card grid. Never steals focus. */
-export function borrowTerminal(paneId: string, container: HTMLElement) {
+ *  the card grid. Never steals focus. Returns false when the pane has no registry
+ *  entry YET — a card can mount in the same commit that created its pane, and
+ *  TerminalPane only acquires the terminal one commit later (slots round-trip
+ *  through state) — so the caller must retry until this returns true. */
+export function borrowTerminal(paneId: string, container: HTMLElement): boolean {
   const e = registry.get(paneId);
-  if (!e) return;
+  if (!e) return false;
   container.appendChild(e.hostEl);
   refit(paneId);
+  return true;
 }
 
 /** Give a borrowed terminal back to the pane container recorded by the last
  *  attachTerminal. The refit there is skipped while the tab stack is hidden
- *  (zero-size guard) — the reveal refit catches up. Parks if the container is gone. */
+ *  (zero-size guard) — the reveal refit catches up. Parks if the container is gone.
+ *  NOTE: paneContainer cannot go stale-but-connected today only because the
+ *  pane-mutation UI (drag re-slot / pop-out) is unreachable while canvas mode is
+ *  showing — if a future feature moves panes FROM canvas, re-derive the container. */
 export function returnTerminal(paneId: string) {
   const e = registry.get(paneId);
   if (!e) return;
@@ -232,11 +239,18 @@ function CanvasCard({ it, now, cost, cardRef, onHeadPointerDown, onHeadDoubleCli
   onOpen: () => void;
 }) {
   const termRef = useRef<HTMLDivElement>(null);
-  // Borrow on mount, give back on unmount. returnTerminal is a no-op after a real
-  // close (releaseTerminal disposed first) and parks if the pane container is gone.
+  // Borrow on mount, give back on unmount. borrowTerminal can miss when this card
+  // mounts in the same commit that created the pane (TerminalPane acquires the
+  // terminal one commit later) — retry per frame until it lands. returnTerminal is
+  // a no-op after a real close (releaseTerminal disposed first), and re-parenting
+  // a never-borrowed host back to its own container is harmless.
   useLayoutEffect(() => {
-    borrowTerminal(it.paneId, termRef.current!);
-    return () => returnTerminal(it.paneId);
+    let raf = 0;
+    const tryBorrow = () => {
+      if (!borrowTerminal(it.paneId, termRef.current!)) raf = requestAnimationFrame(tryBorrow);
+    };
+    tryBorrow();
+    return () => { cancelAnimationFrame(raf); returnTerminal(it.paneId); };
   }, [it.paneId]);
   const w = waitingPanes.get(it.paneId);
   const working = !w && deriveState({ lastLineAt: paneLastLineAt(it.paneId) }, now, 800) === "working";
