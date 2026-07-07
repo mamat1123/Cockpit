@@ -97,13 +97,15 @@ describe("fitAll", () => {
     expect(c.x).toBeCloseTo((800 - CARD_W) / 2);
     expect(c.y).toBeCloseTo((600 - CARD_H) / 2);
   });
-  it("spread-out cards zoom out until everything fits (never past ZOOM_MIN)", () => {
-    const c = fitAll([{ x: 0, y: 0 }, { x: 4000, y: 0 }], { w: 800, h: 600 });
+  it("spread-out cards zoom out until everything fits", () => {
+    // spread chosen to fit WITHIN the zoom clamp: bbox 2240 wide → zoom ≈ 0.30 ≥ ZOOM_MIN.
+    // (A pathological spread that needs < ZOOM_MIN just centers at 25% — clamp wins.)
+    const c = fitAll([{ x: 0, y: 0 }, { x: 2000, y: 0 }], { w: 800, h: 600 });
     expect(c.zoom).toBeLessThan(1);
     expect(c.zoom).toBeGreaterThanOrEqual(ZOOM_MIN);
     // both edges on-screen: left edge of card 0 and right edge of card 1
     expect(0 * c.zoom + c.x).toBeGreaterThanOrEqual(0);
-    expect((4000 + CARD_W) * c.zoom + c.x).toBeLessThanOrEqual(800);
+    expect((2000 + CARD_W) * c.zoom + c.x).toBeLessThanOrEqual(800);
   });
 });
 
