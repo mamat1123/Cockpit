@@ -145,11 +145,12 @@ export function CockpitView() {
   const jumpToSession = useCallback((sessionId: string) => {
     const hit = findPaneBySession(layout, sessionId);
     if (hit) {
+      setViewMode("tabs");
       dispatch({ type: "focusTab", tabId: hit.tabId });
       dispatch({ type: "focusPane", paneId: hit.paneId });
       requestAnimationFrame(() => requestAnimationFrame(() => focusTerminal(hit.paneId)));
     }
-  }, [layout]);
+  }, [layout, setViewMode]);
 
   // Drive beacon window visibility from settings.
   useEffect(() => {
@@ -233,6 +234,7 @@ export function CockpitView() {
                     key={t.id}
                     tab={t}
                     active={t.id === layout.activeTabId}
+                    revealed={viewMode !== "canvas"}
                     dispatch={dispatch}
                     registerSlot={registerSlot}
                   />
@@ -261,6 +263,7 @@ export function CockpitView() {
           layout={layout}
           onClose={() => setDashOpen(false)}
           onJump={(tabId, paneId) => {
+            setViewMode("tabs");
             dispatch({ type: "focusTab", tabId });
             dispatch({ type: "focusPane", paneId });
             setDashOpen(false);
@@ -268,6 +271,7 @@ export function CockpitView() {
             requestAnimationFrame(() => requestAnimationFrame(() => focusTerminal(paneId)));
           }}
           onJumpSession={(sessionId, cwd) => {
+            setViewMode("tabs");
             const hit = findPaneBySession(layout, sessionId);
             if (hit) {
               dispatch({ type: "focusTab", tabId: hit.tabId });

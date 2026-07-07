@@ -60,7 +60,7 @@
 .cockpit-cv__act { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cockpit-cv__foot { display: flex; justify-content: space-between; margin-top: 8px; font-size: 10px; color: var(--ck-muted); }
 
-.cockpit-cv__hud { position: absolute; right: 10px; bottom: 10px; display: flex; gap: 6px; align-items: center; }
+.cockpit-cv__hud { position: absolute; left: 10px; bottom: 10px; display: flex; gap: 6px; align-items: center; }
 .cockpit-cv__zoom,
 .cockpit-cv__fit {
   font-size: 11px;

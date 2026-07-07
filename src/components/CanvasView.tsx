@@ -161,6 +161,15 @@ export function CanvasView({ layout, onJump }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [camera, positions, itemsKey]);
 
+  // Flush the pending save on unmount — a mode flip inside the debounce window must
+  // not lose the last drag/pan. cameraRef is fresher than state mid-wheel-settle.
+  const persistRef = useRef({ positions, liveIds });
+  persistRef.current = { positions, liveIds };
+  useEffect(() => () => {
+    const { positions, liveIds } = persistRef.current;
+    saveCanvasState({ camera: cameraRef.current, positions: prunePositions(positions, liveIds) });
+  }, []);
+
   // Wheel = pan; pinch (wheel+ctrlKey in WKWebView) or ⌘wheel = zoom at cursor.
   // Native listener: React's onWheel can be passive, and preventDefault is required.
   useEffect(() => {

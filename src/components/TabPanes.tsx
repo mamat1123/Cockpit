@@ -35,8 +35,8 @@ function RowPanes({ row, dispatch, registerSlot }: {
   );
 }
 
-export function TabPanes({ tab, active, dispatch, registerSlot }: {
-  tab: Tab; active: boolean; dispatch: (a: Action) => void; registerSlot: (paneId: string) => (el: HTMLElement | null) => void;
+export function TabPanes({ tab, active, revealed, dispatch, registerSlot }: {
+  tab: Tab; active: boolean; revealed: boolean; dispatch: (a: Action) => void; registerSlot: (paneId: string) => (el: HTMLElement | null) => void;
 }) {
   const colRef = useRef<HTMLDivElement>(null);
 
@@ -44,15 +44,17 @@ export function TabPanes({ tab, active, dispatch, registerSlot }: {
   // membership changes (pop-out / close / split). A ResizeObserver alone misses the
   // display:none -> flex transition in the webview, leaving a freshly-revealed or
   // newly-widened pane stuck at its old (smaller) grid until the next manual resize.
+  // The same blind spot applies one level up when canvas mode re-reveals the whole
+  // tab stack — `revealed` re-fires this effect on the way back.
   const paneIdsKey = tab.rows.flatMap((r) => r.panes.map((p) => p.id)).join(",");
   useEffect(() => {
-    if (!active) return;
+    if (!active || !revealed) return;
     const id = requestAnimationFrame(() => {
       tab.rows.flatMap((r) => r.panes).forEach((p) => refit(p.id));
     });
     return () => cancelAnimationFrame(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, paneIdsKey]);
+  }, [active, revealed, paneIdsKey]);
 
   return (
     <div
