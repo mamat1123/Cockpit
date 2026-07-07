@@ -600,7 +600,7 @@ import { costOf } from "../lib/pricing";
 import { loadCanvasState, saveCanvasState } from "../lib/persistence";
 import { debounce } from "../lib/debounce";
 import {
-  type Camera, type Pt, zoomAt, panBy, isDrag, nextFreeCell, fitAll, prunePositions, CARD_W,
+  type Camera, type Pt, clampZoom, zoomAt, panBy, isDrag, nextFreeCell, fitAll, prunePositions, CARD_W,
 } from "./canvasMath";
 import "./CanvasView.css";
 
@@ -640,7 +640,17 @@ export function CanvasView({ layout, onJump }: {
   // Committed truth lives in React state (drives persistence + the HUD zoom %);
   // the LIVE value during a gesture lives in refs and is written straight to the
   // DOM — React renders zero times per gesture frame (the no-lag requirement).
-  const [initial] = useState(loadCanvasState);
+  // persistence.ts deliberately doesn't validate shapes (house style), so guard
+  // the loaded blob here: a malformed camera would poison every transform (1/zoom).
+  const [initial] = useState(() => {
+    const s = loadCanvasState();
+    if (!s || typeof s.camera?.x !== "number" || typeof s.camera?.y !== "number" || typeof s.camera?.zoom !== "number") return null;
+    const positions: Record<string, Pt> = {};
+    for (const [id, p] of Object.entries(s.positions ?? {})) {
+      if (typeof p?.x === "number" && typeof p?.y === "number") positions[id] = { x: p.x, y: p.y };
+    }
+    return { camera: { ...s.camera, zoom: clampZoom(s.camera.zoom) }, positions };
+  });
   const [camera, setCamera] = useState<Camera>(() => initial?.camera ?? { x: 0, y: 0, zoom: 1 });
   const [positions, setPositions] = useState<Record<string, Pt>>(() => initial?.positions ?? {});
   const cameraRef = useRef(camera);
