@@ -24,12 +24,13 @@
   top: 0;
   will-change: transform;
   box-sizing: border-box;
-  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   border-radius: 12px;
   background: var(--ck-surface);
   border: 1px solid var(--ck-border);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
-  cursor: default;
   user-select: none;
   -webkit-user-select: none;
   font-size: 12px;
@@ -41,24 +42,44 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--ck-yellow) 18%, transparent), 0 6px 20px rgba(0, 0, 0, 0.35);
 }
 
-.cockpit-cv__head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-.cockpit-cv__name { font-weight: 600; color: var(--ck-bright); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cockpit-cv__state { flex: none; font-size: 11px; color: var(--ck-idle); }
-.is-working > .cockpit-cv__head > .cockpit-cv__state { color: var(--ck-accent); }
-.is-waiting > .cockpit-cv__head > .cockpit-cv__state { color: var(--ck-yellow); }
-.cockpit-cv__path { margin-top: 2px; font-size: 10px; color: var(--ck-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cockpit-cv__log {
-  margin-top: 8px;
-  padding: 6px 8px;
-  border-radius: 8px;
-  background: var(--ck-bg);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10px;
-  line-height: 1.8;
-  color: var(--ck-text);
+.cockpit-cv__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--ck-border);
+  cursor: grab;
 }
-.cockpit-cv__act { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cockpit-cv__foot { display: flex; justify-content: space-between; margin-top: 8px; font-size: 10px; color: var(--ck-muted); }
+.cockpit-cv__head:active { cursor: grabbing; }
+.cockpit-cv__name { flex: none; max-width: 40%; font-weight: 600; color: var(--ck-bright); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cockpit-cv__path { flex: 1; font-size: 10px; color: var(--ck-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cockpit-cv__state { flex: none; font-size: 11px; color: var(--ck-idle); }
+.is-working .cockpit-cv__state { color: var(--ck-accent); }
+.is-waiting .cockpit-cv__state { color: var(--ck-yellow); }
+.cockpit-cv__open {
+  flex: none;
+  font-size: 12px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 5px;
+  color: var(--ck-muted);
+  background: transparent;
+  border: 1px solid var(--ck-border);
+  cursor: pointer;
+}
+.cockpit-cv__open:hover { color: var(--ck-bright); }
+
+/* The borrowed live xterm host (a width/height:100% div) fills this box. Text
+ * selection must work INSIDE the terminal even though cards are unselectable. */
+.cockpit-cv__term {
+  flex: 1;
+  min-height: 0;
+  margin: 6px 8px 0;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.cockpit-cv__foot { display: flex; justify-content: space-between; padding: 6px 10px; font-size: 10px; color: var(--ck-muted); }
 
 .cockpit-cv__hud { position: absolute; left: 10px; bottom: 10px; display: flex; gap: 6px; align-items: center; }
 .cockpit-cv__zoom,
