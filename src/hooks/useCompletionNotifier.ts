@@ -4,6 +4,7 @@ import type { Settings } from "../lib/settings";
 import { onLogLine } from "../lib/logClient";
 import { parseTurnEnd } from "../lib/completion";
 import { waitingPanes } from "../lib/waiting";
+import { paneActivity } from "../lib/activity";
 import { notifications, type Completion } from "../lib/notifications";
 import { notifyCompletion, notifyWaiting } from "../lib/osNotify";
 import { emitToast } from "../lib/toastBus";
@@ -41,6 +42,7 @@ export function useCompletionNotifier(layout: Layout, settings: Settings): void 
       let unlisten: UnlistenFn = () => {};
       let disposed = false;
       onLogLine(paneId, (line) => {
+        paneActivity.apply(paneId, line);
         const entered = waitingPanes.apply(paneId, line);
         // ADR-0007 freshness gate: resume backfill may re-enter the STATE silently, never alerts.
         if (entered && Date.now() - entered.askedAt < 8000) {

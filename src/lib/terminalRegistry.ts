@@ -7,6 +7,7 @@ import { startLogtail, sessionExists } from "./logClient";
 import { emitSend } from "./juiceBus";
 import { type Theme, themeById, DEFAULT_THEME_ID } from "./themes";
 import { waitingPanes } from "./waiting";
+import { paneActivity } from "./activity";
 import { headroomEnsure, HEADROOM_BASE_URL } from "./headroomClient";
 import { resolveHeadroomRouting } from "./headroomRouting";
 import { paneLaunchEnv } from "./paneLaunchEnv";
@@ -255,6 +256,7 @@ export function releaseTerminal(paneId: string) {
   registry.delete(paneId);
   routed.delete(paneId);
   waitingPanes.clear(paneId);
+  paneActivity.clear(paneId);
 }
 
 /** Live activity timestamp for a pane (last meaningful PTY output), or null. */
