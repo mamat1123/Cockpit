@@ -1171,7 +1171,9 @@ Expected: all tests PASS; `tsc && vite build` clean.
 
 Checklist — every line must be seen working:
 1. Toggle: segmented control click AND ⌘G flip Tabs ⇄ Canvas; the mode survives an app relaunch.
-2. Terminals survive: enter canvas, wait 10 s, return to tabs → sessions still live, pane fits correctly (no squashed grid).
+2. Terminals survive: enter canvas, wait 10 s, return to tabs → sessions still live, pane fits correctly (no squashed grid). Also: RESIZE the window while in canvas, then ⌘G back → grid refits (reveal-refit); with tab bar LEFT mode, select another tab in the sidebar while in canvas, ⌘G back → that tab renders fitted.
+2b. Jumps exit canvas: while in canvas, click a toast/bell "jump" and a Mission Control bay → app returns to Tabs mode focused on that pane (never a silent no-op).
+2c. Persist flush: drag a card and IMMEDIATELY ⌘G back to tabs, relaunch → the dragged position survived (unmount flush).
 3. Pan (drag background + two-finger scroll), pinch/⌘scroll zoom toward cursor, clamped 25–200%; HUD % updates; "fit all" frames every card.
 4. **No-lag check (the requirement):** with 4+ panes open and at least one WORKING, pan/zoom/drag continuously — no stutter while activity lines and status update. Include a 10 s continuous two-finger trackpad pan while a session streams (the wheel path must pause ticks). If the dot grid shows up as jank, apply the noted fallback (static grid) and re-verify. Also check card text stays sharp at 200% zoom (compositor raster-scale) — fallback: drop `will-change` from `.cockpit-cv__card` (keep it on `__world`).
 5. Cards: green border while working, amber+glow while an AskUserQuestion is pending (with `waiting Xm`), activity log shows real tool lines (`⚙ Bash · …`), cost + last-active tick.
@@ -1201,3 +1203,14 @@ Append to `SPEC.md`:
 git add SPEC.md
 git commit -m "docs(canvas): SPEC status — M13 canvas view"
 ```
+
+---
+
+## Post-review deltas (applied during execution)
+
+Code-review findings fixed on top of the planned code — the committed source is authoritative for these:
+
+- **Task 5 / CanvasView** (commit `e494f53`): ghost positions pruned at derivation (`prunePositions` before auto-place, functional commit); wheel treated as a gesture (`{kind:"wheel"}` — pauses ticks, cleared by the 150 ms commit debounce); concurrent wheel ignored during pointer gestures; per-event zoom factor clamped (notched mouse); `endGesture(allowClick)` so pointercancel / lost-up never triggers a jump; first-run framing via `framed` ref fires on first pane arrival; rAF cancel on unmount.
+- **Task 6 wiring** (commit `1afbaf5`): `TabPanes` gained a `revealed` prop re-firing the refit effect when the stack is re-revealed from canvas mode (WKWebView RO misses display:none→flex one level up); ALL jump paths (`jumpToSession`, Mission Control onJump/onJumpSession) now `setViewMode("tabs")` first; CanvasView flushes its debounced persist on unmount (camera from `cameraRef`); HUD moved bottom-left (Juice pill/toast collision); segmented buttons got `aria-pressed`.
+- **Deferred to Task 7 GUI checks**: text sharpness at 200 % (will-change raster-scale fallback documented); momentum-scroll tail freezing status ≤ ~2 s is BY DESIGN (gesture pause).
+- **Accepted v1 quirks** (explicitly not fixed): ⌘W closes the focused-but-invisible pane while in canvas; sidebar tab select while in canvas has no visible effect until ⌘G back; canvas toggle lit while layout is empty shows the empty-state, not the canvas.
