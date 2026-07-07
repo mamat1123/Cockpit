@@ -130,3 +130,19 @@ rendered to feel satisfying. "Game-like" = aesthetic JUICE, not game mechanics (
   TabItem + useTabStrip so both orientations are one implementation (select, drag-reorder,
   rename with focus-steal defense, close+confirm, working/waiting/unseen indicators).
   Setting persisted with backfill. Spec: docs/superpowers/specs/2026-07-03-vertical-tab-bar-design.md.
+
+## Status — updated 2026-07-08
+
+- **M13 — Canvas view (base)**: `⌶ Tabs ⇄ ▦ Canvas` workspace mode (segmented control + ⌘G).
+  Sessions are draggable cards (status border, CNVS-style 3-line tool activity log, cost,
+  last-active) on a pan/zoom canvas; every jump path exits canvas mode; positions/camera/mode
+  persisted (flush-on-unmount). Hand-rolled engine: gestures (incl. wheel) write transforms to
+  DOM refs per rAF, React commits on gesture end; status/cost ticks pause during gestures.
+  `activity.ts` folds tool_use lines from the existing logtail (no Rust changes). TabPanes
+  gained a `revealed` prop so the WKWebView refit blind spot is covered on canvas→tabs.
+  GUI-verified live (cards, activity log, statuses); full no-lag pass deferred until M13b.
+  Spec: docs/superpowers/specs/2026-07-07-canvas-view-design.md ·
+  Plan: docs/superpowers/plans/2026-07-07-canvas-view.md
+- **M13b (next, user-requested after first use)**: real interactive terminals ON the canvas
+  cards (replacing the activity-log body) — user explicitly accepted the trade-offs
+  (blur at zoom ≠ 100%, PTY resize on mode flip, heavier rendering).
