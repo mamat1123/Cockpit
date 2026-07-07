@@ -253,3 +253,45 @@ export const SIDECHAIN_ASSISTANT = JSON.stringify({
 
 /** Malformed / non-JSON line. */
 export const GARBAGE = "not json {";
+
+/** Assistant message with PARALLEL tool_use blocks (Edit + Read) written as one
+ *  record — the activity feed must surface both. Same real shape as ASSISTANT_TOOL_USE. */
+export const ASSISTANT_EDIT = JSON.stringify({
+  parentUuid: "5f02189c-45db-4fc7-8b22-4b5f65f7b65e",
+  isSidechain: false,
+  message: {
+    model: "claude-fable-5",
+    id: "msg_EDIT1",
+    type: "message",
+    role: "assistant",
+    content: [
+      {
+        type: "tool_use",
+        id: "toolu_EDIT1",
+        name: "Edit",
+        input: { file_path: "/Users/example/project/src/components/CanvasView.tsx", old_string: "a", new_string: "b" },
+      },
+      {
+        type: "tool_use",
+        id: "toolu_READ1",
+        name: "Read",
+        input: { file_path: "/Users/example/project/src/components/dragMath.ts" },
+      },
+    ],
+    stop_reason: "tool_use",
+    stop_sequence: null,
+    stop_details: null,
+    usage: { input_tokens: 2, cache_read_input_tokens: 290000, output_tokens: 90 },
+    diagnostics: null,
+  },
+  requestId: "req_EDIT1",
+  type: "assistant",
+  uuid: "d4d4d4d4-0000-4000-8000-000000000001",
+  timestamp: "2026-07-07T04:00:00.000Z",
+  userType: "external",
+  entrypoint: "cli",
+  cwd: "/Users/example/project",
+  sessionId: "ad31a042-e0c0-48d9-9392-850df5077453",
+  version: "2.1.185",
+  gitBranch: "main",
+});
