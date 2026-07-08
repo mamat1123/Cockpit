@@ -54,6 +54,7 @@ export function PaneHost({ layout, slots, dispatch, onRequestClose }: {
               onFocus={() => dispatch({ type: "focusPane", paneId: pane.id })}
               onRename={(t) => dispatch({ type: "renamePane", paneId: pane.id, title: t })}
               onAutoTitle={(t) => dispatch({ type: "autoTitlePane", paneId: pane.id, title: t })}
+              onSessionIdChange={(sessionId) => dispatch({ type: "setSessionId", paneId: pane.id, sessionId })}
               onPopOut={() => dispatch({ type: "popOut", paneId: pane.id })}
               onClose={() => onRequestClose(pane.id)}
               onToggleHeadroom={() => {
@@ -111,12 +112,15 @@ export function PaneHost({ layout, slots, dispatch, onRequestClose }: {
                   setHandoffBusy(pane.id);
                   void createCodexHandoff(pane.cwd, pane.sessionId)
                     .then((handoff) => {
+                      if (handoff.sourceSessionId !== pane.sessionId) {
+                        dispatch({ type: "setSessionId", paneId: pane.id, sessionId: handoff.sourceSessionId });
+                      }
                       dispatch({
                         type: "openCodexHandoff",
                         sourcePaneId: pane.id,
                         cwd: pane.cwd,
                         promptPath: handoff.promptPath,
-                        fromSessionId: pane.sessionId,
+                        fromSessionId: handoff.sourceSessionId,
                         title: handoff.title ?? pane.title,
                       });
                     })

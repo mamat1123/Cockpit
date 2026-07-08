@@ -3,6 +3,7 @@ use std::io::{BufRead, BufReader, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::SystemTime;
 use tauri::{AppHandle, Emitter, State};
 
 /// Claude Code stores a session under ~/.claude/projects/<encoded>/, where <encoded>
@@ -18,7 +19,9 @@ pub fn encode_project_dir(cwd: &str) -> String {
 
 /// Directory that holds this cwd's session logs.
 pub fn project_log_dir(home: &Path, cwd: &str) -> PathBuf {
-    home.join(".claude").join("projects").join(encode_project_dir(cwd))
+    home.join(".claude")
+        .join("projects")
+        .join(encode_project_dir(cwd))
 }
 
 /// Exact log file for a known claude session under a cwd.
@@ -28,7 +31,11 @@ pub fn session_log_path(home: &Path, cwd: &str, session_id: &str) -> PathBuf {
 
 /// Newest *.jsonl in `dir` by mtime, or None if the dir is missing/empty.
 pub fn newest_session_file(dir: &Path) -> Option<PathBuf> {
-    let mut newest: Option<(std::time::SystemTime, PathBuf)> = None;
+    newest_session_file_with_mtime(dir).map(|(_, p)| p)
+}
+
+fn newest_session_file_with_mtime(dir: &Path) -> Option<(SystemTime, PathBuf)> {
+    let mut newest: Option<(SystemTime, PathBuf)> = None;
     for entry in std::fs::read_dir(dir).ok()?.flatten() {
         let p = entry.path();
         if p.extension().and_then(|e| e.to_str()) != Some("jsonl") {
@@ -41,7 +48,54 @@ pub fn newest_session_file(dir: &Path) -> Option<PathBuf> {
             }
         }
     }
-    newest.map(|(_, p)| p)
+    newest
+}
+
+fn session_id_from_path(path: &Path) -> Option<String> {
+    path.file_stem()
+        .and_then(|s| s.to_str())
+        .map(str::to_string)
+}
+
+/// Resolve Cockpit's pane session id to the newest Claude log for the same cwd.
+///
+/// Claude can move a running CLI to a new session after commands like `/clear`.
+/// Cockpit's pane id stays the same, so the frontend can temporarily hold the old
+/// session id. If a newer jsonl exists in the same project log directory, treat it
+/// as the live Claude session. When `allow_missing_requested` is false we keep a
+/// never-created fresh pane id instead of snapping it to an old historical session
+/// before Claude has had time to create the new log file.
+pub fn resolve_current_session_log(
+    home: &Path,
+    cwd: &str,
+    session_id: &str,
+    allow_missing_requested: bool,
+) -> Option<(String, PathBuf)> {
+    let dir = project_log_dir(home, cwd);
+    let requested = session_log_path(home, cwd, session_id);
+    let requested_mtime = std::fs::metadata(&requested)
+        .and_then(|m| m.modified())
+        .ok();
+    let newest = newest_session_file_with_mtime(&dir);
+
+    let chosen = match (requested_mtime, newest) {
+        (Some(req_mtime), Some((new_mtime, newest_path)))
+            if newest_path != requested && new_mtime > req_mtime =>
+        {
+            newest_path
+        }
+        (Some(_), _) => requested,
+        (None, Some((_, newest_path))) if allow_missing_requested => newest_path,
+        (None, _) => requested,
+    };
+
+    session_id_from_path(&chosen).map(|sid| (sid, chosen))
+}
+
+#[tauri::command]
+pub fn current_session_id(cwd: String, session_id: String) -> Option<String> {
+    let home = dirs_home()?;
+    resolve_current_session_log(&home, &cwd, &session_id, false).map(|(sid, _)| sid)
 }
 
 /// Collapse whitespace to single spaces and cap at 60 chars (… suffix if cut).
@@ -105,9 +159,14 @@ pub fn pane_topic(cwd: String, session_id: String) -> Option<String> {
 /// True if the pane's own session log exists and is non-empty (i.e. resumable).
 #[tauri::command]
 pub fn session_exists(cwd: String, session_id: String) -> bool {
-    let home = match dirs_home() { Some(h) => h, None => return false };
+    let home = match dirs_home() {
+        Some(h) => h,
+        None => return false,
+    };
     let path = session_log_path(&home, &cwd, &session_id);
-    std::fs::metadata(&path).map(|m| m.len() > 0).unwrap_or(false)
+    std::fs::metadata(&path)
+        .map(|m| m.len() > 0)
+        .unwrap_or(false)
 }
 
 #[derive(Default)]
@@ -203,6 +262,50 @@ mod tests {
     }
 
     #[test]
+    fn resolves_to_newer_session_log_when_requested_is_stale() {
+        let home = std::env::temp_dir().join(format!("cockpit-current-{}", std::process::id()));
+        let cwd = "/Users/me/Work/app";
+        let dir = project_log_dir(&home, cwd);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("old-session.jsonl"), "{}").unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        std::fs::write(dir.join("new-session.jsonl"), "{}").unwrap();
+
+        let got = resolve_current_session_log(&home, cwd, "old-session", false).unwrap();
+        assert_eq!(got.0, "new-session");
+        assert_eq!(
+            got.1.file_name().unwrap().to_str().unwrap(),
+            "new-session.jsonl"
+        );
+        std::fs::remove_dir_all(&home).ok();
+    }
+
+    #[test]
+    fn keeps_missing_fresh_session_id_unless_missing_is_allowed() {
+        let home =
+            std::env::temp_dir().join(format!("cockpit-current-missing-{}", std::process::id()));
+        let cwd = "/Users/me/Work/app";
+        let dir = project_log_dir(&home, cwd);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("historical.jsonl"), "{}").unwrap();
+
+        let fresh = resolve_current_session_log(&home, cwd, "fresh", false).unwrap();
+        assert_eq!(fresh.0, "fresh");
+        assert_eq!(
+            fresh.1.file_name().unwrap().to_str().unwrap(),
+            "fresh.jsonl"
+        );
+
+        let handoff = resolve_current_session_log(&home, cwd, "fresh", true).unwrap();
+        assert_eq!(handoff.0, "historical");
+        assert_eq!(
+            handoff.1.file_name().unwrap().to_str().unwrap(),
+            "historical.jsonl"
+        );
+        std::fs::remove_dir_all(&home).ok();
+    }
+
+    #[test]
     fn first_user_topic_skips_wrappers_and_collapses_ws() {
         let dir = std::env::temp_dir().join(format!("cockpit-topic-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
@@ -213,7 +316,10 @@ mod tests {
             "{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":\"  Fix the   crypto\\n pricing bug  \"}}\n"
         );
         std::fs::write(&path, content).unwrap();
-        assert_eq!(first_user_topic(&path).as_deref(), Some("Fix the crypto pricing bug"));
+        assert_eq!(
+            first_user_topic(&path).as_deref(),
+            Some("Fix the crypto pricing bug")
+        );
         std::fs::remove_dir_all(&dir).ok();
     }
 
@@ -223,7 +329,14 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("s.jsonl");
         let long = "a ".repeat(80);
-        std::fs::write(&path, format!("{{\"type\":\"user\",\"message\":{{\"role\":\"user\",\"content\":\"{}\"}}}}\n", long)).unwrap();
+        std::fs::write(
+            &path,
+            format!(
+                "{{\"type\":\"user\",\"message\":{{\"role\":\"user\",\"content\":\"{}\"}}}}\n",
+                long
+            ),
+        )
+        .unwrap();
         let got = first_user_topic(&path).unwrap();
         assert!(got.ends_with('…'));
         assert_eq!(got.chars().count(), 61);

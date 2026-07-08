@@ -223,6 +223,16 @@ describe("sessionId", () => {
     const ids = l1.tabs[0].rows[0].panes.map((p) => p.sessionId);
     expect(new Set(ids).size).toBe(2);
   });
+
+  it("can update a live pane's session id without replacing the pane", () => {
+    const l0 = initLayout("/x");
+    const p0 = l0.tabs[0].rows[0].panes[0];
+    const l1 = reduce(l0, { type: "setSessionId", paneId: p0.id, sessionId: "new-session" });
+    const p1 = l1.tabs[0].rows[0].panes[0];
+    expect(p1.id).toBe(p0.id);
+    expect(p1.sessionId).toBe("new-session");
+    expect(l1.focusedPaneId).toBe(p0.id);
+  });
 });
 
 import { serializeLayout, deserializeLayout, layoutHasSessions } from "./paneLayout";

@@ -74,6 +74,8 @@ export interface TermEntry {
   lastLineAt: { current: number | null };
   lastInputAt: { current: number };
   lastResizeAt: { current: number };
+  logtailSessionId?: string;
+  logtailCwd?: string;
 }
 
 let parking: HTMLDivElement | null = null;
@@ -158,7 +160,14 @@ async function launchAgent(
  *  selected agent and starts Claude logtail when applicable. */
 export function acquireTerminal(paneId: string, cwd: string, sessionId: string, resume: boolean, opts: { provider: AgentProvider; headroom: boolean; ponytail: PonytailLevel; codexPromptPath?: string; claudePromptPath?: string }): TermEntry {
   const existing = registry.get(paneId);
-  if (existing) return existing;
+  if (existing) {
+    if (opts.provider !== "codex" && (existing.logtailSessionId !== sessionId || existing.logtailCwd !== cwd)) {
+      existing.logtailSessionId = sessionId;
+      existing.logtailCwd = cwd;
+      void startLogtail(paneId, cwd, sessionId);
+    }
+    return existing;
+  }
 
   const hostEl = document.createElement("div");
   Object.assign(hostEl.style, { width: "100%", height: "100%" });
@@ -215,7 +224,17 @@ export function acquireTerminal(paneId: string, cwd: string, sessionId: string, 
   // (auto-title, waiting detection, notifications). Only codex has no claude log.
   if (opts.provider !== "codex") void startLogtail(paneId, cwd, sessionId);
 
-  const entry: TermEntry = { term, hostEl, fit, paneContainer: null, lastLineAt, lastInputAt, lastResizeAt };
+  const entry: TermEntry = {
+    term,
+    hostEl,
+    fit,
+    paneContainer: null,
+    lastLineAt,
+    lastInputAt,
+    lastResizeAt,
+    logtailSessionId: opts.provider !== "codex" ? sessionId : undefined,
+    logtailCwd: opts.provider !== "codex" ? cwd : undefined,
+  };
   registry.set(paneId, entry);
   return entry;
 }

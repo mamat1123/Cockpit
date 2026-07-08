@@ -55,6 +55,7 @@ export type Action =
   | { type: "loadLayout"; saved: SavedLayout }
   | { type: "setHeadroom"; paneId: string; on: boolean }
   | { type: "setPonytail"; paneId: string; level: PonytailLevel }
+  | { type: "setSessionId"; paneId: string; sessionId: string }
   | { type: "setProvider"; paneId: string; provider: AgentProvider };
 
 let counter = 0;
@@ -408,6 +409,16 @@ export function reduce(l: Layout, a: Action): Layout {
         rows: t.rows.map((r) => ({
           ...r,
           panes: r.panes.map((p) => (p.id === a.paneId ? { ...p, ponytail: a.level } : p)),
+        })),
+      }));
+      return { ...l, tabs };
+    }
+    case "setSessionId": {
+      const tabs = l.tabs.map((t) => ({
+        ...t,
+        rows: t.rows.map((r) => ({
+          ...r,
+          panes: r.panes.map((p) => (p.id === a.paneId ? { ...p, sessionId: a.sessionId } : p)),
         })),
       }));
       return { ...l, tabs };

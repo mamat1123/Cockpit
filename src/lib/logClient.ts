@@ -17,3 +17,6 @@ export function paneTopic(cwd: string, sessionId: string): Promise<string | null
 export function sessionExists(cwd: string, sessionId: string): Promise<boolean> {
   return invoke("session_exists", { cwd, sessionId });
 }
+export function currentSessionId(cwd: string, sessionId: string): Promise<string | null> {
+  return invoke("current_session_id", { cwd, sessionId });
+}

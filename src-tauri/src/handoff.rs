@@ -29,7 +29,8 @@ pub struct ClaudeHandoff {
 #[tauri::command]
 pub fn create_codex_handoff(cwd: String, session_id: String) -> Result<CodexHandoff, String> {
     let home = dirs_home().ok_or("no home dir")?;
-    let path = crate::logtail::session_log_path(&home, &cwd, &session_id);
+    let (source_session_id, path) = crate::logtail::resolve_current_session_log(&home, &cwd, &session_id, true)
+        .unwrap_or_else(|| (session_id.clone(), crate::logtail::session_log_path(&home, &cwd, &session_id)));
     if !path.exists() {
         return Err(format!("Claude session log not found: {}", path.display()));
     }
@@ -42,14 +43,14 @@ pub fn create_codex_handoff(cwd: String, session_id: String) -> Result<CodexHand
     let selected = select_entries(&entries, MAX_TRANSCRIPT_CHARS);
     let omitted = entries.len().saturating_sub(selected.len());
     let git = git_snapshot(&cwd);
-    let prompt = render_prompt(&cwd, &session_id, &selected, omitted, &git);
-    let prompt_path = write_prompt("codex", &session_id, &prompt)?;
+    let prompt = render_prompt(&cwd, &source_session_id, &selected, omitted, &git);
+    let prompt_path = write_prompt("codex", &source_session_id, &prompt)?;
 
     Ok(CodexHandoff {
         prompt_path: prompt_path.to_string_lossy().into_owned(),
         title,
         cwd,
-        source_session_id: session_id,
+        source_session_id,
         excerpt_count: selected.len(),
         omitted_count: omitted,
     })

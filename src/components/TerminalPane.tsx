@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { debounce } from "../lib/debounce";
 import { deriveState, type PaneState } from "../lib/paneState";
 import { waitingPanes, waitingLabel } from "../lib/waiting";
-import { paneTopic } from "../lib/logClient";
+import { currentSessionId, paneTopic } from "../lib/logClient";
 import { acquireTerminal, attachTerminal, parkTerminalNode, refit, focusTerminal } from "../lib/terminalRegistry";
 import { writePty } from "../lib/ptyClient";
 import { saveDroppedFile, dragHasFiles, droppableFiles } from "../lib/dropClient";
@@ -11,7 +11,7 @@ import { ponytailInstalled, type PonytailLevel } from "../lib/ponytailClient";
 import type { AgentProvider } from "../layout/paneLayout";
 import "./TerminalPane.css";
 
-export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, ponytail, provider, codexPromptPath, claudePromptPath, title, focused, isDragging, isDropTarget, onFocus, onRename, onAutoTitle, onPopOut, onClose, onToggleHeadroom, onSetPonytail, onSelectProvider, dragHandleProps, dropZoneProps }: {
+export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, ponytail, provider, codexPromptPath, claudePromptPath, title, focused, isDragging, isDropTarget, onFocus, onRename, onAutoTitle, onSessionIdChange, onPopOut, onClose, onToggleHeadroom, onSetPonytail, onSelectProvider, dragHandleProps, dropZoneProps }: {
   paneId: string;
   cwd: string;
   sessionId: string;
@@ -28,6 +28,7 @@ export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, ponytai
   onFocus: () => void;
   onRename: (title: string) => void;
   onAutoTitle: (title: string) => void;
+  onSessionIdChange: (sessionId: string) => void;
   onPopOut: () => void;
   onClose: () => void;
   onToggleHeadroom: () => void;
@@ -43,6 +44,8 @@ export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, ponytai
   useEffect(() => { ponytailInstalled().then(setPtInstalled).catch(() => {}); }, []);
   const onAutoTitleRef = useRef(onAutoTitle);
   onAutoTitleRef.current = onAutoTitle;
+  const onSessionIdChangeRef = useRef(onSessionIdChange);
+  onSessionIdChangeRef.current = onSessionIdChange;
   const onFocusRef = useRef(onFocus);
   onFocusRef.current = onFocus;
 
@@ -154,6 +157,33 @@ export function TerminalPane({ paneId, cwd, sessionId, resume, headroom, ponytai
     };
     const first = setTimeout(poll, 1200);
     const id = setInterval(poll, 6000);
+    return () => {
+      alive = false;
+      clearTimeout(first);
+      clearInterval(id);
+    };
+  }, [cwd, sessionId, provider]);
+
+  // Claude can move a running CLI to a new session after `/clear`. Cockpit owns the
+  // outer pane, so keep the pane metadata pointed at the live Claude jsonl file.
+  useEffect(() => {
+    if (provider === "codex") return;
+    let alive = true;
+    let inFlight = false;
+    const poll = async () => {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const next = await currentSessionId(cwd, sessionId);
+        if (alive && next && next !== sessionId) onSessionIdChangeRef.current(next);
+      } catch {
+        /* not under Tauri / no log yet — ignore */
+      } finally {
+        inFlight = false;
+      }
+    };
+    const first = setTimeout(poll, 1800);
+    const id = setInterval(poll, 5000);
     return () => {
       alive = false;
       clearTimeout(first);

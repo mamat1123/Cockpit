@@ -117,6 +117,7 @@ pub fn run() {
             logtail::logtail_stop,
             logtail::pane_topic,
             logtail::session_exists,
+            logtail::current_session_id,
             cost::session_usage,
             cost::cost_report,
             cost::list_projects,
