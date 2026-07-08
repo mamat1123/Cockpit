@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-import { reduce, emptyLayout, findPaneBySession, serializeLayout, deserializeLayout, type Layout } from "../layout/paneLayout";
+import { reduce, emptyLayout, findPaneBySession, serializeLayout, deserializeLayout, type Layout, type BurrowInfo } from "../layout/paneLayout";
 import { loadLast, saveLast, savePreset, loadViewMode, saveViewMode, type ViewMode } from "../lib/persistence";
+import { createBurrow, removeBurrow, burrowDirty } from "../lib/worktreeClient";
 import { loadSettings, saveSettings } from "../lib/settings";
 import { themeById, applyTheme } from "../lib/themes";
 import { useKeybindings } from "../layout/useKeybindings";
@@ -15,6 +16,7 @@ import { ProviderPicker, type ProviderPickerContext } from "./ProviderPicker";
 import { WorkspacesMenu } from "./WorkspacesMenu";
 import { SettingsMenu } from "./SettingsMenu";
 import { UpdateModal } from "./UpdateModal";
+import { BurrowCloseDialog, type BurrowToClose } from "./BurrowCloseDialog";
 import { killPty } from "../lib/ptyClient";
 import { stopLogtail } from "../lib/logClient";
 import { releaseTerminal, focusTerminal, setTerminalTheme, setTerminalFont } from "../lib/terminalRegistry";
@@ -78,6 +80,67 @@ export function CockpitView() {
   const [appVersion, setAppVersion] = useState("");
   const [settings, setSettings] = useState(loadSettings);
   const patchSettings = useCallback((p: Partial<typeof settings>) => setSettings((s) => { const n = { ...s, ...p }; saveSettings(n); return n; }), []);
+  const focusedPaneCwd = useCallback((): string => {
+    for (const t of layout.tabs) for (const r of t.rows) for (const p of r.panes)
+      if (p.id === layout.focusedPaneId) return p.cwd;
+    return layout.tabs[0]?.rows[0]?.panes[0]?.cwd ?? "";
+  }, [layout]);
+  // Create a Burrow for `cwd` when the toggle is on; undefined ⇒ caller uses the plain cwd
+  // (setting off, no folder, non-git repo, or git error — all fall back silently).
+  const maybeBurrow = useCallback(async (cwd: string): Promise<BurrowInfo | undefined> => {
+    if (!settings.burrows || !cwd) return undefined;
+    try { return await createBurrow(cwd); }
+    catch (e) { console.warn("[cockpit] burrow skipped:", e); return undefined; }
+  }, [settings.burrows]);
+
+  // Close orchestration: closing a pane/tab that carries a dirty Burrow pauses the
+  // close and asks delete/keep/cancel; clean or non-Burrow panes close immediately.
+  const [closingBurrows, setClosingBurrows] = useState<{ burrows: BurrowToClose[]; onConfirmDelete: () => void; onConfirmKeep: () => void } | null>(null);
+
+  const burrowPanesIn = useCallback((predicate: (paneId: string) => boolean): BurrowToClose[] => {
+    const out: BurrowToClose[] = [];
+    for (const t of layout.tabs) for (const r of t.rows) for (const p of r.panes)
+      if (p.isBurrow && p.burrowBranch && predicate(p.id))
+        out.push({ paneId: p.id, codename: p.codename ?? p.title, path: p.cwd, branch: p.burrowBranch });
+    return out;
+  }, [layout]);
+
+  // Burrows to remove once their pane ACTUALLY leaves the layout — gated by the
+  // removed-pane effect below so the reducer's "never close the last pane/tab" guard
+  // can't leave us deleting a worktree out from under a still-live terminal.
+  const pendingBurrowPurge = useRef(new Map<string, { path: string; branch: string }>());
+
+  // Register each Burrow for removal, then run the layout change. Actual removal happens
+  // in the removed-pane effect below, only if the pane really left the layout.
+  const purgeAndClose = useCallback((list: BurrowToClose[], commit: () => void) => {
+    for (const b of list) pendingBurrowPurge.current.set(b.paneId, { path: b.path, branch: b.branch });
+    commit();
+  }, []);
+
+  const closeWithBurrows = useCallback(async (list: BurrowToClose[], commit: () => void) => {
+    if (list.length === 0) { commit(); return; }
+    const dirties = await Promise.all(list.map((b) => burrowDirty(b.path).catch(() => ({ uncommitted: true, unpushed: false }))));
+    const dirty = list.filter((_, i) => dirties[i].uncommitted || dirties[i].unpushed);
+    if (dirty.length === 0) { purgeAndClose(list, commit); return; }
+    setClosingBurrows({
+      burrows: dirty,
+      onConfirmDelete: () => purgeAndClose(list, commit),
+      // keep: drop any stale purge registration (e.g. from an earlier refused Delete on the
+      // last pane) so a kept worktree can never be deleted, then close.
+      onConfirmKeep: () => { for (const b of list) pendingBurrowPurge.current.delete(b.paneId); commit(); },
+    });
+  }, [purgeAndClose]);
+
+  const requestClosePane = useCallback((paneId: string) => {
+    const list = burrowPanesIn((id) => id === paneId);
+    void closeWithBurrows(list, () => { dispatch({ type: "focusPane", paneId }); dispatch({ type: "close" }); });
+  }, [burrowPanesIn, closeWithBurrows]);
+
+  const requestCloseTab = useCallback((tabId: string) => {
+    const paneIds = new Set(layout.tabs.find((t) => t.id === tabId)?.rows.flatMap((r) => r.panes.map((p) => p.id)) ?? []);
+    const list = burrowPanesIn((id) => paneIds.has(id));
+    void closeWithBurrows(list, () => dispatch({ type: "closeTab", tabId }));
+  }, [layout, burrowPanesIn, closeWithBurrows]);
   const theme = themeById(settings.themeId);
   useEffect(() => {
     applyTheme(theme, settings.accent);
@@ -93,7 +156,7 @@ export function CockpitView() {
   }, []);
   const toggleDash = useCallback(() => setDashOpen((o) => !o), []);
   // ⌘T opens the picker (a tab must always start in a chosen folder), same as ⌘O / the + button.
-  useKeybindings(dispatch, { onNewTab: () => setPickerOpen(true), onSplit: (down) => setPendingCreation(down ? { kind: "splitDown" } : { kind: "split" }), onToggleDashboard: toggleDash, onOpenProject: () => setPickerOpen(true), onOpenWorkspaces: () => setWsOpen(true), onOpenSettings: () => setSettingsOpen(true), onToggleBell: () => setBellOpen((o) => !o), onToggleCanvas: toggleCanvas });
+  useKeybindings(dispatch, { onNewTab: () => setPickerOpen(true), onSplit: (down) => setPendingCreation(down ? { kind: "splitDown" } : { kind: "split" }), onToggleDashboard: toggleDash, onOpenProject: () => setPickerOpen(true), onOpenWorkspaces: () => setWsOpen(true), onOpenSettings: () => setSettingsOpen(true), onToggleBell: () => setBellOpen((o) => !o), onClose: () => requestClosePane(layout.focusedPaneId), onToggleCanvas: toggleCanvas });
 
   // Auto-restore: persist the layout (with session ids) shortly after each change.
   useEffect(() => {
@@ -129,7 +192,14 @@ export function CockpitView() {
   useEffect(() => {
     const now = livePaneIds(layout);
     for (const id of prevIds.current) {
-      if (!now.has(id)) { void killPty(id); void stopLogtail(id); slotCbs.current.delete(id); releaseTerminal(id); }
+      if (!now.has(id)) {
+        void killPty(id); void stopLogtail(id); slotCbs.current.delete(id); releaseTerminal(id);
+        const b = pendingBurrowPurge.current.get(id);
+        if (b) {
+          pendingBurrowPurge.current.delete(id);
+          void removeBurrow(b.path, b.branch, true).catch((e) => console.error("[cockpit] burrow removal failed", e));
+        }
+      }
     }
     prevIds.current = now;
   }, [layout]);
@@ -198,7 +268,7 @@ export function CockpitView() {
         onNewTab={() => setPickerOpen(true)}
         onReorder={(tabId, toIndex) => dispatch({ type: "moveTab", tabId, toIndex })}
         onRenameTab={(tabId, title) => dispatch({ type: "renameTab", tabId, title })}
-        onCloseTab={(tabId) => dispatch({ type: "closeTab", tabId })}
+        onCloseTab={(tabId) => requestCloseTab(tabId)}
         onOpenDashboard={() => setDashOpen(true)}
         onOpenPicker={() => setPickerOpen(true)}
         onOpenWorkspaces={() => setWsOpen(true)}
@@ -213,7 +283,7 @@ export function CockpitView() {
             onSelect={selectTab}
             onReorder={(tabId, toIndex) => dispatch({ type: "moveTab", tabId, toIndex })}
             onRenameTab={(tabId, title) => dispatch({ type: "renameTab", tabId, title })}
-            onCloseTab={(tabId) => dispatch({ type: "closeTab", tabId })}
+            onCloseTab={(tabId) => requestCloseTab(tabId)}
           />
         )}
         <div style={{ position: "relative", flex: 1, minWidth: 0, minHeight: 0 }}>
@@ -262,7 +332,7 @@ export function CockpitView() {
           )}
         </div>
       </div>
-      <PaneHost layout={layout} slots={slots} dispatch={dispatch} />
+      <PaneHost layout={layout} slots={slots} dispatch={dispatch} onRequestClose={requestClosePane} />
       <Juice layout={layout} onAttention={addAttention} />
       <ToastHost onJump={(c) => jumpToSession(c.sessionId)} />
       {dashOpen && (
@@ -301,10 +371,22 @@ export function CockpitView() {
         <ProviderPicker
           context={pendingCreation}
           onCancel={() => setPendingCreation(null)}
-          onPick={(provider) => {
-            if (pendingCreation.kind === "newTab") dispatch({ type: "newTab", cwd: pendingCreation.cwd, provider });
-            else dispatch({ type: pendingCreation.kind, provider });
+          onPick={async (provider) => {
+            const pc = pendingCreation;
             setPendingCreation(null);
+            if (!pc) return;
+            // A z.ai pane launches via the `claude --glm` wrapper, which sources its creds
+            // from ~/.claude/glm.env — no Cockpit-side token gate needed (the monitor token
+            // in Settings is only for the usage gauge, a separate credential).
+            if (pc.kind === "newTab") {
+              const burrow = await maybeBurrow(pc.cwd);
+              dispatch({ type: "newTab", cwd: pc.cwd, provider, burrow });
+            } else {
+              // split / splitDown: cut a fresh Burrow off the default branch, located via
+              // the focused pane's cwd (which itself may be a Burrow — create_burrow resolves it).
+              const burrow = await maybeBurrow(focusedPaneCwd());
+              dispatch({ type: pc.kind, provider, burrow });
+            }
           }}
         />
       )}
@@ -328,6 +410,14 @@ export function CockpitView() {
           update={update}
           currentVersion={appVersion}
           onClose={() => setUpdate(null)}
+        />
+      )}
+      {closingBurrows && (
+        <BurrowCloseDialog
+          burrows={closingBurrows.burrows}
+          onDelete={() => { closingBurrows.onConfirmDelete(); setClosingBurrows(null); }}
+          onKeep={() => { closingBurrows.onConfirmKeep(); setClosingBurrows(null); }}
+          onCancel={() => setClosingBurrows(null)}
         />
       )}
     </div>

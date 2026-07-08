@@ -169,6 +169,49 @@ describe("paneLayout (rows model)", () => {
     expect(panes[1].handoffFromSessionId).toBe(fromSessionId);
     expect(l.focusedPaneId).toBe(panes[1].id);
   });
+
+  it("openClaudeHandoff targets z.ai when provider is zai", () => {
+    let l = initLayout(CWD);
+    const source = l.focusedPaneId;
+    l = reduce(l, {
+      type: "openClaudeHandoff",
+      sourcePaneId: source,
+      cwd: CWD,
+      promptPath: "/tmp/handoff.md",
+      title: "port the parser",
+      provider: "zai",
+    });
+    const panes = l.tabs[0].rows[0].panes;
+    expect(panes.length).toBe(2);
+    expect(panes[1].provider).toBe("zai");
+    expect(panes[1].claudePromptPath).toBe("/tmp/handoff.md");
+    expect(panes[1].title).toBe("zai: port the parser");
+    expect(l.focusedPaneId).toBe(panes[1].id);
+  });
+
+  it("openClaudeHandoff defaults to a claude pane when no provider given", () => {
+    let l = initLayout(CWD);
+    const source = l.focusedPaneId;
+    l = reduce(l, { type: "openClaudeHandoff", sourcePaneId: source, cwd: CWD, promptPath: "/tmp/h.md" });
+    const panes = l.tabs[0].rows[0].panes;
+    expect(panes[1].provider).toBe("claude");
+  });
+
+  it("setProvider flips a pane's provider in place, keeping session + toggles", () => {
+    let l = initLayout(CWD);
+    const paneId = l.focusedPaneId;
+    l = reduce(l, { type: "setHeadroom", paneId, on: true });
+    const before = l.tabs[0].rows[0].panes[0];
+    l = reduce(l, { type: "setProvider", paneId, provider: "zai" });
+    const after = l.tabs[0].rows[0].panes[0];
+    expect(after.id).toBe(before.id);
+    expect(after.sessionId).toBe(before.sessionId);
+    expect(after.provider).toBe("zai");
+    expect(after.headroom).toBe(true); // preserved so switching back to Claude restores it
+    // and back again
+    l = reduce(l, { type: "setProvider", paneId, provider: "claude" });
+    expect(l.tabs[0].rows[0].panes[0].provider).toBe("claude");
+  });
 });
 
 describe("sessionId", () => {
@@ -429,5 +472,40 @@ describe("provider switching", () => {
     const saved = serializeLayout(l, true);
     expect(saved.tabs[0].rows[0].panes[0].provider).toBe("zai");
     expect(deserializeLayout(saved).tabs[0].rows[0].panes[0].provider).toBe("zai");
+  });
+});
+
+import type { BurrowInfo } from "./paneLayout";
+
+const BURROW: BurrowInfo = { path: "/repo/.worktrees/otter", branch: "otter", codename: "otter", emoji: "🦦" };
+
+describe("burrow panes", () => {
+  it("newTab with a burrow spawns in the worktree path and titles as emoji+codename", () => {
+    const l = reduce(initLayout("/repo"), { type: "newTab", cwd: "/repo", provider: "claude", burrow: BURROW });
+    const pane = l.tabs[l.tabs.length - 1].rows[0].panes[0];
+    expect(pane.cwd).toBe("/repo/.worktrees/otter");
+    expect(pane.title).toBe("🦦 otter");
+    expect(pane.autoTitle).toBe(false);
+    expect(pane.isBurrow).toBe(true);
+    expect(pane.burrowBranch).toBe("otter");
+  });
+
+  it("split with a burrow ignores the inherited cwd and uses the worktree", () => {
+    const base = initLayout("/repo/.worktrees/panda");
+    const l = reduce(base, { type: "split", provider: "claude", burrow: BURROW });
+    const pane = l.tabs[0].rows[0].panes.find((p) => p.id === l.focusedPaneId)!;
+    expect(pane.cwd).toBe("/repo/.worktrees/otter");
+    expect(pane.isBurrow).toBe(true);
+  });
+
+  it("serialize→deserialize round-trips burrow fields", () => {
+    const l = reduce(initLayout("/repo"), { type: "newTab", cwd: "/repo", burrow: BURROW });
+    const back = deserializeLayout(serializeLayout(l, true));
+    const pane = back.tabs[back.tabs.length - 1].rows[0].panes[0];
+    expect(pane.isBurrow).toBe(true);
+    expect(pane.codename).toBe("otter");
+    expect(pane.emoji).toBe("🦦");
+    expect(pane.burrowBranch).toBe("otter");
+    expect(pane.title).toBe("🦦 otter");
   });
 });

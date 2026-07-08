@@ -113,11 +113,11 @@ export function PaneHeader({ paneId, title, repo, state, waitLabel, headroom, po
                 className={`pane-head__provider-item provider-${p.id}${p.id === provider ? " is-sel" : ""}`}
                 role="menuitemradio"
                 aria-checked={p.id === provider}
-                disabled={!p.enabled}
+                disabled={!p.enabled || p.id === provider}
                 onClick={() => {
-                  if (!p.enabled) return;
+                  if (!p.enabled || p.id === provider) return;
                   setProviderOpen(false);
-                  if (p.id !== provider) onSelectProvider(p.id);
+                  onSelectProvider(p.id);
                 }}
               >
                 <span className="pane-head__provider-item-mark"><ProviderIcon id={p.id} /></span>

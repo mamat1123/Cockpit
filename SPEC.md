@@ -32,7 +32,9 @@ rendered to feel satisfying. "Game-like" = aesthetic JUICE, not game mechanics (
 - Budget alerts / caps per project.
 
 ## Out of scope (v1)
-- Task orchestration / worktree batch dispatch.  [ADR 0001]
+- Task orchestration / worktree *batch dispatch* (fire-and-forget).  [ADR 0001]
+  (NB: per-Session **Burrow** isolation — interactive Sessions in their own git worktree —
+  is a distinct, in-scope feature; see [ADR 0011]. It is not batch orchestration.)
 - Any scoring / combo game system.  [ADR 0002]
 - Non-Claude CLI agents (Claude Code only).
 

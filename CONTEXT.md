@@ -23,6 +23,17 @@ _Avoid_: window, split
 A codebase / working directory that Sessions attach to and that cost is attributed to.
 _Avoid_: repo (when grouping cost)
 
+**Burrow**:
+An isolated git worktree on its own branch where a Session works, giving each Session a private
+working copy of a [[Project]]. Created off the Project's default branch and identified by a
+[[Codename]]. Lives at `<project>/.worktrees/<codename>`.
+_Avoid_: worktree (that's the git mechanism — the domain term is Burrow), sandbox, workspace
+
+**Codename**:
+The animal name (e.g. `otter`, `panda`) that identifies a [[Burrow]] — it names the Burrow's
+branch, its directory, and, by default, its Session's [[Pane]] title. Unique within a Project.
+_Avoid_: alias, nickname, tag, handle
+
 **Juice**:
 Satisfying visual/audio feedback layered on ordinary actions (sending a prompt, Claude
 finishing a turn). The app's "game feel" IS juice — not gameplay.

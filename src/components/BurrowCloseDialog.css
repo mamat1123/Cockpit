@@ -1,0 +1,29 @@
+.burrow-close { position: fixed; inset: 0; z-index: 70; background: rgba(8, 9, 12, 0.6); backdrop-filter: blur(3px);
+  display: flex; justify-content: center; align-items: center; animation: burrow-close-in 0.12s ease; }
+@keyframes burrow-close-in { from { opacity: 0; } to { opacity: 1; } }
+
+.burrow-close__panel { width: min(440px, 92vw); max-height: 86vh; overflow-y: auto; background: var(--ck-bg);
+  border: 1px solid var(--ck-surface-2); border-radius: 14px; box-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.6);
+  font-family: ui-monospace, Menlo, monospace; }
+
+.burrow-close__head { padding: 16px 18px; border-bottom: 1px solid var(--ck-border); background: var(--ck-bg); }
+.burrow-close__head h3 { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.04em; color: var(--ck-bright); }
+
+.burrow-close__body { display: flex; flex-direction: column; gap: 10px; padding: 16px 18px; }
+.burrow-close__hint { margin: 0; font-size: 12px; line-height: 1.5; color: var(--ck-muted); }
+
+.burrow-close__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px;
+  max-height: 30vh; overflow-y: auto; }
+.burrow-close__item { font-size: 12px; color: var(--ck-text); background: var(--ck-surface);
+  border: 1px solid var(--ck-border); border-radius: 8px; padding: 8px 10px; }
+.burrow-close__item code { color: var(--ck-accent); font-weight: 700; }
+.burrow-close__path { color: var(--ck-dim); word-break: break-all; }
+
+.burrow-close__actions { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 18px; border-top: 1px solid var(--ck-border); }
+.burrow-close__btn { font-family: inherit; font-size: 12px; font-weight: 600; padding: 8px 16px; border-radius: 8px; cursor: pointer;
+  background: var(--ck-surface-2); color: var(--ck-text); border: 1px solid var(--ck-border);
+  transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease; }
+.burrow-close__btn:hover { border-color: var(--ck-dim); }
+.burrow-close__btn:focus-visible { outline: 2px solid var(--ck-accent); outline-offset: 2px; }
+.burrow-close__btn--danger { background: var(--ck-red); color: #fff; border-color: var(--ck-red); }
+.burrow-close__btn--danger:hover { box-shadow: 0 0 12px -3px var(--ck-red); border-color: var(--ck-red); }

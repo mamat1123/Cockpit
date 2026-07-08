@@ -29,10 +29,12 @@ export function dragHasFiles(dt: DataTransfer | null): boolean {
   return !!dt && Array.from(dt.types).includes("Files");
 }
 
-const IMAGE_EXT = /\.(png|jpe?g|gif|webp|bmp|svg|heic|tiff?|avif)$/i;
-
-/** Keep only image files — the drop-to-claude flow is for screenshots/images,
- *  for which a temp copy is semantically correct (claude just reads the pixels). */
-export function imageFiles(list: FileList): File[] {
-  return Array.from(list).filter((f) => f.type.startsWith("image/") || IMAGE_EXT.test(f.name));
+/** Every dropped file. We persist each to a temp path and insert that path into
+ *  the pane's PTY. claude renders an image path as an `[Image #N]` chip, and
+ *  inserts any other path (pdf, code, docs) as literal text it reads on submit —
+ *  so we no longer filter to images. A temp copy is fine for both: claude only
+ *  reads the file's content. (It is NOT the original repo file, so claude can't
+ *  edit it in place — that would need the real path via native drag-drop.) */
+export function droppableFiles(list: FileList): File[] {
+  return Array.from(list);
 }
