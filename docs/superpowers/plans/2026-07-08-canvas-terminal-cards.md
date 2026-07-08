@@ -709,3 +709,22 @@ git commit -m "feat(canvas): terminal cards — live interactive xterms on the c
 git add SPEC.md
 git commit -m "docs(canvas): SPEC status — M13b terminal cards"
 ```
+
+---
+
+## Post-review deltas (applied during execution)
+
+- **Task 2** (`27f2777`): `borrowTerminal` returns boolean + retry-loop contract — a card can
+  mount in the same commit that creates its pane (TerminalPane acquires one commit later via
+  the slots state round-trip), so a fire-once borrow goes permanently blank (cold start into
+  canvas mode; ⌘T/⌘D while in canvas). `returnTerminal` doc-notes the "pane-mutation UI is
+  unreachable from canvas" staleness invariant.
+- **Task 3** (`b99938f`): cards sync LAYOUT focus via a new required `onFocusPane` prop
+  (header click / snap dispatch focusTab+focusPane — without it ⌘W killed whichever pane
+  tabs mode last focused); native dblclick replaced by manual double-press detection
+  (< 350 ms, un-moved, same header) because setPointerCapture can retarget compat mouse
+  events away in WKWebView; cardRefCbs/cardEls pruned on pane close; root onScroll resets
+  scrollLeft/Top (caret-reveal on an offscreen focused textarea); borrow comment records the
+  TerminalPane-remount invariant.
+- **Deferred, accepted**: ctrl/⌘-wheel over a TUI with mouse-reporting (vim/htop) both zooms
+  the canvas and scrolls the TUI — claude panes unaffected; revisit only if it annoys.
