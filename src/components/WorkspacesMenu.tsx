@@ -5,16 +5,28 @@ import "./WorkspacesMenu.css";
 
 export function WorkspacesMenu({ onLoad, onSaveCurrent, onClose }: {
   onLoad: (saved: SavedLayout) => void;
-  onSaveCurrent: (name: string, keepSessions: boolean) => void;
+  onSaveCurrent: (name: string, keepSessions: boolean) => void | Promise<void>;
   onClose: () => void;
 }) {
   const [presets, setPresets] = useState<Record<string, SavedLayout>>({});
   const [name, setName] = useState("");
   const [keepSessions, setKeepSessions] = useState(false);
+  const [saving, setSaving] = useState(false);
   const refresh = () => setPresets(getPresets());
   useEffect(() => { refresh(); }, []);
   const names = Object.keys(presets).sort();
-  const save = () => { const n = name.trim(); if (!n) return; onSaveCurrent(n, keepSessions); setName(""); refresh(); };
+  const save = async () => {
+    const n = name.trim();
+    if (!n || saving) return;
+    setSaving(true);
+    try {
+      await onSaveCurrent(n, keepSessions);
+      setName("");
+      refresh();
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="ws" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -23,9 +35,9 @@ export function WorkspacesMenu({ onLoad, onSaveCurrent, onClose }: {
           <input
             className="ws__input" autoFocus placeholder="Save current layout as…" value={name}
             onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") save(); else if (e.key === "Escape") onClose(); }}
+            onKeyDown={(e) => { if (e.key === "Enter") void save(); else if (e.key === "Escape") onClose(); }}
           />
-          <button className="ws__savebtn" onClick={save} disabled={!name.trim()}>Save</button>
+          <button className="ws__savebtn" onClick={() => void save()} disabled={!name.trim() || saving}>Save</button>
         </div>
         <div className="ws__mode">
           <div className="ws__seg" role="radiogroup" aria-label="What to save">

@@ -18,7 +18,7 @@ import { SettingsMenu } from "./SettingsMenu";
 import { UpdateModal } from "./UpdateModal";
 import { BurrowCloseDialog, type BurrowToClose } from "./BurrowCloseDialog";
 import { killPty } from "../lib/ptyClient";
-import { stopLogtail } from "../lib/logClient";
+import { currentSessionId, stopLogtail } from "../lib/logClient";
 import { releaseTerminal, focusTerminal, setTerminalTheme, setTerminalFont } from "../lib/terminalRegistry";
 import { setWindowBlur } from "../lib/windowClient";
 import { checkForUpdate, type Update } from "../lib/updateClient";
@@ -33,6 +33,7 @@ import { paneLastLineAt } from "../lib/terminalRegistry";
 import { deriveState } from "../lib/paneState";
 import { waitingPanes } from "../lib/waiting";
 import { startSavings } from "../lib/savingsStore";
+import { resolveLayoutSessionIds } from "../lib/layoutSessions";
 
 function livePaneIds(l: Layout): Set<string> {
   return new Set(l.tabs.flatMap((t) => t.rows.flatMap((r) => r.panes.map((p) => p.id))));
@@ -158,11 +159,22 @@ export function CockpitView() {
   // ⌘T opens the picker (a tab must always start in a chosen folder), same as ⌘O / the + button.
   useKeybindings(dispatch, { onNewTab: () => setPickerOpen(true), onSplit: (down) => setPendingCreation(down ? { kind: "splitDown" } : { kind: "split" }), onToggleDashboard: toggleDash, onOpenProject: () => setPickerOpen(true), onOpenWorkspaces: () => setWsOpen(true), onOpenSettings: () => setSettingsOpen(true), onToggleBell: () => setBellOpen((o) => !o), onClose: () => requestClosePane(layout.focusedPaneId), onToggleCanvas: toggleCanvas });
 
-  // Auto-restore: persist the layout (with session ids) shortly after each change.
-  useEffect(() => {
-    const id = setTimeout(() => saveLast(serializeLayout(layout, true)), 600);
-    return () => clearTimeout(id);
+  const serializeCurrentLayout = useCallback(async (keepSessions: boolean) => {
+    const resolved = keepSessions ? await resolveLayoutSessionIds(layout, currentSessionId) : layout;
+    return serializeLayout(resolved, keepSessions);
   }, [layout]);
+
+  // Auto-restore: persist the layout (with session ids) shortly after each change.
+  const autoSaveSeq = useRef(0);
+  useEffect(() => {
+    const seq = ++autoSaveSeq.current;
+    const id = setTimeout(() => {
+      void serializeCurrentLayout(true).then((saved) => {
+        if (autoSaveSeq.current === seq) saveLast(saved);
+      });
+    }, 600);
+    return () => clearTimeout(id);
+  }, [serializeCurrentLayout]);
 
   const [slots, setSlots] = useState<Record<string, HTMLElement>>({});
   // `registerSlot(paneId)` returns a STABLE ref callback (cached per pane). A fresh
@@ -394,7 +406,7 @@ export function CockpitView() {
         <WorkspacesMenu
           onClose={() => setWsOpen(false)}
           onLoad={(saved) => { dispatch({ type: "loadLayout", saved }); setWsOpen(false); }}
-          onSaveCurrent={(name, keepSessions) => savePreset(name, serializeLayout(layout, keepSessions))}
+          onSaveCurrent={async (name, keepSessions) => savePreset(name, await serializeCurrentLayout(keepSessions))}
         />
       )}
       {settingsOpen && (

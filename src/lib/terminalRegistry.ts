@@ -3,7 +3,7 @@ import type { ITheme } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import { spawnPty, writePty, resizePty, killPty, onPtyOutput, onPtyExit } from "./ptyClient";
-import { startLogtail, sessionExists } from "./logClient";
+import { currentSessionId, startLogtail, sessionExists } from "./logClient";
 import { emitSend } from "./juiceBus";
 import { type Theme, themeById, DEFAULT_THEME_ID } from "./themes";
 import { waitingPanes } from "./waiting";
@@ -108,8 +108,8 @@ function shellQuote(s: string): string {
 /** Build + run the launch command for a Claude pane. Resolves HR routing (when on) and merges
  *  the HR + ponytail env via paneLaunchEnv (PONYTAIL_DEFAULT_MODE is always set, incl.
  *  "off", so Cockpit's per-pane level is authoritative). Resumes if the session log
- *  exists. Returns whether Headroom routing actually engaged (false = direct / proxy down,
- *  which falls back to direct so the pane is never stuck).
+ *  exists. Returns the session id actually used plus whether Headroom routing engaged
+ *  (false = direct / proxy down, which falls back to direct so the pane is never stuck).
  *
  *  `glm` launches through the user's `claude --glm` zsh wrapper — the claude binary on the
  *  GLM (z.ai) backend, configured in ~/.claude/glm.env. The wrapper adds
@@ -118,11 +118,33 @@ function shellQuote(s: string): string {
  *
  *  `promptPath` (a Codex→Claude handoff) seeds the first turn: its file is cat'd into the
  *  launch as the opening prompt when NOT resuming. */
-async function launchClaude(paneId: string, cwd: string, sessionId: string, resume: boolean, promptPath: string | undefined, opts: { headroom: boolean; ponytail: PonytailLevel; glm?: boolean }, cols: number, rows: number): Promise<boolean> {
+interface LaunchResult {
+  engaged: boolean;
+  sessionId: string;
+}
+
+async function resolveResumeSessionId(cwd: string, sessionId: string, resume: boolean): Promise<string> {
+  if (!resume) return sessionId;
+  try { return (await currentSessionId(cwd, sessionId)) ?? sessionId; } catch { return sessionId; }
+}
+
+function startResolvedLogtail(paneId: string, cwd: string, sessionId: string, entry: TermEntry): void {
+  entry.logtailSessionId = sessionId;
+  entry.logtailCwd = cwd;
+  void resolveResumeSessionId(cwd, sessionId, true).then((resolvedSessionId) => {
+    if (registry.get(paneId) !== entry) return;
+    if (entry.logtailSessionId !== sessionId || entry.logtailCwd !== cwd) return;
+    entry.logtailSessionId = resolvedSessionId;
+    void startLogtail(paneId, cwd, resolvedSessionId);
+  });
+}
+
+async function launchClaude(paneId: string, cwd: string, sessionId: string, resume: boolean, promptPath: string | undefined, opts: { headroom: boolean; ponytail: PonytailLevel; glm?: boolean }, cols: number, rows: number): Promise<LaunchResult> {
+  const launchSessionId = await resolveResumeSessionId(cwd, sessionId, resume);
   const bin = opts.glm ? "claude --glm" : "claude --dangerously-skip-permissions";
-  let launch = `${bin} --session-id ${sessionId}`;
+  let launch = `${bin} --session-id ${launchSessionId}`;
   if (resume) {
-    try { if (await sessionExists(cwd, sessionId)) launch = `${bin} --resume ${sessionId}`; } catch { /* not under tauri */ }
+    try { if (await sessionExists(cwd, launchSessionId)) launch = `${bin} --resume ${launchSessionId}`; } catch { /* not under tauri */ }
   } else if (promptPath) {
     launch = `${launch} "$(cat ${shellQuote(promptPath)})"`;
   }
@@ -131,16 +153,16 @@ async function launchClaude(paneId: string, cwd: string, sessionId: string, resu
     : await resolveHeadroomRouting(opts.headroom, headroomEnsure, HEADROOM_BASE_URL);
   const env = paneLaunchEnv({ headroomEngaged: engaged, ponytail: opts.ponytail, headroomBaseUrl: HEADROOM_BASE_URL });
   void spawnPty(paneId, cwd, cols, rows, launch, env);
-  return engaged;
+  return { engaged, sessionId: launchSessionId };
 }
 
-async function launchCodex(paneId: string, cwd: string, promptPath: string | undefined, cols: number, rows: number): Promise<boolean> {
+async function launchCodex(paneId: string, cwd: string, promptPath: string | undefined, cols: number, rows: number): Promise<LaunchResult> {
   const flags = "--dangerously-bypass-approvals-and-sandbox";
   const launch = promptPath
     ? `codex ${flags} --cd ${shellQuote(cwd)} "$(cat ${shellQuote(promptPath)})"`
     : `codex ${flags} --cd ${shellQuote(cwd)}`;
   await spawnPty(paneId, cwd, cols, rows, launch, null);
-  return false;
+  return { engaged: false, sessionId: "" };
 }
 
 async function launchAgent(
@@ -151,7 +173,7 @@ async function launchAgent(
   opts: { provider: AgentProvider; headroom: boolean; ponytail: PonytailLevel; codexPromptPath?: string; claudePromptPath?: string },
   cols: number,
   rows: number,
-): Promise<boolean> {
+): Promise<LaunchResult> {
   if (opts.provider === "codex") return launchCodex(paneId, cwd, opts.codexPromptPath, cols, rows);
   return launchClaude(paneId, cwd, sessionId, resume, opts.claudePromptPath, { headroom: opts.headroom, ponytail: opts.ponytail, glm: opts.provider === "zai" }, cols, rows);
 }
@@ -162,9 +184,7 @@ export function acquireTerminal(paneId: string, cwd: string, sessionId: string, 
   const existing = registry.get(paneId);
   if (existing) {
     if (opts.provider !== "codex" && (existing.logtailSessionId !== sessionId || existing.logtailCwd !== cwd)) {
-      existing.logtailSessionId = sessionId;
-      existing.logtailCwd = cwd;
-      void startLogtail(paneId, cwd, sessionId);
+      startResolvedLogtail(paneId, cwd, sessionId, existing);
     }
     return existing;
   }
@@ -218,12 +238,6 @@ export function acquireTerminal(paneId: string, cwd: string, sessionId: string, 
     void writePty(paneId, data);
   });
 
-  void launchAgent(paneId, cwd, sessionId, resume, opts, term.cols, term.rows)
-    .then((engaged) => { if (engaged) routed.add(paneId); else routed.delete(paneId); });
-  // z.ai panes run the claude binary, so their session jsonl feeds the same logtail
-  // (auto-title, waiting detection, notifications). Only codex has no claude log.
-  if (opts.provider !== "codex") void startLogtail(paneId, cwd, sessionId);
-
   const entry: TermEntry = {
     term,
     hostEl,
@@ -232,10 +246,22 @@ export function acquireTerminal(paneId: string, cwd: string, sessionId: string, 
     lastLineAt,
     lastInputAt,
     lastResizeAt,
-    logtailSessionId: opts.provider !== "codex" ? sessionId : undefined,
-    logtailCwd: opts.provider !== "codex" ? cwd : undefined,
+    logtailSessionId: undefined,
+    logtailCwd: undefined,
   };
   registry.set(paneId, entry);
+  void launchAgent(paneId, cwd, sessionId, resume, opts, term.cols, term.rows)
+    .then(({ engaged, sessionId: launchedSessionId }) => {
+      if (registry.get(paneId) !== entry) return;
+      if (engaged) routed.add(paneId); else routed.delete(paneId);
+      // z.ai panes run the claude binary, so their session jsonl feeds the same logtail
+      // (auto-title, waiting detection, notifications). Only codex has no claude log.
+      if (opts.provider !== "codex" && launchedSessionId) {
+        entry.logtailSessionId = launchedSessionId;
+        entry.logtailCwd = cwd;
+        void startLogtail(paneId, cwd, launchedSessionId);
+      }
+    });
   return entry;
 }
 
@@ -359,8 +385,11 @@ export async function setPaneHeadroom(paneId: string, cwd: string, sessionId: st
   if (!e) return false;
   await killPty(paneId);
   e.term.write("\r\n[switching Headroom routing…]\r\n");
-  const engaged = await launchClaude(paneId, cwd, sessionId, true, undefined, { headroom: on, ponytail }, e.term.cols, e.term.rows);
+  const { engaged, sessionId: launchedSessionId } = await launchClaude(paneId, cwd, sessionId, true, undefined, { headroom: on, ponytail }, e.term.cols, e.term.rows);
   if (engaged) routed.add(paneId); else routed.delete(paneId);
+  e.logtailSessionId = launchedSessionId;
+  e.logtailCwd = cwd;
+  void startLogtail(paneId, cwd, launchedSessionId);
   if (on && !engaged) e.term.write("[Headroom proxy unavailable — staying on direct]\r\n");
   return engaged;
 }
@@ -375,8 +404,11 @@ export async function setPanePonytail(paneId: string, cwd: string, sessionId: st
   if (!e) return;
   await killPty(paneId);
   e.term.write(`\r\n[switching ponytail → ${level}…]\r\n`);
-  const engaged = await launchClaude(paneId, cwd, sessionId, true, undefined, { headroom, ponytail: level, glm: provider === "zai" }, e.term.cols, e.term.rows);
+  const { engaged, sessionId: launchedSessionId } = await launchClaude(paneId, cwd, sessionId, true, undefined, { headroom, ponytail: level, glm: provider === "zai" }, e.term.cols, e.term.rows);
   if (engaged) routed.add(paneId); else routed.delete(paneId);
+  e.logtailSessionId = launchedSessionId;
+  e.logtailCwd = cwd;
+  void startLogtail(paneId, cwd, launchedSessionId);
 }
 
 /** Switch a LIVE pane between the Anthropic and GLM (z.ai) claude backends: kill its claude
@@ -388,6 +420,9 @@ export async function setPaneProvider(paneId: string, cwd: string, sessionId: st
   if (!e) return;
   await killPty(paneId);
   e.term.write(`\r\n[switching provider → ${provider}…]\r\n`);
-  const engaged = await launchClaude(paneId, cwd, sessionId, true, undefined, { headroom, ponytail, glm: provider === "zai" }, e.term.cols, e.term.rows);
+  const { engaged, sessionId: launchedSessionId } = await launchClaude(paneId, cwd, sessionId, true, undefined, { headroom, ponytail, glm: provider === "zai" }, e.term.cols, e.term.rows);
   if (engaged) routed.add(paneId); else routed.delete(paneId);
+  e.logtailSessionId = launchedSessionId;
+  e.logtailCwd = cwd;
+  void startLogtail(paneId, cwd, launchedSessionId);
 }
