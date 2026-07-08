@@ -146,3 +146,13 @@ rendered to feel satisfying. "Game-like" = aesthetic JUICE, not game mechanics (
 - **M13b (next, user-requested after first use)**: real interactive terminals ON the canvas
   cards (replacing the activity-log body) — user explicitly accepted the trade-offs
   (blur at zoom ≠ 100%, PTY resize on mode flip, heavier rendering).
+- **M13b — Canvas terminal cards**: cards are now real interactive terminals (640×420):
+  the live xterm host node is borrowed into the card and returned on exit (pop-out
+  appendChild mechanism; session/PTY untouched; retry-per-frame borrow covers the
+  same-commit mount race). Drag by header; header click focuses AND syncs layout focus
+  (⌘W targets the clicked card); double-click header (manual double-press detection —
+  WKWebView-safe) snaps to 100 % centered; ↗ opens in Tabs; wheel over a terminal
+  scrolls scrollback (pinch/⌘ still zooms). Activity-log card body removed (feed
+  retained for future LOD). GUI-verified by the user (typing, ⌘W focus, snap, wheel
+  routing, mode round-trips, new-pane-in-canvas, no-lag).
+  Spec: docs/superpowers/specs/2026-07-08-canvas-terminal-cards-design.md.
