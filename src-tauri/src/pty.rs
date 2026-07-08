@@ -215,10 +215,22 @@ pub fn pty_kill(mgr: State<PtyManager>, pane_id: String) {
     // Explicitly kill the child — dropping the session does NOT kill it
     // (portable-pty leaves it running on macOS), which otherwise orphans claude
     // and breaks resume-after-respawn via a --session-id collision. kill() returns
-    // immediately; reap in a detached thread so a slow-exiting child can't block
-    // this command (a synchronous wait() here would hang the toggle).
-    if let Some(mut sess) = mgr.0.lock().unwrap().remove(&pane_id) {
-        let _ = sess.child.kill();
-        std::thread::spawn(move || { let _ = sess.child.wait(); });
+    // immediately; wait briefly for the child to actually exit before the frontend
+    // relaunches the pane with the same session id. Without this bounded wait, a
+    // provider/headroom/ponytail restart can race the old claude process and Claude
+    // may fork to a fresh session, leaving Cockpit's pane session id pointing at the
+    // previous transcript.
+    if let Some(sess) = mgr.0.lock().unwrap().remove(&pane_id) {
+        let PtySession { master, writer, mut child } = sess;
+        let _ = child.kill();
+        drop(writer);
+        drop(master);
+
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = child.wait();
+            let _ = tx.send(());
+        });
+        let _ = rx.recv_timeout(std::time::Duration::from_millis(2_000));
     }
 }
